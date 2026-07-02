@@ -8,21 +8,14 @@
         MinWidth="660" MinHeight="420"
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaChromeHints="PreferSystemChrome"
-        ExtendClientAreaTitleBarHeightHint="-1">
+        ExtendClientAreaTitleBarHeightHint="-1"
+        DragDrop.AllowDrop="True">
   <DockPanel>
     <Border DockPanel.Dock="Top" Padding="14,8,146,8" Name="HeaderBar" Background="Transparent">
       <DockPanel>
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
           <Button Classes="icon" Name="ThemeButton" Click="OnThemeClick" ToolTip.Tip="Theme: auto">
             <TextBlock Classes="glyph" Text="&#xE793;" Opacity="0.6" />
-          </Button>
-          <Button Content="Add tunnel">
-            <Button.Flyout>
-              <MenuFlyout>
-                <MenuItem Header="Import .conf file…" Command="{Binding ImportFileCommand}" />
-                <MenuItem Header="Paste config…" Command="{Binding PasteConfigCommand}" />
-              </MenuFlyout>
-            </Button.Flyout>
           </Button>
         </StackPanel>
         <StackPanel Orientation="Horizontal" Spacing="10">
@@ -66,7 +59,7 @@
         </ItemsControl>
         <TextBlock Classes="muted" Margin="2,6" TextWrapping="Wrap"
                    IsVisible="{Binding !Tunnels.Count}"
-                   Text="No tunnels yet. Use 'Add tunnel' to import a WireGuard .conf file or paste a config. Domains you attach to a peer resolve through that peer's DNS while connected; everything else keeps using your normal system DNS." />
+                   Text="No tunnels yet. Drop a WireGuard .conf file anywhere in this window, or copy a config and press Ctrl+V. Domains you attach to a peer resolve through that peer's DNS while connected; everything else keeps using your normal system DNS." />
       </StackPanel>
     </ScrollViewer>
   </DockPanel>

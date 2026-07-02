@@ -8,8 +8,6 @@ namespace WgSplitDns.ViewModels;
 public interface IDialogs
 {
     Task<bool> ConfirmAsync(string title, string message);
-    Task<string?> PickConfFileAsync();
-    Task<string?> PasteConfigAsync();
     Task CopyToClipboardAsync(string text);
 }
 
@@ -33,8 +31,6 @@ public class MainViewModel : ObservableObject, ITunnelHost
     public MainViewModel(IDialogs dialogs)
     {
         _dialogs = dialogs;
-        ImportFileCommand = new RelayCommand(() => _ = ImportFileAsync());
-        PasteConfigCommand = new RelayCommand(() => _ = PasteConfigAsync());
         TestCommand = new RelayCommand(() => _ = RunTestAsync(), () => !string.IsNullOrWhiteSpace(TestHost));
         _tunnels.StatsUpdated += (name, stats) => Dispatcher.UIThread.Post(() =>
             Tunnels.FirstOrDefault(t => !t.IsExternal && t.Name == name)?.ApplyStats(stats));
@@ -61,8 +57,6 @@ public class MainViewModel : ObservableObject, ITunnelHost
     bool _testOk;
     public bool TestOk { get => _testOk; set => Set(ref _testOk, value); }
 
-    public RelayCommand ImportFileCommand { get; }
-    public RelayCommand PasteConfigCommand { get; }
     public RelayCommand TestCommand { get; }
 
     public async Task InitializeAsync()
@@ -222,45 +216,6 @@ public class MainViewModel : ObservableObject, ITunnelHost
         }
     }
 
-    // ---- live domain edits (view mode) -------------------------------------
-
-    public void DomainAdded(TunnelViewModel tunnel, PeerViewModel peer, string domain)
-    {
-        SyncPeerDomains(tunnel, peer);
-        _store.Save(_config);
-        RebuildTestTargets();
-        if (tunnel.IsConnected && peer.HasDns)
-        {
-            var (name, key) = RuleKeyFor(tunnel, peer);
-            _ = Task.Run(() => _nrpt.ApplyDomain(name, key, domain, peer.Dns.Trim()));
-        }
-    }
-
-    public void DomainRemoved(TunnelViewModel tunnel, PeerViewModel peer, string domain)
-    {
-        SyncPeerDomains(tunnel, peer);
-        _store.Save(_config);
-        RebuildTestTargets();
-        var (name, key) = RuleKeyFor(tunnel, peer);
-        _ = Task.Run(() => _nrpt.RemoveDomain(name, key, domain));
-    }
-
-    static (string Name, string Key) RuleKeyFor(TunnelViewModel tunnel, PeerViewModel peer) =>
-        tunnel.IsExternal ? (ExtName(tunnel.Name), tunnel.Name) : (tunnel.Name, peer.PublicKey);
-
-    void SyncPeerDomains(TunnelViewModel tunnel, PeerViewModel peer)
-    {
-        if (tunnel.IsExternal)
-        {
-            tunnel.External!.Domains = peer.Domains.ToList();
-        }
-        else
-        {
-            var cfg = tunnel.Config!.Peers.FirstOrDefault(p => p.PublicKey == peer.PublicKey);
-            if (cfg is not null) cfg.Domains = peer.Domains.ToList();
-        }
-    }
-
     public bool IsDomainInUse(string domain, PeerViewModel except) =>
         Tunnels.SelectMany(t => t.Peers)
             .Where(p => !ReferenceEquals(p, except))
@@ -269,7 +224,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
 
     // ---- edit/save/delete ---------------------------------------------------
 
-    public void TunnelSaved(TunnelViewModel vm)
+    public void TunnelSaved(TunnelViewModel vm, bool connectionChanged)
     {
         _store.Save(_config);
         RefreshPins();
@@ -282,12 +237,12 @@ public class MainViewModel : ObservableObject, ITunnelHost
             }
             else if (vm.IsConnected)
             {
-                // Connection fields may have changed: quick reapply (sub-second blip).
+                // DNS/domain-only edits refresh NRPT in place; connection edits need a quick reconnect.
                 foreach (var p in vm.Config!.Peers) _nrpt.RemovePeerRules(vm.Name, p.PublicKey);
-                _tunnels.Disconnect(vm.Name);
+                if (connectionChanged) _tunnels.Disconnect(vm.Name);
                 try
                 {
-                    _tunnels.Connect(vm.Config);
+                    if (connectionChanged) _tunnels.Connect(vm.Config);
                     foreach (var p in vm.Config.Peers.Where(p => p.Dns is not null && p.Domains.Count > 0))
                         _nrpt.ApplyPeerRules(vm.Name, p.PublicKey, p.Domains, p.Dns!);
                 }
@@ -325,21 +280,12 @@ public class MainViewModel : ObservableObject, ITunnelHost
 
     public void CopyText(string text) => _ = _dialogs.CopyToClipboardAsync(text);
 
-    // ---- add tunnel -----------------------------------------------------------
+    // ---- add tunnel (drag-drop or Ctrl+V) --------------------------------------
 
-    async Task ImportFileAsync()
-    {
-        var text = await _dialogs.PickConfFileAsync();
-        if (text is not null) AddTunnelFromText(text.Split('\0')[0], text.Contains('\0') ? text.Split('\0')[1] : null);
-    }
+    public static bool LooksLikeConfig(string? text) =>
+        text is not null && text.Contains("[Interface]", StringComparison.OrdinalIgnoreCase);
 
-    async Task PasteConfigAsync()
-    {
-        var text = await _dialogs.PasteConfigAsync();
-        if (text is not null) AddTunnelFromText(text, null);
-    }
-
-    void AddTunnelFromText(string text, string? suggestedName)
+    public void AddTunnelFromText(string text, string? suggestedName)
     {
         var parsed = WireGuardConf.Parse(text);
         if (!PeerViewModel.IsValidKey(parsed.PrivateKey))
@@ -356,6 +302,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
         {
             Name = name,
             PrivateKeyProtected = RuleStore.Protect(parsed.PrivateKey),
+            ListenPort = parsed.ListenPort,
             Addresses = parsed.Addresses.ToList(),
             Peers = parsed.Peers.Select(p => new PeerConfig
             {
@@ -371,6 +318,8 @@ public class MainViewModel : ObservableObject, ITunnelHost
         _store.Save(_config);
         Tunnels.Add(new TunnelViewModel(this, cfg));
         RebuildTestTargets();
+        TestResult = $"Tunnel '{name}' added";
+        TestOk = true;
     }
 
     // ---- externals -------------------------------------------------------------

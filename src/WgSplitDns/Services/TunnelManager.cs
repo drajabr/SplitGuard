@@ -58,7 +58,7 @@ public class TunnelManager : IDisposable
         var adapter = WireGuardAdapter.Create(config.Name);
         try
         {
-            adapter.SetConfiguration(privateKey, peers);
+            adapter.SetConfiguration(privateKey, config.ListenPort, peers);
             foreach (var addr in config.Addresses)
             {
                 if (WireGuardConf.TryParseCidr(addr, out var ip, out var prefix))

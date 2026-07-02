@@ -8,6 +8,7 @@ public class ParsedTunnel
 {
     public string? Name { get; set; }
     public string PrivateKey { get; set; } = "";
+    public ushort ListenPort { get; set; }
     public List<string> Addresses { get; } = new();
     public string? InterfaceDns { get; set; }
     public List<ParsedPeer> Peers { get; } = new();
@@ -55,6 +56,7 @@ public static class WireGuardConf
                 switch (key)
                 {
                     case "privatekey": result.PrivateKey = value; break;
+                    case "listenport": if (ushort.TryParse(value, out var lp)) result.ListenPort = lp; break;
                     case "address": result.Addresses.AddRange(SplitList(value)); break;
                     case "dns": result.InterfaceDns = SplitList(value).FirstOrDefault(); break;
                     default: result.Warnings.Add($"Ignored [Interface] {key}"); break;
@@ -123,6 +125,7 @@ public static class WireGuardConf
         var sb = new StringBuilder();
         sb.AppendLine("[Interface]");
         sb.AppendLine($"PrivateKey = {privateKey}");
+        if (t.ListenPort > 0) sb.AppendLine($"ListenPort = {t.ListenPort}");
         sb.AppendLine($"Address = {string.Join(", ", t.Addresses)}");
         foreach (var p in t.Peers)
         {

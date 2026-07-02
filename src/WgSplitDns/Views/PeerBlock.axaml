@@ -16,7 +16,7 @@
       </DockPanel>
       <Separator />
 
-      <Grid Margin="10,6" ColumnDefinitions="80,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
+      <Grid Margin="10,6" ColumnDefinitions="80,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
 
         <TextBlock Grid.Row="0" Grid.Column="0" Classes="lbl" Text="Endpoint" IsVisible="{Binding !IsExternal}" Margin="0,0,0,4" />
         <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" IsVisible="{Binding !IsExternal}" Margin="0,0,0,4">
@@ -37,8 +37,14 @@
           </ToggleButton>
         </StackPanel>
 
-        <TextBlock Grid.Row="3" Grid.Column="0" Classes="lbl" Text="Allowed IPs" IsVisible="{Binding !IsExternal}" Margin="0,0,0,4" />
-        <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" IsVisible="{Binding !IsExternal}" Margin="0,0,0,4">
+        <TextBlock Grid.Row="3" Grid.Column="0" Classes="lbl" Text="Keepalive" IsVisible="{Binding IsEditing}" Margin="0,0,0,4" />
+        <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsEditing}" Margin="0,0,0,4">
+          <TextBox Classes="mono" Width="70" Text="{Binding KeepaliveText}" Watermark="off" />
+          <TextBlock Classes="muted" Text="seconds" />
+        </StackPanel>
+
+        <TextBlock Grid.Row="4" Grid.Column="0" Classes="lbl" Text="Allowed IPs" IsVisible="{Binding !IsExternal}" Margin="0,0,0,4" />
+        <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" IsVisible="{Binding !IsExternal}" Margin="0,0,0,4">
           <ItemsControl ItemsSource="{Binding AllowedIps}">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
@@ -57,7 +63,7 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
-          <TextBox Classes="mono addbox" Classes.error="{Binding AllowedIpAddError}" Watermark="+ add"
+          <TextBox Classes="mono addbox" Classes.error="{Binding AllowedIpAddError}" Watermark="+"
                    Text="{Binding NewAllowedIp}" IsVisible="{Binding IsEditing}">
             <TextBox.KeyBindings>
               <KeyBinding Gesture="Enter" Command="{Binding AddAllowedIpCommand}" />
@@ -65,8 +71,8 @@
           </TextBox>
         </StackPanel>
 
-        <TextBlock Grid.Row="4" Grid.Column="0" Classes="lbl" Text="DNS" Margin="0,0,0,4" />
-        <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+        <TextBlock Grid.Row="5" Grid.Column="0" Classes="lbl" Text="DNS" Margin="0,0,0,4" />
+        <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
           <Border Classes="item" IsVisible="{Binding !IsEditing}">
             <TextBlock Classes="mono" Text="{Binding Dns}" />
           </Border>
@@ -78,8 +84,8 @@
           <TextBlock Classes="accent" Text="{Binding PinCaption}" IsVisible="{Binding !IsEditing}" />
         </StackPanel>
 
-        <TextBlock Grid.Row="5" Grid.Column="0" Classes="lbl" Text="Domains" />
-        <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal">
+        <TextBlock Grid.Row="6" Grid.Column="0" Classes="lbl" Text="Domains" />
+        <StackPanel Grid.Row="6" Grid.Column="1" Orientation="Horizontal">
           <ItemsControl ItemsSource="{Binding Domains}">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
@@ -89,7 +95,7 @@
                 <Border Classes="item" Margin="0,0,6,4">
                   <StackPanel Orientation="Horizontal" Spacing="6">
                     <TextBlock Classes="mono" Text="{Binding}" />
-                    <Button Classes="chipx"
+                    <Button Classes="chipx" IsVisible="{Binding $parent[UserControl].DataContext.IsEditing}"
                             Command="{Binding $parent[UserControl].DataContext.RemoveDomainCommand}" CommandParameter="{Binding}">
                       <TextBlock Classes="glyph" Text="&#xE711;" FontSize="9" Opacity="0.6" />
                     </Button>
@@ -98,8 +104,8 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
-          <TextBox Classes="mono addbox" Classes.error="{Binding DomainAddError}" Watermark="+ add"
-                   Text="{Binding NewDomain}">
+          <TextBox Classes="mono addbox" Classes.error="{Binding DomainAddError}" Watermark="+"
+                   Text="{Binding NewDomain}" IsVisible="{Binding IsEditing}">
             <TextBox.KeyBindings>
               <KeyBinding Gesture="Enter" Command="{Binding AddDomainCommand}" />
             </TextBox.KeyBindings>

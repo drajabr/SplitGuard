@@ -26,7 +26,7 @@ public partial class PeerViewModel : ObservableObject
         set { if (Set(ref _publicKey, value)) { Raise(nameof(KeyShort)); } }
     }
 
-    public string KeyShort => PublicKey.Length > 12 ? $"{PublicKey[..6]}…{PublicKey[^5..]}" : PublicKey;
+    public string KeyShort => PublicKey.Length > 12 ? $"{PublicKey[..5]}…{PublicKey[^5..]}" : PublicKey;
 
     string _presharedKey = "";
     public string PresharedKey { get => _presharedKey; set => Set(ref _presharedKey, value); }
@@ -47,7 +47,10 @@ public partial class PeerViewModel : ObservableObject
     public bool HasDns => !string.IsNullOrWhiteSpace(Dns);
     public bool PinEnabled => HasDns;
 
-    public ushort PersistentKeepalive { get; set; }
+    string _keepaliveText = "";
+    public string KeepaliveText { get => _keepaliveText; set => Set(ref _keepaliveText, value); }
+
+    public ushort ParsedKeepalive => ushort.TryParse(KeepaliveText.Trim(), out var v) ? v : (ushort)0;
 
     public ObservableCollection<string> AllowedIps { get; } = new();
     public ObservableCollection<string> Domains { get; } = new();
@@ -116,16 +119,9 @@ public partial class PeerViewModel : ObservableObject
         }
         Domains.Add(domain);
         NewDomain = "";
-        if (!IsEditing)
-            _tunnel.Host.DomainAdded(_tunnel, this, domain); // live: applies NRPT immediately
     }
 
-    void RemoveDomain(string domain)
-    {
-        Domains.Remove(domain);
-        if (!IsEditing)
-            _tunnel.Host.DomainRemoved(_tunnel, this, domain);
-    }
+    void RemoveDomain(string domain) => Domains.Remove(domain);
 
     void AddAllowedIp()
     {
@@ -150,6 +146,8 @@ public partial class PeerViewModel : ObservableObject
         foreach (var cidr in AllowedIps)
             if (!Models.WireGuardConf.TryParseCidr(cidr, out _, out _)) return $"Invalid allowed IP: {cidr}";
         if (HasDns && !IPAddress.TryParse(Dns.Trim(), out _)) return $"Invalid DNS server: {Dns}";
+        if (KeepaliveText.Trim().Length > 0 && !ushort.TryParse(KeepaliveText.Trim(), out _))
+            return $"Keepalive must be seconds (0-65535) — got '{KeepaliveText}'";
         foreach (var d in Domains)
             if (!IsValidDomain(d)) return $"Invalid domain: {d}";
         return null;

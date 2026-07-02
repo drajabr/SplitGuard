@@ -22,6 +22,7 @@ public sealed class WireGuardAdapter : IDisposable
     const int AllowedIpSize = 24;
 
     const uint IfaceHasPrivateKey = 1 << 1;
+    const uint IfaceHasListenPort = 1 << 2;
     const uint IfaceReplacePeers = 1 << 3;
     const uint PeerHasPublicKey = 1 << 0;
     const uint PeerHasPresharedKey = 1 << 1;
@@ -62,12 +63,15 @@ public sealed class WireGuardAdapter : IDisposable
         return adapter;
     }
 
-    public void SetConfiguration(byte[] privateKey, IReadOnlyList<(byte[] PublicKey, byte[]? Psk, IPEndPoint? Endpoint, IReadOnlyList<(IPAddress Ip, byte Cidr)> AllowedIps, ushort Keepalive)> peers)
+    public void SetConfiguration(byte[] privateKey, ushort listenPort, IReadOnlyList<(byte[] PublicKey, byte[]? Psk, IPEndPoint? Endpoint, IReadOnlyList<(IPAddress Ip, byte Cidr)> AllowedIps, ushort Keepalive)> peers)
     {
         int size = IfaceSize + peers.Sum(p => PeerSize + p.AllowedIps.Count * AllowedIpSize);
         var buf = new byte[size];
         var span = buf.AsSpan();
-        BinaryPrimitives.WriteUInt32LittleEndian(span, IfaceHasPrivateKey | IfaceReplacePeers);
+        var ifaceFlags = IfaceHasPrivateKey | IfaceReplacePeers;
+        if (listenPort > 0) ifaceFlags |= IfaceHasListenPort;
+        BinaryPrimitives.WriteUInt32LittleEndian(span, ifaceFlags);
+        BinaryPrimitives.WriteUInt16LittleEndian(span[4..], listenPort);
         privateKey.CopyTo(span[6..]);
         BinaryPrimitives.WriteUInt32LittleEndian(span[72..], (uint)peers.Count);
         int off = IfaceSize;

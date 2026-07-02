@@ -11,6 +11,18 @@ namespace WgSplitDns.Views;
 
 public partial class MainWindow : Window, IDialogs
 {
+    static readonly (string Name, ThemeVariant Variant, string? Background)[] ThemeSteps =
+    {
+        ("auto", ThemeVariant.Default, null),
+        ("light", ThemeVariant.Light, null),
+        ("pearl", ThemeVariant.Light, "#F0EFEC"),
+        ("ash", ThemeVariant.Light, "#DFDEDA"),
+        ("slate", ThemeVariant.Dark, "#4A4F55"),
+        ("charcoal", ThemeVariant.Dark, "#33373C"),
+        ("dark", ThemeVariant.Dark, null),
+    };
+    int _themeIndex;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -20,19 +32,50 @@ public partial class MainWindow : Window, IDialogs
             if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed && e.Source is not Button)
                 BeginMoveDrag(e);
         };
+        AddHandler(DragDrop.DragOverEvent, (_, e) =>
+            e.DragEffects = e.Data.Contains(DataFormats.Files) ? DragDropEffects.Copy : DragDropEffects.None);
+        AddHandler(DragDrop.DropEvent, OnDrop);
+    }
+
+    async void OnDrop(object? sender, DragEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        var files = e.Data.GetFiles() ?? Enumerable.Empty<IStorageItem>();
+        foreach (var item in files.OfType<IStorageFile>())
+        {
+            if (!item.Name.EndsWith(".conf", StringComparison.OrdinalIgnoreCase)) continue;
+            await using var stream = await item.OpenReadAsync();
+            using var reader = new StreamReader(stream);
+            vm.AddTunnelFromText(await reader.ReadToEndAsync(), Path.GetFileNameWithoutExtension(item.Name));
+        }
+    }
+
+    protected override async void OnKeyDown(KeyEventArgs e)
+    {
+        // Ctrl+V outside a text field imports a config from the clipboard.
+        if (e.Key == Key.V && e.KeyModifiers.HasFlag(KeyModifiers.Control)
+            && FocusManager?.GetFocusedElement() is not TextBox
+            && DataContext is MainViewModel vm && Clipboard is not null)
+        {
+            var text = await Clipboard.GetTextAsync();
+            if (MainViewModel.LooksLikeConfig(text))
+            {
+                vm.AddTunnelFromText(text!, null);
+                e.Handled = true;
+                return;
+            }
+        }
+        base.OnKeyDown(e);
     }
 
     void OnThemeClick(object? sender, RoutedEventArgs e)
     {
-        var app = Avalonia.Application.Current!;
-        var (next, tip) = app.RequestedThemeVariant switch
-        {
-            var v when v == ThemeVariant.Light => (ThemeVariant.Dark, "Theme: dark"),
-            var v when v == ThemeVariant.Dark => (ThemeVariant.Default, "Theme: auto"),
-            _ => (ThemeVariant.Light, "Theme: light"),
-        };
-        app.RequestedThemeVariant = next;
-        ToolTip.SetTip(ThemeButton, tip);
+        _themeIndex = (_themeIndex + 1) % ThemeSteps.Length;
+        var (name, variant, background) = ThemeSteps[_themeIndex];
+        Avalonia.Application.Current!.RequestedThemeVariant = variant;
+        if (background is null) ClearValue(BackgroundProperty);
+        else Background = new SolidColorBrush(Color.Parse(background));
+        ToolTip.SetTip(ThemeButton, $"Theme: {name}");
     }
 
     public async Task<bool> ConfirmAsync(string title, string message)
@@ -66,68 +109,6 @@ public partial class MainWindow : Window, IDialogs
             },
         };
         return await dialog.ShowDialog<bool?>(this) == true;
-    }
-
-    public async Task<string?> PickConfFileAsync()
-    {
-        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-        {
-            Title = "Import WireGuard config",
-            AllowMultiple = false,
-            FileTypeFilter = new[]
-            {
-                new FilePickerFileType("WireGuard config") { Patterns = new[] { "*.conf" } },
-            },
-        });
-        var file = files.FirstOrDefault();
-        if (file is null) return null;
-        await using var stream = await file.OpenReadAsync();
-        using var reader = new StreamReader(stream);
-        var text = await reader.ReadToEndAsync();
-        var name = Path.GetFileNameWithoutExtension(file.Name);
-        return $"{text}\0{name}";
-    }
-
-    public async Task<string?> PasteConfigAsync()
-    {
-        var dialog = new Window
-        {
-            Title = "Paste WireGuard config",
-            Width = 520,
-            SizeToContent = SizeToContent.Height,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            CanResize = false,
-        };
-        var box = new TextBox
-        {
-            AcceptsReturn = true,
-            Height = 260,
-            FontFamily = new FontFamily("Consolas,Courier New,monospace"),
-            FontSize = 12,
-            Watermark = "[Interface]\nPrivateKey = …\nAddress = …\n\n[Peer]\nPublicKey = …\nEndpoint = …\nAllowedIPs = …",
-        };
-        var add = new Button { Content = "Add tunnel", Classes = { "primary" } };
-        var cancel = new Button { Content = "Cancel" };
-        add.Click += (_, _) => dialog.Close(box.Text);
-        cancel.Click += (_, _) => dialog.Close(null);
-        dialog.Content = new StackPanel
-        {
-            Margin = new Avalonia.Thickness(16),
-            Spacing = 12,
-            Children =
-            {
-                box,
-                new StackPanel
-                {
-                    Orientation = Orientation.Horizontal,
-                    HorizontalAlignment = HorizontalAlignment.Right,
-                    Spacing = 8,
-                    Children = { cancel, add },
-                },
-            },
-        };
-        var result = await dialog.ShowDialog<string?>(this);
-        return string.IsNullOrWhiteSpace(result) ? null : result;
     }
 
     public async Task CopyToClipboardAsync(string text)

@@ -12,6 +12,7 @@ public class TunnelConfig
 {
     public string Name { get; set; } = "";
     public string PrivateKeyProtected { get; set; } = "";
+    public ushort ListenPort { get; set; }
     public List<string> Addresses { get; set; } = new();
     public List<PeerConfig> Peers { get; set; } = new();
 }

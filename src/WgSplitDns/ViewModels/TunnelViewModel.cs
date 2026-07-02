@@ -9,10 +9,8 @@ public interface ITunnelHost
     void RequestConnect(TunnelViewModel tunnel);
     void RequestDisconnect(TunnelViewModel tunnel);
     void TogglePin(TunnelViewModel tunnel, PeerViewModel peer);
-    void DomainAdded(TunnelViewModel tunnel, PeerViewModel peer, string domain);
-    void DomainRemoved(TunnelViewModel tunnel, PeerViewModel peer, string domain);
     bool IsDomainInUse(string domain, PeerViewModel except);
-    void TunnelSaved(TunnelViewModel tunnel);
+    void TunnelSaved(TunnelViewModel tunnel, bool connectionChanged);
     void RequestDelete(TunnelViewModel tunnel);
     void CopyText(string text);
 }
@@ -60,6 +58,7 @@ public class TunnelViewModel : ObservableObject
     void LoadFromConfig()
     {
         Name = Config!.Name;
+        ListenPortText = Config.ListenPort > 0 ? Config.ListenPort.ToString() : "";
         Addresses.Clear();
         foreach (var a in Config.Addresses) Addresses.Add(a);
         Peers.Clear();
@@ -71,7 +70,7 @@ public class TunnelViewModel : ObservableObject
                 Endpoint = p.Endpoint,
                 Dns = p.Dns ?? "",
                 HasPsk = p.PresharedKeyProtected is not null,
-                PersistentKeepalive = p.PersistentKeepalive,
+                KeepaliveText = p.PersistentKeepalive > 0 ? p.PersistentKeepalive.ToString() : "",
             };
             foreach (var ip in p.AllowedIps) vm.AllowedIps.Add(ip);
             foreach (var d in p.Domains) vm.Domains.Add(d);
@@ -91,7 +90,7 @@ public class TunnelViewModel : ObservableObject
     }
 
     public string PublicKeyShort =>
-        PublicKeyFull.Length > 20 ? $"{PublicKeyFull[..14]}…{PublicKeyFull[^7..]}" : PublicKeyFull;
+        PublicKeyFull.Length > 12 ? $"{PublicKeyFull[..5]}…{PublicKeyFull[^5..]}" : PublicKeyFull;
 
     public ObservableCollection<string> Addresses { get; } = new();
     public ObservableCollection<PeerViewModel> Peers { get; } = new();
@@ -105,6 +104,11 @@ public class TunnelViewModel : ObservableObject
 
     bool _addressAddError;
     public bool AddressAddError { get => _addressAddError; set => Set(ref _addressAddError, value); }
+
+    string _listenPortText = "";
+    public string ListenPortText { get => _listenPortText; set => Set(ref _listenPortText, value); }
+
+    string _connSnapshot = "";
 
     string _privateKeyEdit = "";
     public string PrivateKeyEdit
@@ -198,8 +202,16 @@ public class TunnelViewModel : ObservableObject
                 }
             }
         }
+        _connSnapshot = ConnSnapshot();
         IsEditing = true;
     }
+
+    // Everything that requires a tunnel reconnect when it changes (DNS/domains excluded).
+    string ConnSnapshot() => string.Join("|",
+        Name.Trim(), PrivateKeyEdit.Trim(), ListenPortText.Trim(),
+        string.Join(",", Addresses),
+        string.Join(";", Peers.Select(p =>
+            $"{p.PublicKey.Trim()},{p.PresharedKey.Trim()},{p.Endpoint.Trim()},{string.Join("+", p.AllowedIps)},{p.ParsedKeepalive}")));
 
     void CancelEdit()
     {
@@ -228,6 +240,7 @@ public class TunnelViewModel : ObservableObject
         }
         ValidationError = "";
         WarningText = string.Join(" · ", Peers.Select(p => p.DnsRouteWarning()).Where(w => w is not null)!);
+        var connectionChanged = !IsExternal && ConnSnapshot() != _connSnapshot;
         if (IsExternal)
         {
             External!.Dns = Peers[0].HasDns ? Peers[0].Dns.Trim() : null;
@@ -237,6 +250,7 @@ public class TunnelViewModel : ObservableObject
         {
             Config!.Name = Name.Trim();
             Config.PrivateKeyProtected = RuleStore.Protect(PrivateKeyEdit.Trim());
+            Config.ListenPort = ushort.TryParse(ListenPortText.Trim(), out var lp) ? lp : (ushort)0;
             Config.Addresses = Addresses.ToList();
             Config.Peers = Peers.Select(p => new PeerConfig
             {
@@ -244,7 +258,7 @@ public class TunnelViewModel : ObservableObject
                 PresharedKeyProtected = string.IsNullOrWhiteSpace(p.PresharedKey) ? null : RuleStore.Protect(p.PresharedKey.Trim()),
                 Endpoint = p.Endpoint.Trim(),
                 AllowedIps = p.AllowedIps.ToList(),
-                PersistentKeepalive = p.PersistentKeepalive,
+                PersistentKeepalive = p.ParsedKeepalive,
                 Dns = p.HasDns ? p.Dns.Trim() : null,
                 Domains = p.Domains.ToList(),
             }).ToList();
@@ -253,7 +267,7 @@ public class TunnelViewModel : ObservableObject
         IsEditing = false;
         PrivateKeyEdit = "";
         foreach (var p in Peers) p.PresharedKey = "";
-        Host.TunnelSaved(this);
+        Host.TunnelSaved(this, connectionChanged);
     }
 
     string? Validate()
@@ -262,6 +276,8 @@ public class TunnelViewModel : ObservableObject
         {
             if (string.IsNullOrWhiteSpace(Name)) return "Tunnel needs a name";
             if (!PeerViewModel.IsValidKey(PrivateKeyEdit)) return "Private key must be a valid 32-byte base64 key";
+            if (ListenPortText.Trim().Length > 0 && !ushort.TryParse(ListenPortText.Trim(), out _))
+                return $"Listen port must be 0-65535 — got '{ListenPortText}'";
             if (Addresses.Count == 0) return "Tunnel needs at least one address";
             foreach (var a in Addresses)
                 if (!WireGuardConf.TryParseCidr(a, out _, out _)) return $"Invalid address: {a}";

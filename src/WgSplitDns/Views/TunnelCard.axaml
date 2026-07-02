@@ -20,6 +20,9 @@
           <Button Classes="icon" Command="{Binding BeginEditCommand}" IsVisible="{Binding !IsEditing}" ToolTip.Tip="Edit">
             <TextBlock Classes="glyph" Text="&#xE70F;" Opacity="0.6" />
           </Button>
+          <Button Classes="link danger" Content="Delete" Command="{Binding DeleteCommand}" IsVisible="{Binding IsEditing}" FontSize="11.5" />
+          <Button Content="Cancel" Command="{Binding CancelEditCommand}" IsVisible="{Binding IsEditing}" />
+          <Button Classes="primary" Content="Save" Command="{Binding SaveEditCommand}" IsVisible="{Binding IsEditing}" />
         </StackPanel>
         <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
           <Ellipse Classes="dot" Classes.up="{Binding IsConnected}" />
@@ -44,11 +47,8 @@
               <Border Classes="item">
                 <TextBlock Classes="mono" Text="{Binding PublicKeyShort}" />
               </Border>
-              <Button Classes="link" Command="{Binding CopyPublicKeyCommand}" FontSize="11.5" ToolTip.Tip="Copy full public key">
-                <StackPanel Orientation="Horizontal" Spacing="4">
-                  <TextBlock Classes="glyph" Text="&#xE8C8;" FontSize="12" />
-                  <TextBlock Text="copy" FontSize="11.5" VerticalAlignment="Center" />
-                </StackPanel>
+              <Button Classes="icon" Command="{Binding CopyPublicKeyCommand}" ToolTip.Tip="Copy full public key">
+                <TextBlock Classes="glyph" Text="&#xE8C8;" FontSize="12" Opacity="0.6" />
               </Button>
             </StackPanel>
           </StackPanel>
@@ -63,6 +63,11 @@
               </ToggleButton>
               <Button Classes="link" Content="generate" Command="{Binding GenerateKeyCommand}" FontSize="11.5" />
             </StackPanel>
+          </StackPanel>
+
+          <StackPanel Spacing="3" IsVisible="{Binding IsEditing}">
+            <TextBlock Classes="lbl" Text="Listen port" />
+            <TextBox Classes="mono" Width="90" HorizontalAlignment="Left" Text="{Binding ListenPortText}" Watermark="auto" />
           </StackPanel>
 
           <StackPanel Spacing="3">
@@ -115,17 +120,6 @@
                  IsVisible="{Binding WarningText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
       <TextBlock Classes="errtext" Margin="12,0,12,8" Text="{Binding ValidationError}"
                  IsVisible="{Binding ValidationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-
-      <StackPanel IsVisible="{Binding IsEditing}">
-        <Separator />
-        <DockPanel Margin="12,8">
-          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
-            <Button Content="Cancel" Command="{Binding CancelEditCommand}" />
-            <Button Classes="primary" Content="Save" Command="{Binding SaveEditCommand}" />
-          </StackPanel>
-          <Button Classes="link danger" Content="Delete tunnel" Command="{Binding DeleteCommand}" HorizontalAlignment="Left" FontSize="11.5" />
-        </DockPanel>
-      </StackPanel>
     </StackPanel>
   </Border>
 </UserControl>
