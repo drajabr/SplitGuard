@@ -36,10 +36,21 @@ $wgDll = Get-ChildItem -Recurse (Join-Path $wgExtract "*") -Filter "wireguard.dl
     Where-Object { $_.FullName -match [regex]::Escape($dllArch) } | Select-Object -First 1
 if (-not $wgDll) { throw "wireguard.dll for $dllArch not found in the wireguard-nt archive." }
 
+# The app runs elevated and hides to tray, so stop it hard; escalate via UAC if needed.
+if (Get-Process WgSplitDns -ErrorAction SilentlyContinue) {
+    Write-Host "Stopping running WgSplitDns..."
+    Get-Process WgSplitDns -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 500
+    if (Get-Process WgSplitDns -ErrorAction SilentlyContinue) {
+        Write-Host "Instance is elevated - requesting admin rights to stop it (UAC prompt)..."
+        Start-Process taskkill -ArgumentList "/IM", "WgSplitDns.exe", "/F" -Verb RunAs -Wait
+        Start-Sleep -Milliseconds 500
+    }
+}
 $out = Join-Path $root "dist\win-$Arch"
 if (Test-Path $out) {
     try { Remove-Item -Recurse -Force $out -ErrorAction Stop }
-    catch { throw "Cannot clean $out — close any running WgSplitDns.exe first." }
+    catch { throw "Cannot clean $out - close any running WgSplitDns.exe first (it may be elevated)." }
 }
 
 Write-Host "Publishing ($Arch)..."
