@@ -39,9 +39,11 @@ The tool writes rules into the Windows Name Resolution Policy Table (NRPT) — t
 
 Requires the .NET 8 SDK only:
 
-```powershell
-.\build.ps1
 ```
+.\build.cmd
+```
+
+(`build.cmd` is a thin wrapper that runs `build.ps1` with `-ExecutionPolicy Bypass`, so it works even when PowerShell script execution is disabled — the Windows default.)
 
 Output: `dist/WgSplitDns-win-x64.zip`. The official signed `wireguard.dll` is fetched automatically at build time.
 
