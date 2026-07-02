@@ -4,7 +4,7 @@ Split DNS for WireGuard on Windows, in one small native app.
 
 Connect one or more WireGuard tunnels and decide, per peer, which DNS server resolves which domains — for example `*.corp.example` through your office tunnel's DNS and `*.lab.internal` through your homelab's — while everything else keeps using your normal system DNS, untouched. Optionally pin one tunnel's DNS as your device-wide resolver, with automatic failover if that tunnel drops.
 
-> **Status: in development — not yet released.** See [ROADMAP.md](ROADMAP.md) for the plan and progress.
+> **Status: pre-release.** Builds and packages; awaiting first tagged release and field verification. See [ROADMAP.md](ROADMAP.md).
 
 ## Why
 

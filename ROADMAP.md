@@ -1,6 +1,6 @@
 # WG Split DNS — Roadmap
 
-Status: **design complete, implementation not started.** Docs are disjoint by role: this file = why + scope + milestones · [SPEC.md](SPEC.md) = every technical decision (the build blueprint) · [AGENTS.md](AGENTS.md) = rules and invariants.
+Status: **implemented (v0.1.0), pending first tagged release.** Docs are disjoint by role: this file = why + scope + milestones · [SPEC.md](SPEC.md) = every technical decision (the build blueprint) · [AGENTS.md](AGENTS.md) = rules and invariants.
 
 ## Purpose
 
@@ -24,12 +24,10 @@ No DNS blocking, no local DNS forwarder, no general VPN-manager features, no per
 ## Milestones
 
 - **M0 — Foundation** ✅ docs + skeleton
-- **M1 — Build pipeline**: csproj, manifest, empty window, `build.ps1` incl. `wireguard.dll` fetch, CI green
-- **M2 — Core**: models, `.conf` parser, DPAPI persistence, RuleStore
-- **M3 — WireGuard engine**: TunnelManager (adapter, config, routes, stats)
-- **M4 — NRPT engine**: tagged rules, catch-all + chain, reconciliation, GPO detection
-- **M5 — UI**: window, cards, peer blocks, view/edit, pin, live domain cards, import
-- **M6 — Test bar + external tunnels**
-- **M7 — Release v0.1.0**
-
-Each milestone lands in a working state (app builds and runs at every step).
+- **M1 — Build pipeline** ✅ csproj, manifest, `build.ps1` incl. `wireguard.dll` fetch, CI workflow
+- **M2 — Core** ✅ models, `.conf` parser, DPAPI persistence, RuleStore, X25519 (verified against RFC 7748)
+- **M3 — WireGuard engine** ✅ TunnelManager (adapter, config, routes, stats)
+- **M4 — NRPT engine** ✅ tagged rules, catch-all + chain, reconciliation, GPO detection
+- **M5 — UI** ✅ window, cards, peer blocks, view/edit, pin, live domain cards, import
+- **M6 — Test bar + external tunnels** ✅
+- **M7 — Release v0.1.0** — push to GitHub, tag `v0.1.0`, verify Actions release; first on-machine verification of tunnel + NRPT behavior (needs a real WireGuard endpoint and admin session)

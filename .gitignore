@@ -5,3 +5,4 @@ dist/
 .vs/
 *.dll
 !src/**/Assets/**
+.cache/

@@ -1,0 +1,119 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:WgSplitDns.Views"
+             x:Class="WgSplitDns.Views.TunnelCard">
+  <Border Classes="card" Classes.editing="{Binding IsEditing}">
+    <StackPanel>
+      <DockPanel Margin="12,10">
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+          <TextBlock Classes="muted" Text="{Binding HeaderHandshake}" IsVisible="{Binding StatsVisible}" />
+          <StackPanel Orientation="Horizontal" Spacing="3" IsVisible="{Binding StatsVisible}">
+            <TextBlock Classes="glyph" Text="&#xE74A;" FontSize="11" Opacity="0.6" />
+            <TextBlock Classes="mono" Text="{Binding UpRate}" Opacity="0.75" />
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="3" IsVisible="{Binding StatsVisible}">
+            <TextBlock Classes="glyph" Text="&#xE74B;" FontSize="11" Opacity="0.6" />
+            <TextBlock Classes="mono" Text="{Binding DownRate}" Opacity="0.75" />
+          </StackPanel>
+          <TextBlock Classes="muted" Text="Disconnected" IsVisible="{Binding !IsConnected}" />
+          <ToggleSwitch IsChecked="{Binding IsConnected}" IsVisible="{Binding ShowToggle}" />
+          <Button Classes="icon" Command="{Binding BeginEditCommand}" IsVisible="{Binding !IsEditing}" ToolTip.Tip="Edit">
+            <TextBlock Classes="glyph" Text="&#xE70F;" Opacity="0.6" />
+          </Button>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+          <Ellipse Classes="dot" Classes.up="{Binding IsConnected}" />
+          <TextBlock FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" Text="{Binding Name}" IsVisible="{Binding !IsEditing}" />
+          <TextBox Width="150" Text="{Binding Name}" IsVisible="{Binding IsEditing}" />
+          <TextBlock Classes="accent" Text="editing" IsVisible="{Binding IsEditing}" />
+          <Border Background="#18808080" CornerRadius="4" Padding="6,2" IsVisible="{Binding IsExternal}" VerticalAlignment="Center">
+            <TextBlock FontSize="11" Opacity="0.7" Text="External" />
+          </Border>
+          <TextBlock Classes="muted" Text="managed by WireGuard app" IsVisible="{Binding IsExternal}" />
+          <TextBlock Classes="errtext" Text="{Binding StatusError}" VerticalAlignment="Center"
+                     IsVisible="{Binding StatusError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        </StackPanel>
+      </DockPanel>
+      <Separator Height="1" Background="#25808080" Margin="0" />
+
+      <Grid Margin="12,10,12,4" ColumnDefinitions="90,*" RowDefinitions="Auto,Auto,Auto" IsVisible="{Binding ShowInterfaceSection}">
+        <TextBlock Grid.Row="0" Grid.Column="0" Classes="lbl" Text="Public key" Margin="0,0,0,6" />
+        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="0,0,0,6">
+          <Border Classes="item">
+            <TextBlock Classes="mono" Text="{Binding PublicKeyShort}" />
+          </Border>
+          <Button Classes="link" Command="{Binding CopyPublicKeyCommand}" FontSize="11.5">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBlock Classes="glyph" Text="&#xE8C8;" FontSize="12" />
+              <TextBlock Text="copy" FontSize="11.5" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+
+        <TextBlock Grid.Row="1" Grid.Column="0" Classes="lbl" Text="Private key" IsVisible="{Binding IsEditing}" Margin="0,0,0,6" />
+        <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsEditing}" Margin="0,0,0,6">
+          <TextBox Classes="mono" Width="360" PasswordChar="●" RevealPassword="{Binding #PrivEye.IsChecked}" Text="{Binding PrivateKeyEdit}" />
+          <ToggleButton Name="PrivEye" Background="Transparent" BorderThickness="0" Padding="4">
+            <TextBlock Classes="glyph" Text="&#xE7B3;" FontSize="13" />
+          </ToggleButton>
+          <Button Classes="link" Content="generate" Command="{Binding GenerateKeyCommand}" FontSize="11.5" />
+        </StackPanel>
+
+        <TextBlock Grid.Row="2" Grid.Column="0" Classes="lbl" Text="Address" Margin="0,0,0,6" />
+        <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,6">
+          <ItemsControl ItemsSource="{Binding Addresses}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Classes="item" Margin="0,0,6,0">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Classes="mono" Text="{Binding}" />
+                    <Button Classes="chipx" IsVisible="{Binding $parent[views:TunnelCard].DataContext.IsEditing}"
+                            Command="{Binding $parent[views:TunnelCard].DataContext.RemoveAddressCommand}" CommandParameter="{Binding}">
+                      <TextBlock Classes="glyph" Text="&#xE711;" FontSize="9" Opacity="0.6" />
+                    </Button>
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBox Classes="mono addbox" Classes.error="{Binding AddressAddError}" Watermark="+ add"
+                   Text="{Binding NewAddress}" IsVisible="{Binding IsEditing}">
+            <TextBox.KeyBindings>
+              <KeyBinding Gesture="Enter" Command="{Binding AddAddressCommand}" />
+            </TextBox.KeyBindings>
+          </TextBox>
+        </StackPanel>
+      </Grid>
+
+      <ItemsControl ItemsSource="{Binding Peers}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <views:PeerBlock />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <Button Classes="link" Content="+ Add peer" Command="{Binding AddPeerCommand}" Margin="10,0,0,8" FontSize="11.5"
+              IsVisible="{Binding IsEditing}" />
+
+      <TextBlock Classes="warntext" Margin="12,0,12,8" Text="{Binding WarningText}"
+                 IsVisible="{Binding WarningText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+      <TextBlock Classes="errtext" Margin="12,0,12,8" Text="{Binding ValidationError}"
+                 IsVisible="{Binding ValidationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+      <StackPanel IsVisible="{Binding IsEditing}">
+        <Separator Height="1" Background="#25808080" Margin="0" />
+        <DockPanel Margin="12,8">
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
+            <Button Content="Cancel" Command="{Binding CancelEditCommand}" />
+            <Button Classes="primary" Content="Save" Command="{Binding SaveEditCommand}" />
+          </StackPanel>
+          <Button Classes="link danger" Content="Delete tunnel" Command="{Binding DeleteCommand}" HorizontalAlignment="Left" FontSize="11.5" />
+        </DockPanel>
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</UserControl>
