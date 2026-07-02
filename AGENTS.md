@@ -4,7 +4,7 @@ Guide for AI agents and human contributors. Everything here was agreed with the 
 
 ## What this project is
 
-A native WinUI 3 utility with one purpose: split DNS for WireGuard on Windows. It embeds its own WireGuard client (WireGuardNT via the official `wireguard.dll`) and steers DNS with Windows NRPT rules: per peer, "this DNS server resolves these domains", optionally pinning one peer's DNS as the device-wide resolver with automatic failover.
+A native desktop utility (Avalonia UI, C#/.NET 8) with one purpose: split DNS for WireGuard on Windows. It embeds its own WireGuard client (WireGuardNT via the official `wireguard.dll`) and steers DNS with Windows NRPT rules: per peer, "this DNS server resolves these domains", optionally pinning one peer's DNS as the device-wide resolver with automatic failover.
 
 **Non-goals** (reject scope creep toward these): DNS blocking, local DNS forwarder/proxy, general VPN manager features, per-app routing, MSIX packaging, tray daemon / Windows service, kill switch.
 
@@ -55,7 +55,7 @@ Only `NrptService` writes NRPT. Only `TunnelManager` talks to the driver. UI nev
 
 ## UI rules (agreed through mockups — see ROADMAP.md "UI specification" for the full spec)
 
-- Stock WinUI controls only. No custom-templated controls, no pills, 4px corners, one window, sentence case.
+- Avalonia 11, Fluent theme, stock controls plus one small shared style set (dense 28px inputs, compact item cards, dashed add button) in `Views/`. No per-view ad-hoc styling, no pills, 4px corners, one window, sentence case. (Decision record: WinUI 3 was the original plan; switched to Avalonia for build simplicity and the dense card UI — see ROADMAP.md.)
 - One field per line inside cards; every value is a small square-corner item card.
 - **Always live in view mode**: domain cards (inline add via Enter, × to remove — instant NRPT ops) and the DNS pin. Everything else is gated behind the pencil (edit mode): one card at a time, accent border, connect toggle hidden, Save validates everything before anything applies, Delete tunnel behind a confirm dialog.
 - **Pin**: exactly one device-wide, across all tunnels/peers; re-click to unpin (= system default); disabled when peer has no DNS; caption states "device DNS" / "device DNS · suspended".
@@ -72,8 +72,8 @@ Only `NrptService` writes NRPT. Only `TunnelManager` talks to the driver. UI nev
 
 ## Conventions
 
-- C# 12 / .NET 8, nullable enabled, `net8.0-windows10.0.19041.0`.
-- No new NuGet dependencies without strong justification (current set: WindowsAppSDK, Microsoft.Management.Infrastructure).
+- C# 12 / .NET 8, nullable enabled, `net8.0-windows`.
+- No new NuGet dependencies without strong justification (current set: Avalonia 11 + Fluent theme, Microsoft.Management.Infrastructure).
 - Plain MVVM; view models own state, services own side effects, views own nothing.
 - Comments only for constraints code can't express (e.g., why a route trick exists). Match existing style.
 - UI copy: sentence case, no exclamation marks, verb-first buttons.
@@ -83,7 +83,7 @@ Only `NrptService` writes NRPT. Only `TunnelManager` talks to the driver. UI nev
 1. Builds clean via `.\build.ps1`.
 2. All invariants above hold — especially: kill the app mid-operation, relaunch, reconciliation leaves no orphaned tagged rules; unpin + disconnect-all leaves zero tagged NRPT rules (`Get-DnsClientNrptRule` clean).
 3. No secret material in logs or UI beyond masked fields.
-4. UI changes stay within the stock-controls rule and the interaction spec.
+4. UI changes stay within the shared-style rule and the interaction spec.
 5. README/ROADMAP updated if behavior or scope moved.
 
 ## Release flow

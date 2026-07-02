@@ -19,8 +19,8 @@ The tool embeds its own WireGuard client, so end users need nothing else install
 
 | Layer | Choice |
 |---|---|
-| UI | WinUI 3 (Windows App SDK 1.6), C# / .NET 8 LTS, stock controls only |
-| Deployment | Unpackaged, self-contained single folder (zip), x64 (arm64 optional in CI matrix) |
+| UI | Avalonia UI 11 (Fluent theme), C# / .NET 8 LTS, stock controls with minimal terse styles. Decision record: WinUI 3 was the original choice; switched because the agreed dense card UI needs pervasive density overrides there, and the Windows App SDK adds build/deployment fragility. Avalonia keeps the whole backend identical and gives the simplest possible build. |
+| Deployment | Self-contained single-file exe (zipped), x64 (arm64 optional in CI matrix) — no runtime dependencies |
 | Elevation | `app.manifest` → `requireAdministrator` (NRPT and the driver require admin) |
 | WireGuard | Official prebuilt signed `wireguard.dll` (WireGuardNT driver), fetched at build time from download.wireguard.com — never committed to the repo |
 | Split DNS | Windows NRPT via CIM (`Microsoft.Management.Infrastructure`, `root/StandardCimv2` → `MSFT_DNSClientNrptRule`) — no PowerShell process spawning |
@@ -80,7 +80,7 @@ Mirrors WireGuard semantics exactly: interface (name, private key, addresses) + 
 
 ## UI specification (final, agreed through mockups)
 
-One window, stock WinUI controls only (`Grid`, `StackPanel`, `TextBox`, `ToggleSwitch`, `ToggleButton`, `FontIcon`, `ItemsRepeater`, `ComboBox`, `ContentDialog`, `Ellipse`), 4px corners, no custom-templated controls, no pills.
+One window, stock Avalonia Fluent controls (`Grid`, `StackPanel`, `WrapPanel`, `TextBox`, `ToggleSwitch`, `ToggleButton`, `ItemsControl`, `ComboBox`, `PathIcon`, `Ellipse`) plus a small shared style set for the dense look (28px inputs, compact item cards, dashed add button), 4px corners, no pills.
 
 ### Window
 
@@ -123,14 +123,14 @@ wg-split-dns/
 ├── .github/workflows/
 │   └── build-release.yml          # CI on push/PR; Release on v* tags
 └── src/WgSplitDns/
-    ├── WgSplitDns.csproj          # net8.0-windows10.0.19041.0, WindowsAppSDK, self-contained
-    ├── app.manifest               # requireAdministrator
-    ├── App.xaml / App.xaml.cs
-    ├── MainWindow.xaml / .cs
+    ├── WgSplitDns.csproj          # net8.0-windows, Avalonia 11, self-contained single-file publish
+    ├── app.manifest               # requireAdministrator (standard win32 manifest, embedded)
+    ├── App.axaml / App.axaml.cs
+    ├── MainWindow.axaml / .cs
     ├── Models/                    # Tunnel, Peer, AppConfig, WireGuardConfig (conf parse/serialize)
     ├── Services/                  # TunnelManager, NrptService, RuleStore, TunnelService (external), TestService
     ├── ViewModels/                # MainViewModel + per-card VMs (plain INotifyPropertyChanged)
-    ├── Views/                     # card/peer templates, dialogs
+    ├── Views/                     # card/peer templates, dialogs, shared styles
     └── Assets/
 ```
 
