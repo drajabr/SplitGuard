@@ -1,14 +1,39 @@
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
+using Avalonia.Styling;
 using WgSplitDns.ViewModels;
 
 namespace WgSplitDns.Views;
 
 public partial class MainWindow : Window, IDialogs
 {
-    public MainWindow() => InitializeComponent();
+    public MainWindow()
+    {
+        InitializeComponent();
+        // The header lives inside the extended title bar area — make it draggable.
+        HeaderBar.PointerPressed += (_, e) =>
+        {
+            if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed && e.Source is not Button)
+                BeginMoveDrag(e);
+        };
+    }
+
+    void OnThemeClick(object? sender, RoutedEventArgs e)
+    {
+        var app = Avalonia.Application.Current!;
+        var (next, tip) = app.RequestedThemeVariant switch
+        {
+            var v when v == ThemeVariant.Light => (ThemeVariant.Dark, "Theme: dark"),
+            var v when v == ThemeVariant.Dark => (ThemeVariant.Default, "Theme: auto"),
+            _ => (ThemeVariant.Light, "Theme: light"),
+        };
+        app.RequestedThemeVariant = next;
+        ToolTip.SetTip(ThemeButton, tip);
+    }
 
     public async Task<bool> ConfirmAsync(string title, string message)
     {

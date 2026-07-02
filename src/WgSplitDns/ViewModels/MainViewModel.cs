@@ -377,7 +377,9 @@ public class MainViewModel : ObservableObject, ITunnelHost
 
     async Task RefreshExternalsAsync()
     {
-        var adapters = await Task.Run(_external.GetExternalAdapters);
+        var adapters = (await Task.Run(_external.GetExternalAdapters))
+            .Where(a => _config.Tunnels.All(t => t.Name != a.Name)) // our own adapters aren't "external"
+            .ToList();
         foreach (var adapter in adapters)
         {
             var ext = _config.Externals.FirstOrDefault(e => e.AdapterName == adapter.Name);

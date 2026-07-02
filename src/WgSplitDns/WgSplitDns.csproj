@@ -11,7 +11,11 @@
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <AssemblyName>WgSplitDns</AssemblyName>
     <Version>0.1.0</Version>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
   </PropertyGroup>
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.2.3" />
     <PackageReference Include="Avalonia.Desktop" Version="11.2.3" />

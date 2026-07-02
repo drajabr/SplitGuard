@@ -111,6 +111,8 @@ public static class Netio
 
     public static void AddRoute(ulong luid, IPAddress destination, byte prefixLength, IPAddress? nextHop = null, uint metric = 0)
     {
+        // CreateIpForwardEntry2 rejects prefixes with host bits set (ERROR_INVALID_PARAMETER).
+        destination = MaskToNetwork(destination, prefixLength);
         InitializeIpForwardEntry(out var row);
         row.InterfaceLuid = luid;
         row.DestinationPrefix = SockaddrInet.From(destination);
@@ -121,6 +123,18 @@ public static class Netio
         var err = CreateIpForwardEntry2(ref row);
         if (err != 0 && err != 5010)
             throw new InvalidOperationException($"Route {destination}/{prefixLength} failed (win32 {err}).");
+    }
+
+    static IPAddress MaskToNetwork(IPAddress ip, byte prefixLength)
+    {
+        var bytes = ip.GetAddressBytes();
+        int bits = prefixLength;
+        for (int i = 0; i < bytes.Length; i++, bits -= 8)
+        {
+            if (bits >= 8) continue;
+            bytes[i] = bits <= 0 ? (byte)0 : (byte)(bytes[i] & (0xFF << (8 - bits)));
+        }
+        return new IPAddress(bytes);
     }
 
     // Host route for the tunnel endpoint via the current best (physical) route, so

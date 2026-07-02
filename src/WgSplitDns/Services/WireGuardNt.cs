@@ -11,7 +11,7 @@ public record PeerStats(byte[] PublicKey, ulong TxBytes, ulong RxBytes, DateTime
 // mirror wireguard.h, where all three structs are __declspec(align(8)).
 public sealed class WireGuardAdapter : IDisposable
 {
-    const string Pool = "WgSplitDns";
+    const string TunnelType = "WgSplitDns";
 
     // WIREGUARD_INTERFACE: Flags u32@0, ListenPort u16@4, PrivateKey[32]@6, PublicKey[32]@38, PeersCount u32@72, size 80
     const int IfaceSize = 80;
@@ -30,7 +30,7 @@ public sealed class WireGuardAdapter : IDisposable
     const uint PeerReplaceAllowedIps = 1 << 5;
 
     [DllImport("wireguard", CharSet = CharSet.Unicode, SetLastError = true)]
-    static extern IntPtr WireGuardCreateAdapter(string pool, string name, IntPtr requestedGuid);
+    static extern IntPtr WireGuardCreateAdapter(string name, string tunnelType, IntPtr requestedGuid);
 
     [DllImport("wireguard")]
     static extern void WireGuardCloseAdapter(IntPtr adapter);
@@ -53,7 +53,7 @@ public sealed class WireGuardAdapter : IDisposable
 
     public static WireGuardAdapter Create(string name)
     {
-        var handle = WireGuardCreateAdapter(Pool, name, IntPtr.Zero);
+        var handle = WireGuardCreateAdapter(name, TunnelType, IntPtr.Zero);
         if (handle == IntPtr.Zero)
             throw new InvalidOperationException($"Adapter creation failed (win32 {Marshal.GetLastWin32Error()}). Is wireguard.dll beside the exe?");
         var adapter = new WireGuardAdapter { _handle = handle };

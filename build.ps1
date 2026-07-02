@@ -37,7 +37,10 @@ $wgDll = Get-ChildItem -Recurse (Join-Path $wgExtract "*") -Filter "wireguard.dl
 if (-not $wgDll) { throw "wireguard.dll for $dllArch not found in the wireguard-nt archive." }
 
 $out = Join-Path $root "dist\win-$Arch"
-if (Test-Path $out) { Remove-Item -Recurse -Force $out }
+if (Test-Path $out) {
+    try { Remove-Item -Recurse -Force $out -ErrorAction Stop }
+    catch { throw "Cannot clean $out — close any running WgSplitDns.exe first." }
+}
 
 Write-Host "Publishing ($Arch)..."
 & $dotnetExe publish (Join-Path $root "src\WgSplitDns") -c Release -r "win-$Arch" --self-contained `
