@@ -150,8 +150,8 @@ public class TunnelViewModel : ObservableObject
 
     public bool StatsVisible => IsConnected;
 
-    // Expanded IS edit mode: clicking the card or the pencil opens editing;
-    // Cancel/Save collapse it again. There is no read-only expanded state.
+    // Expanded IS edit mode: clicking the card opens editing; clicking blank card
+    // space again, or Cancel/Save, collapses it. No read-only expanded state.
     bool _isEditing;
     public bool IsEditing
     {
@@ -161,21 +161,19 @@ public class TunnelViewModel : ObservableObject
             if (!Set(ref _isEditing, value)) return;
             foreach (var p in Peers) p.IsEditing = value;
             Raise(nameof(ShowToggle));
-            Raise(nameof(ShowPencil));
         }
     }
-
-    public bool ShowPencil => !IsEditing;
 
     public string CollapsedSummary =>
         Peers.Select(p => p.Endpoint).FirstOrDefault(e => !string.IsNullOrWhiteSpace(e)) ?? "";
 
-    // Second collapsed line: what this tunnel's split DNS actually does.
+    // Second collapsed line: addresses plus what this tunnel's split DNS does.
     public string CollapsedDetail
     {
         get
         {
             var parts = new List<string>();
+            if (AddressValues.Any()) parts.Add(string.Join(", ", AddressValues));
             foreach (var p in Peers)
             {
                 var domains = p.DomainValues.ToList();
@@ -186,6 +184,8 @@ public class TunnelViewModel : ObservableObject
                 parts.Add(p.HasDns ? $"{p.Dns} → {list}" : list);
             }
             if (Peers.Any(p => p.IsPinned)) parts.Add("device DNS");
+            var keepalive = Peers.FirstOrDefault(p => p.HasKeepalive);
+            if (keepalive is not null) parts.Add(keepalive.KeepaliveDisplay);
             return parts.Count == 0 ? "no split DNS configured" : string.Join("  ·  ", parts);
         }
     }

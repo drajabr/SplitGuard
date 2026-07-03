@@ -30,16 +30,19 @@ public partial class TunnelCard : UserControl
         AddHandler(Gestures.TappedEvent, OnTapped);
     }
 
-    // Clicking a collapsed card (outside interactive controls) opens edit mode.
+    // Clicking blank card space toggles: collapsed → edit, editing → cancel/collapse.
+    // Clicks on controls, chips, and peer blocks never count as blank space.
     void OnTapped(object? sender, TappedEventArgs e)
     {
-        if (DataContext is not TunnelViewModel vm || vm.IsEditing) return;
+        if (DataContext is not TunnelViewModel vm) return;
         var element = e.Source as Avalonia.Visual;
         while (element is not null && element != this)
         {
             if (element is Button or ToggleButton or ToggleSwitch or TextBox or ComboBox) return;
+            if (vm.IsEditing && element is Border b && (b.Classes.Contains("item") || b.Classes.Contains("peerblock"))) return;
             element = element.GetVisualParent();
         }
-        vm.BeginEditCommand.Execute(null);
+        if (vm.IsEditing) vm.CancelEditCommand.Execute(null);
+        else vm.BeginEditCommand.Execute(null);
     }
 }
