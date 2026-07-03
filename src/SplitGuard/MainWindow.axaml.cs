@@ -11,22 +11,22 @@ namespace SplitGuard.Views;
 
 public partial class MainWindow : Window, IDialogs
 {
-    static readonly (string Name, ThemeVariant Variant, string? Background)[] ThemeSteps =
+    // Each theme is one coherent palette: page + card surface + chip fill + border
+    // strength + secondary-text contrast, tuned together. null page/surface/item = the
+    // OS-adaptive overlay path ("auto"). This folds the old separate "contrast" control in.
+    record ThemeDef(string Name, ThemeVariant Variant, string? Page, string? Surface, string? Item,
+                 double Dim, byte Hair, byte Field);
+
+    static readonly ThemeDef[] ThemeSteps =
     {
-        ("auto", ThemeVariant.Default, null),
-        ("light", ThemeVariant.Light, "#FFFFFF"),
-        ("pearl", ThemeVariant.Light, "#F1EFEA"),
-        ("ash", ThemeVariant.Light, "#DEDCD7"),
-        ("steel", ThemeVariant.Dark, "#4A5158"),
-        ("slate", ThemeVariant.Dark, "#383E45"),
-        ("graphite", ThemeVariant.Dark, "#26292D"),
-        ("dark", ThemeVariant.Dark, null),
-    };
-    static readonly (string Name, double Opacity)[] ContrastSteps =
-    {
-        ("soft", 0.5),
-        ("normal", 0.68),
-        ("high", 0.9),
+        new("auto",     ThemeVariant.Default, null,      null,      null,      0.68, 0x33, 0x40),
+        new("light",    ThemeVariant.Light,  "#F4F3F0", "#FFFFFF", "#ECEAE4", 0.62, 0x33, 0x42),
+        new("pearl",    ThemeVariant.Light,  "#EAE8E2", "#F7F5F0", "#E0DDD5", 0.62, 0x36, 0x46),
+        new("ash",      ThemeVariant.Light,  "#DBD9D2", "#EAE8E2", "#D0CDC5", 0.60, 0x3C, 0x4C),
+        new("steel",    ThemeVariant.Dark,   "#464C53", "#525860", "#3C424A", 0.72, 0x44, 0x56),
+        new("slate",    ThemeVariant.Dark,   "#363C43", "#414750", "#2D333A", 0.72, 0x3E, 0x50),
+        new("graphite", ThemeVariant.Dark,   "#24272B", "#2E3339", "#1F2226", 0.70, 0x38, 0x48),
+        new("dark",     ThemeVariant.Dark,   "#1A1C1F", "#25282C", "#17191C", 0.70, 0x34, 0x44),
     };
     static readonly (string Name, string Hex)[] AccentSteps =
     {
@@ -63,7 +63,6 @@ public partial class MainWindow : Window, IDialogs
     };
 
     int _themeIndex;
-    int _contrastIndex = 1;
     int _accentIndex;
     int _fontIndex;
     int _zoomIndex;
@@ -137,12 +136,10 @@ public partial class MainWindow : Window, IDialogs
     public void ApplyUiPrefs(SplitGuard.Models.UiPrefs prefs)
     {
         _themeIndex = Math.Max(0, Array.FindIndex(ThemeSteps, s => s.Name == prefs.Theme));
-        _contrastIndex = Math.Max(0, Array.FindIndex(ContrastSteps, s => s.Name == prefs.Contrast));
         _accentIndex = Math.Max(0, Array.FindIndex(AccentSteps, s => s.Name == prefs.Accent));
         _fontIndex = Math.Max(0, Array.FindIndex(FontSteps, s => s.Name == prefs.Font));
         _zoomIndex = Math.Max(0, Array.FindIndex(ZoomSteps, s => s.Name == prefs.Zoom));
         ApplyTheme();
-        ApplyContrast();
         ApplyAccent();
         ApplyFont();
         ApplyZoom();
@@ -166,28 +163,19 @@ public partial class MainWindow : Window, IDialogs
 
     void ApplyTheme()
     {
-        var (name, variant, background) = ThemeSteps[_themeIndex];
-        Avalonia.Application.Current!.RequestedThemeVariant = variant;
-        if (background is null) ClearValue(BackgroundProperty);
-        else Background = new SolidColorBrush(Color.Parse(background));
-        ThemeLabel.Text = name;
-    }
-
-    void ApplyContrast()
-    {
-        var (name, opacity) = ContrastSteps[_contrastIndex];
+        var t = ThemeSteps[_themeIndex];
         var resources = Avalonia.Application.Current!.Resources;
-        resources["DimOpacity"] = opacity;
-        // Borders follow contrast too: hairlines and field borders get stronger with it.
-        var (hairline, field) = name switch
-        {
-            "soft" => ((byte)0x20, (byte)0x2C),
-            "high" => ((byte)0x58, (byte)0x6E),
-            _ => ((byte)0x33, (byte)0x40),
-        };
-        resources["HairlineBrush"] = new SolidColorBrush(Color.FromArgb(hairline, 0x80, 0x80, 0x80));
-        resources["FieldBorderBrush"] = new SolidColorBrush(Color.FromArgb(field, 0x80, 0x80, 0x80));
-        ContrastLabel.Text = name;
+        Avalonia.Application.Current!.RequestedThemeVariant = t.Variant;
+
+        if (t.Page is null) ClearValue(BackgroundProperty);
+        else Background = new SolidColorBrush(Color.Parse(t.Page));
+        // Opaque surfaces when the theme defines a palette; transparent overlays under "auto".
+        resources["SurfaceBrush"] = new SolidColorBrush(t.Surface is null ? Color.Parse("#00FFFFFF") : Color.Parse(t.Surface));
+        resources["ItemBrush"] = new SolidColorBrush(t.Item is null ? Color.FromArgb(0x14, 0x80, 0x80, 0x80) : Color.Parse(t.Item));
+        resources["DimOpacity"] = t.Dim;
+        resources["HairlineBrush"] = new SolidColorBrush(Color.FromArgb(t.Hair, 0x80, 0x80, 0x80));
+        resources["FieldBorderBrush"] = new SolidColorBrush(Color.FromArgb(t.Field, 0x80, 0x80, 0x80));
+        ThemeLabel.Text = t.Name;
     }
 
     void ApplyAccent()
@@ -254,13 +242,6 @@ public partial class MainWindow : Window, IDialogs
         _themeIndex = (_themeIndex + 1) % ThemeSteps.Length;
         ApplyTheme();
         Persist(p => p.Theme = ThemeSteps[_themeIndex].Name);
-    }
-
-    void OnContrastClick(object? sender, RoutedEventArgs e)
-    {
-        _contrastIndex = (_contrastIndex + 1) % ContrastSteps.Length;
-        ApplyContrast();
-        Persist(p => p.Contrast = ContrastSteps[_contrastIndex].Name);
     }
 
     void OnAccentClick(object? sender, RoutedEventArgs e)

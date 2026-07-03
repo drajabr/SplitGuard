@@ -5,7 +5,7 @@
              xmlns:views="clr-namespace:SplitGuard.Views"
              xmlns:ae="using:AvaloniaEdit"
              x:Class="SplitGuard.Views.TunnelCard">
-  <Border Classes="card" Classes.editing="{Binding IsEditing}" Background="Transparent">
+  <Border Classes="card" Classes.editing="{Binding IsEditing}" Background="{DynamicResource SurfaceBrush}">
     <StackPanel>
       <DockPanel Margin="12,8" Height="{DynamicResource HeaderH}">
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
@@ -30,7 +30,7 @@
             <TextBox Width="150" FontSize="{DynamicResource Fs135}" FontWeight="Medium" Text="{Binding Name}" IsVisible="{Binding IsEditing}" />
           </Grid>
           <TextBlock Classes="muted" Text="{Binding CollapsedSummary}" IsVisible="{Binding !IsEditing}" />
-          <Border Background="#12808080" CornerRadius="4" Padding="6,2" IsVisible="{Binding IsExternal}" VerticalAlignment="Center">
+          <Border Background="{DynamicResource ItemBrush}" CornerRadius="4" Padding="6,2" IsVisible="{Binding IsExternal}" VerticalAlignment="Center">
             <TextBlock FontSize="{DynamicResource Fs11}" Opacity="0.7" Text="External" />
           </Border>
         </StackPanel>
@@ -48,7 +48,7 @@
       <StackPanel>
         <Separator />
 
-        <Border Margin="12,8" CornerRadius="4" Background="#10808080" BorderBrush="{DynamicResource FieldBorderBrush}" BorderThickness="1"
+        <Border Margin="12,8" CornerRadius="4" Background="{DynamicResource ItemBrush}" BorderBrush="{DynamicResource FieldBorderBrush}" BorderThickness="1"
                 IsVisible="{Binding IsTextMode}">
           <ae:TextEditor Name="ConfEditor" MinHeight="220" Padding="8,6"
                          FontFamily="Consolas,Courier New,monospace" FontSize="{DynamicResource Fs12}"

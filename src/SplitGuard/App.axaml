@@ -20,6 +20,8 @@
     <SolidColorBrush x:Key="AccentDimBrush">#663378DD</SolidColorBrush>
     <SolidColorBrush x:Key="HairlineBrush">#33808080</SolidColorBrush>
     <SolidColorBrush x:Key="FieldBorderBrush">#40808080</SolidColorBrush>
+    <SolidColorBrush x:Key="SurfaceBrush">#00FFFFFF</SolidColorBrush>
+    <SolidColorBrush x:Key="ItemBrush">#14808080</SolidColorBrush>
     <SolidColorBrush x:Key="SynIpBrush">#4098D7</SolidColorBrush>
     <SolidColorBrush x:Key="SynDomainBrush">#58A65C</SolidColorBrush>
     <SolidColorBrush x:Key="SynKeyBrush">#9A6FD0</SolidColorBrush>
