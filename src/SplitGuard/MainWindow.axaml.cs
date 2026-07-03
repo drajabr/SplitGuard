@@ -199,32 +199,16 @@ public partial class MainWindow : Window, IDialogs
         resources["SystemAccentColorLight2"] = Tint(color, 0.30);
         resources["SystemAccentColorLight3"] = Tint(color, 0.45);
 
-        // Syntax palette leans slightly toward the accent, in fields and the raw editor alike.
         // Icon set (window, tray, header logo) recomposed in the accent color.
+        // Syntax colors are deliberately NOT accent-derived — they stay fixed and
+        // consistent across every accent (see Syntax.* constants).
         var icons = AppIcons.Get(color);
         Icon = icons.Idle;
         LogoImage.Source = icons.Logo;
         if (Avalonia.Application.Current is App app)
             app.SetAccentIcons(icons.Idle, icons.Active);
-
-        var ip = Mix(Color.Parse("#4098D7"), color, 0.22);
-        var domain = Mix(Color.Parse("#58A65C"), color, 0.22);
-        var key = Mix(Color.Parse("#9A6FD0"), color, 0.22);
-        var num = Mix(Color.Parse("#C77E16"), color, 0.22);
-        resources["SynIpBrush"] = new SolidColorBrush(ip);
-        resources["SynDomainBrush"] = new SolidColorBrush(domain);
-        resources["SynKeyBrush"] = new SolidColorBrush(key);
-        resources["SynNumBrush"] = new SolidColorBrush(num);
-        TunnelCard.UpdateHighlighting(Hex(color), Hex(num), Hex(key), Hex(ip), Hex(num), Hex(domain));
         AccentLabel.Text = name;
     }
-
-    static Color Mix(Color a, Color b, double amount) => Color.FromRgb(
-        (byte)(a.R + (b.R - a.R) * amount),
-        (byte)(a.G + (b.G - a.G) * amount),
-        (byte)(a.B + (b.B - a.B) * amount));
-
-    static string Hex(Color c) => $"#{c.R:X2}{c.G:X2}{c.B:X2}";
 
     static Color Shade(Color c, double factor) =>
         Color.FromRgb((byte)(c.R * factor), (byte)(c.G * factor), (byte)(c.B * factor));

@@ -41,7 +41,7 @@
         <DockPanel Margin="30,0,12,8">
           <TextBlock DockPanel.Dock="Right" Classes="mono synip" Margin="12,0,0,0" Opacity="0.8"
                      VerticalAlignment="Top" Text="{Binding CollapsedAllowedIps}" />
-          <TextBlock Name="DetailText" Classes="mono" FontSize="{DynamicResource Fs12}" TextWrapping="Wrap" />
+          <WrapPanel Name="DetailPanel" VerticalAlignment="Top" />
         </DockPanel>
       </Border>
 

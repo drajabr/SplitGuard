@@ -14,17 +14,17 @@ namespace SplitGuard.Views;
 
 public partial class TunnelCard : UserControl
 {
-    // wg-quick highlighting sharing the fields-mode palette: property names in the
-    // accent color, values typed (keys purple, IPs blue, masks/ports amber, domains green).
-    static string BuildXshd(string prop, string section, string key, string ip, string num, string domain) => $$"""
+    // wg-quick highlighting using the one fixed syntax palette (Syntax.*), so the
+    // editor matches the field/description colors and never shifts with the accent.
+    static readonly IHighlightingDefinition ConfHighlighting = LoadHighlighting($$"""
         <SyntaxDefinition name="WgConf" xmlns="http://icsharpcode.net/sharpdevelop/syntaxdefinition/2008">
           <Color name="Comment" foreground="#6A9955" />
-          <Color name="Section" foreground="{{section}}" fontWeight="bold" />
-          <Color name="Prop" foreground="{{prop}}" />
-          <Color name="Key64" foreground="{{key}}" />
-          <Color name="Ip" foreground="{{ip}}" />
-          <Color name="Num" foreground="{{num}}" />
-          <Color name="Domain" foreground="{{domain}}" />
+          <Color name="Section" foreground="{{Syntax.Prop}}" fontWeight="bold" />
+          <Color name="Prop" foreground="{{Syntax.Prop}}" />
+          <Color name="Key64" foreground="{{Syntax.Key}}" />
+          <Color name="Ip" foreground="{{Syntax.Ip}}" />
+          <Color name="Num" foreground="{{Syntax.Num}}" />
+          <Color name="Domain" foreground="{{Syntax.Domain}}" />
           <RuleSet>
             <Span color="Comment" begin="#" />
             <Rule color="Section">\[[^\]]*\]</Rule>
@@ -36,18 +36,7 @@ public partial class TunnelCard : UserControl
             <Rule color="Domain">\b(\*\.)?[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+\b</Rule>
           </RuleSet>
         </SyntaxDefinition>
-        """;
-
-    static IHighlightingDefinition _confHighlighting =
-        LoadHighlighting(BuildXshd("#3378DD", "#C77E16", "#9A6FD0", "#4098D7", "#C77E16", "#58A65C"));
-
-    static event Action? HighlightingChanged;
-
-    public static void UpdateHighlighting(string prop, string section, string key, string ip, string num, string domain)
-    {
-        _confHighlighting = LoadHighlighting(BuildXshd(prop, section, key, ip, num, domain));
-        HighlightingChanged?.Invoke();
-    }
+        """);
 
     static IHighlightingDefinition LoadHighlighting(string xshd)
     {
@@ -58,25 +47,10 @@ public partial class TunnelCard : UserControl
     TunnelViewModel? _vm;
     bool _syncingEditor;
 
-    readonly Action _onHighlightingChanged;
-
-    protected override void OnAttachedToVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
-    {
-        base.OnAttachedToVisualTree(e);
-        HighlightingChanged += _onHighlightingChanged;
-    }
-
-    protected override void OnDetachedFromVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
-    {
-        base.OnDetachedFromVisualTree(e);
-        HighlightingChanged -= _onHighlightingChanged;
-    }
-
     public TunnelCard()
     {
         InitializeComponent();
-        _onHighlightingChanged = () => ConfEditor.SyntaxHighlighting = _confHighlighting;
-        ConfEditor.SyntaxHighlighting = _confHighlighting;
+        ConfEditor.SyntaxHighlighting = ConfHighlighting;
         ConfEditor.TextChanged += (_, _) =>
         {
             if (_syncingEditor || _vm is null) return;
@@ -124,24 +98,28 @@ public partial class TunnelCard : UserControl
             BuildDetail();
     }
 
-    // Syntax-colored collapsed detail: addresses in IP color, domains in domain color.
+    // Syntax-colored collapsed detail as atomic tokens in a WrapPanel: addresses in
+    // IP color, domains in domain color. Each token is a whole TextBlock, so wrapping
+    // moves a full address/domain to the next line and never splits one.
     void BuildDetail()
     {
-        DetailText.Inlines?.Clear();
-        if (_vm is null || DetailText.Inlines is null) return;
-        var res = Avalonia.Application.Current!.Resources;
-        IBrush Brush(string key) => res[key] as IBrush ?? Brushes.Gray;
+        DetailPanel.Children.Clear();
+        if (_vm is null) return;
 
-        if (_vm.CollapsedAddresses.Length > 0)
-            DetailText.Inlines.Add(new Run(_vm.CollapsedAddresses) { Foreground = Brush("SynIpBrush") });
-        if (_vm.CollapsedDomains.Length > 0)
-        {
-            if (_vm.CollapsedAddresses.Length > 0)
-                DetailText.Inlines.Add(new Run("   ") );
-            DetailText.Inlines.Add(new Run(_vm.CollapsedDomains) { Foreground = Brush("SynDomainBrush") });
-        }
-        if (DetailText.Inlines.Count == 0)
-            DetailText.Inlines.Add(new Run("no split DNS configured") { Foreground = Brush("SynIpBrush"), FontStyle = FontStyle.Italic });
+        void AddToken(string text, IBrush brush) =>
+            DetailPanel.Children.Add(new TextBlock
+            {
+                Text = text,
+                Foreground = brush,
+                FontFamily = new FontFamily("Consolas,Courier New,monospace"),
+                FontSize = 12,
+                Margin = new Avalonia.Thickness(0, 0, 10, 2),
+            });
+
+        foreach (var addr in _vm.AddressValues) AddToken(addr, Syntax.IpBrush);
+        foreach (var domain in _vm.AllDomains) AddToken(domain, Syntax.DomainBrush);
+        if (DetailPanel.Children.Count == 0)
+            AddToken("no split DNS configured", Syntax.IpBrush);
     }
 
     // Clicking blank card space toggles: collapsed → edit, editing → cancel/collapse.

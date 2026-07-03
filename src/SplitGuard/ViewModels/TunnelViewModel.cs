@@ -176,14 +176,8 @@ public class TunnelViewModel : ObservableObject
     // the resolved domains (domain color). Nothing else.
     public string CollapsedAddresses => string.Join(", ", AddressValues);
 
-    public string CollapsedDomains
-    {
-        get
-        {
-            var domains = Peers.SelectMany(p => p.DomainValues).Distinct().ToList();
-            return string.Join(", ", domains);
-        }
-    }
+    public IEnumerable<string> AllDomains => Peers.SelectMany(p => p.DomainValues).Distinct();
+    public string CollapsedDomains => string.Join(", ", AllDomains);
 
     public string CollapsedAllowedIps
     {
