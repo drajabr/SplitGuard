@@ -1,4 +1,4 @@
-# WG Split DNS
+# SplitGuard
 
 Split DNS for WireGuard on Windows, in one small native app.
 
@@ -20,7 +20,7 @@ WireGuard's `DNS =` setting is all-or-nothing: it takes over DNS for the whole m
 
 ## Install
 
-Download the latest zip from the Releases page, extract, and run `WgSplitDns.exe`. It requires administrator rights (UAC prompt) because DNS policy and the network driver are system-level. No installer, no background service — delete the folder to uninstall (use "unpin + disconnect" first to clear any active rules).
+Download the latest zip from the Releases page, extract, and run `SplitGuard.exe`. It requires administrator rights (UAC prompt) because DNS policy and the network driver are system-level. No installer, no background service — delete the folder to uninstall (use "unpin + disconnect" first to clear any active rules).
 
 ## Usage
 
@@ -44,7 +44,7 @@ Requires the .NET 8 SDK only:
 
 (`build.cmd` is a thin wrapper that runs `build.ps1` with `-ExecutionPolicy Bypass`, so it works even when PowerShell script execution is disabled — the Windows default.)
 
-Output: `dist/WgSplitDns-win-x64.zip`. The official signed `wireguard.dll` is fetched automatically at build time.
+Output: `dist/SplitGuard-win-x64.zip`. The official signed `wireguard.dll` is fetched automatically at build time.
 
 ## Caveats
 

@@ -1,0 +1,56 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:SplitGuard.Views"
+        x:Class="SplitGuard.Views.MainWindow"
+        Title="SplitGuard"
+        Icon="avares://SplitGuard/Assets/app.ico"
+        Width="820" Height="700"
+        MinWidth="660" MinHeight="420"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="PreferSystemChrome"
+        ExtendClientAreaTitleBarHeightHint="-1"
+        DragDrop.AllowDrop="True">
+  <DockPanel>
+    <Border DockPanel.Dock="Top" Padding="14,8,146,8" Name="HeaderBar" Background="Transparent">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
+          <Button Classes="icon" Name="AddButton" Click="OnAddClick" ToolTip.Tip="Add tunnel (.conf) — or drop a file / Ctrl+V">
+            <TextBlock Classes="glyph" Text="&#xE710;" Foreground="#3378DD" FontSize="15" />
+          </Button>
+          <Button Classes="icon" Name="ThemeButton" Click="OnThemeClick" ToolTip.Tip="Theme: auto">
+            <TextBlock Classes="glyph" Text="&#xE793;" Opacity="0.6" />
+          </Button>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <Image Source="avares://SplitGuard/Assets/app.ico" Width="17" Height="17" VerticalAlignment="Center" />
+          <TextBlock FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" Text="SplitGuard" />
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <Border DockPanel.Dock="Top" Background="#26D83B01" Padding="14,8" IsVisible="{Binding GpoWarning}">
+      <TextBlock FontSize="12" TextWrapping="Wrap"
+                 Text="Group Policy DNS rules are active on this machine and override local ones — this tool's rules won't take effect." />
+    </Border>
+
+    <Border DockPanel.Dock="Bottom" BorderBrush="#20808080" BorderThickness="0,1,0,0" Padding="14,6"
+            IsVisible="{Binding HasStatus}">
+      <TextBlock Text="{Binding StatusText}" Classes="oktext" Classes.errtext="{Binding !StatusOk}" />
+    </Border>
+
+    <ScrollViewer>
+      <StackPanel Margin="14,8,14,12">
+        <ItemsControl ItemsSource="{Binding Tunnels}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <views:TunnelCard Margin="0,0,0,10" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock Classes="muted" Margin="2,6" TextWrapping="Wrap"
+                   IsVisible="{Binding !Tunnels.Count}"
+                   Text="No tunnels yet. Drop a WireGuard .conf file anywhere in this window, or copy a config and press Ctrl+V. Domains you attach to a peer resolve through that peer's DNS while connected; everything else keeps using your normal system DNS." />
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</Window>

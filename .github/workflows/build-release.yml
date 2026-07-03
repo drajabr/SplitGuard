@@ -22,7 +22,7 @@ jobs:
         run: ./build.ps1 -Arch ${{ matrix.arch }}
       - uses: actions/upload-artifact@v4
         with:
-          name: WgSplitDns-win-${{ matrix.arch }}
+          name: SplitGuard-win-${{ matrix.arch }}
           path: dist/*.zip
 
   release:

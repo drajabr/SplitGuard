@@ -1,4 +1,4 @@
-# WG Split DNS — Roadmap
+# SplitGuard — Roadmap
 
 Status: **implemented (v0.1.0), pending first tagged release.** Docs are disjoint by role: this file = why + scope + milestones · [SPEC.md](SPEC.md) = every technical decision (the build blueprint) · [AGENTS.md](AGENTS.md) = rules and invariants.
 
@@ -19,7 +19,7 @@ No DNS blocking, no local DNS forwarder, no general VPN-manager features, no per
 
 ## Deliverables
 
-`README.md` · `AGENTS.md` · `SPEC.md` · `build.ps1` (only .NET 8 SDK required) · `.github/workflows/build-release.yml` (CI on push/PR; Release on `v*` tags) · `src/WgSplitDns/` (Avalonia app: Models, Services, ViewModels, Views — full layout in SPEC).
+`README.md` · `AGENTS.md` · `SPEC.md` · `build.ps1` (only .NET 8 SDK required) · `.github/workflows/build-release.yml` (CI on push/PR; Release on `v*` tags) · `src/SplitGuard/` (Avalonia app: Models, Services, ViewModels, Views — full layout in SPEC).
 
 ## Milestones
 

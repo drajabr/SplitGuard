@@ -1,4 +1,4 @@
-# AGENTS.md — WG Split DNS
+# AGENTS.md — SplitGuard
 
 Rules for AI agents and contributors. [SPEC.md](SPEC.md) holds every technical decision — implement from it, don't research alternatives. [ROADMAP.md](ROADMAP.md) holds scope and milestone order. Do not silently deviate from any of the three.
 
@@ -38,7 +38,7 @@ Avalonia 11 Fluent, stock controls + the single shared style set in `Views/Style
 
 ## Verify
 
-- Build: `.\build.ps1` (needs .NET 8 SDK only). Dev loop: `dotnet build src/WgSplitDns`. App requires elevation (manifest → UAC).
+- Build: `.\build.ps1` (needs .NET 8 SDK only). Dev loop: `dotnet build src/SplitGuard`. App requires elevation (manifest → UAC).
 - NRPT state: `Get-DnsClientNrptRule` (look for the tag). Resolution: `Resolve-DnsName` — **never `nslookup`** (it bypasses NRPT). There is deliberately no in-app tester (removed from scope).
 - CI: push/PR builds; tag `v*` releases.
 

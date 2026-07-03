@@ -4,7 +4,7 @@ Complete technical spec. Every decision is final — implement, don't research a
 
 ## Project
 
-`src/WgSplitDns/WgSplitDns.csproj`: `net8.0-windows`, `WinExe`, nullable, unsafe allowed, `ApplicationManifest=app.manifest`. Publish: `-r win-x64 --self-contained -p:PublishSingleFile=true`.
+`src/SplitGuard/SplitGuard.csproj`: `net8.0-windows`, `WinExe`, nullable, unsafe allowed, `ApplicationManifest=app.manifest`. Publish: `-r win-x64 --self-contained -p:PublishSingleFile=true`.
 Packages: `Avalonia` + `Avalonia.Desktop` + `Avalonia.Themes.Fluent` 11.2.*, `Microsoft.Management.Infrastructure` 3.0.*, `System.Security.Cryptography.ProtectedData` 8.0.*.
 `app.manifest`: `requireAdministrator` + Win10/11 supportedOS GUIDs.
 
@@ -15,13 +15,13 @@ Packages: `Avalonia` + `Avalonia.Desktop` + `Avalonia.Themes.Fluent` 11.2.*, `Mi
 
 ## Crypto (`Services/Curve25519.cs`)
 
-Minimal X25519: clamp + scalar-mult-base for deriving public from private; keygen = `RandomNumberGenerator.GetBytes(32)` + clamp. Keys are 44-char base64 (32 bytes). Secrets at rest: `ProtectedData.Protect(bytes, null, DataProtectionScope.LocalMachine)` → base64 in config.json. Store: `%ProgramData%\WgSplitDns\config.json`, atomic write (tmp + `File.Move(overwrite)`) in `Services/RuleStore.cs`.
+Minimal X25519: clamp + scalar-mult-base for deriving public from private; keygen = `RandomNumberGenerator.GetBytes(32)` + clamp. Keys are 44-char base64 (32 bytes). Secrets at rest: `ProtectedData.Protect(bytes, null, DataProtectionScope.LocalMachine)` → base64 in config.json. Store: `%ProgramData%\SplitGuard\config.json`, atomic write (tmp + `File.Move(overwrite)`) in `Services/RuleStore.cs`.
 
 ## WireGuard engine
 
 ### `Services/WireGuardNt.cs` — P/Invoke over `wireguard.dll` (loaded from exe dir)
 
-Exports: `WireGuardCreateAdapter(name, tunnelType, guidPtr)` — note 0.10.x order is (Name, TunnelType), NOT (Pool, Name); getting this wrong yields win32 87 downstream — `WireGuardCloseAdapter`, `WireGuardSetConfiguration(handle, ptr, bytes)`, `WireGuardGetConfiguration(handle, ptr, ref bytes)` (stats), `WireGuardSetAdapterState(handle, state)` (`Down=0, Up=1`), `WireGuardGetAdapterLUID(handle, out ulong)`. Pool name `"WgSplitDns"` (distinguishes our adapters from the official client's `"WireGuard"` pool).
+Exports: `WireGuardCreateAdapter(name, tunnelType, guidPtr)` — note 0.10.x order is (Name, TunnelType), NOT (Pool, Name); getting this wrong yields win32 87 downstream — `WireGuardCloseAdapter`, `WireGuardSetConfiguration(handle, ptr, bytes)`, `WireGuardGetConfiguration(handle, ptr, ref bytes)` (stats), `WireGuardSetAdapterState(handle, state)` (`Down=0, Up=1`), `WireGuardGetAdapterLUID(handle, out ulong)`. Pool name `"SplitGuard"` (distinguishes our adapters from the official client's `"WireGuard"` pool).
 Config blob = contiguous: `WIREGUARD_INTERFACE`, then per peer `WIREGUARD_PEER` + its `WIREGUARD_ALLOWED_IP[]`. Copy struct layouts and flag enums verbatim from wireguard-nt `wireguard.h` (`WIREGUARD_INTERFACE{Flags,ListenPort,PrivateKey[32],PublicKey[32],PeersCount}`; `WIREGUARD_PEER{Flags,Reserved,PublicKey[32],PresharedKey[32],PersistentKeepalive,Endpoint SOCKADDR_INET,TxBytes,RxBytes,LastHandshake,AllowedIPsCount}`; `WIREGUARD_ALLOWED_IP{Address[16],AddressFamily,Cidr}`; flags: HAS_PUBLIC_KEY=1, HAS_PRESHARED_KEY=2, HAS_PERSISTENT_KEEPALIVE=4, HAS_ENDPOINT=8, REPLACE_ALLOWED_IPS=32; interface: HAS_PUBLIC_KEY=1, HAS_PRIVATE_KEY=2, REPLACE_PEERS=8).
 
 ### `Services/Netio.cs` — P/Invoke `iphlpapi.dll`
@@ -66,7 +66,7 @@ ViewModels: `MainViewModel` (tunnel collection, pin arbitration, GPO banner, tes
 
 ## build.ps1
 
-1. Assert `dotnet` ≥ 8 else exit with message. 2. Download `https://download.wireguard.com/wireguard-nt/wireguard-nt-0.10.1.zip` to temp (skip if cached in `.cache/`), extract `bin/amd64/wireguard.dll`. 3. `dotnet publish src/WgSplitDns -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o dist/win-x64`. 4. Copy `wireguard.dll` beside exe. 5. `Compress-Archive` → `dist/WgSplitDns-win-x64.zip`. Params: `-Arch x64|arm64` (arm64 uses `bin/arm64/`).
+1. Assert `dotnet` ≥ 8 else exit with message. 2. Download `https://download.wireguard.com/wireguard-nt/wireguard-nt-0.10.1.zip` to temp (skip if cached in `.cache/`), extract `bin/amd64/wireguard.dll`. 3. `dotnet publish src/SplitGuard -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o dist/win-x64`. 4. Copy `wireguard.dll` beside exe. 5. `Compress-Archive` → `dist/SplitGuard-win-x64.zip`. Params: `-Arch x64|arm64` (arm64 uses `bin/arm64/`).
 
 ## .github/workflows/build-release.yml
 

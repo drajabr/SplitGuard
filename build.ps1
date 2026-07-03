@@ -1,4 +1,4 @@
-# Builds WgSplitDns into dist\WgSplitDns-win-<arch>.zip. Requires only the .NET 8 SDK.
+# Builds SplitGuard into dist\SplitGuard-win-<arch>.zip. Requires only the .NET 8 SDK.
 param(
     [ValidateSet("x64", "arm64")]
     [string]$Arch = "x64"
@@ -37,31 +37,31 @@ $wgDll = Get-ChildItem -Recurse (Join-Path $wgExtract "*") -Filter "wireguard.dl
 if (-not $wgDll) { throw "wireguard.dll for $dllArch not found in the wireguard-nt archive." }
 
 # The app runs elevated and hides to tray, so stop it hard; escalate via UAC if needed.
-if (Get-Process WgSplitDns -ErrorAction SilentlyContinue) {
-    Write-Host "Stopping running WgSplitDns..."
-    Get-Process WgSplitDns -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+if (Get-Process SplitGuard -ErrorAction SilentlyContinue) {
+    Write-Host "Stopping running SplitGuard..."
+    Get-Process SplitGuard -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     Start-Sleep -Milliseconds 500
-    if (Get-Process WgSplitDns -ErrorAction SilentlyContinue) {
+    if (Get-Process SplitGuard -ErrorAction SilentlyContinue) {
         Write-Host "Instance is elevated - requesting admin rights to stop it (UAC prompt)..."
-        Start-Process taskkill -ArgumentList "/IM", "WgSplitDns.exe", "/F" -Verb RunAs -Wait
+        Start-Process taskkill -ArgumentList "/IM", "SplitGuard.exe", "/F" -Verb RunAs -Wait
         Start-Sleep -Milliseconds 500
     }
 }
 $out = Join-Path $root "dist\win-$Arch"
 if (Test-Path $out) {
     try { Remove-Item -Recurse -Force $out -ErrorAction Stop }
-    catch { throw "Cannot clean $out - close any running WgSplitDns.exe first (it may be elevated)." }
+    catch { throw "Cannot clean $out - close any running SplitGuard.exe first (it may be elevated)." }
 }
 
 Write-Host "Publishing ($Arch)..."
-& $dotnetExe publish (Join-Path $root "src\WgSplitDns") -c Release -r "win-$Arch" --self-contained `
+& $dotnetExe publish (Join-Path $root "src\SplitGuard") -c Release -r "win-$Arch" --self-contained `
     -p:PublishSingleFile=true -o $out -v q
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed." }
 
 Copy-Item $wgDll.FullName (Join-Path $out "wireguard.dll")
 Get-ChildItem $out -Filter "*.pdb" | Remove-Item
 
-$zip = Join-Path $root "dist\WgSplitDns-win-$Arch.zip"
+$zip = Join-Path $root "dist\SplitGuard-win-$Arch.zip"
 if (Test-Path $zip) { Remove-Item $zip }
 Compress-Archive -Path (Join-Path $out "*") -DestinationPath $zip
 
