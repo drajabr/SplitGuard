@@ -9,6 +9,7 @@
   </Application.Resources>
   <Application.Styles>
     <FluentTheme />
+    <StyleInclude Source="avares://AvaloniaEdit/Themes/Fluent/AvaloniaEdit.xaml" />
     <StyleInclude Source="avares://SplitGuard/Views/Styles.axaml" />
   </Application.Styles>
 </Application>

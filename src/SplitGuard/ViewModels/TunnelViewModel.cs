@@ -10,6 +10,7 @@ public interface ITunnelHost
     void RequestDisconnect(TunnelViewModel tunnel);
     void TogglePin(TunnelViewModel tunnel, PeerViewModel peer);
     bool IsDomainInUse(string domain, PeerViewModel except);
+    void EditStarted(TunnelViewModel tunnel);
     void TunnelSaved(TunnelViewModel tunnel, bool connectionChanged);
     void RequestDelete(TunnelViewModel tunnel);
     void CopyText(string text);
@@ -360,6 +361,7 @@ public class TunnelViewModel : ObservableObject
             }
         }
         _connSnapshot = ConnSnapshot();
+        Host.EditStarted(this); // collapses any other expanded card
         IsEditing = true;
     }
 

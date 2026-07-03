@@ -200,6 +200,12 @@ public class MainViewModel : ObservableObject, ITunnelHost
         }
     }
 
+    public void EditStarted(TunnelViewModel tunnel)
+    {
+        foreach (var other in Tunnels.Where(t => t.IsEditing && !ReferenceEquals(t, tunnel)).ToList())
+            other.CancelEditCommand.Execute(null);
+    }
+
     public bool IsDomainInUse(string domain, PeerViewModel except) =>
         Tunnels.SelectMany(t => t.Peers)
             .Where(p => !ReferenceEquals(p, except))

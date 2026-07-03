@@ -79,6 +79,13 @@ public partial class MainWindow : Window, IDialogs
             e.Handled = true;
             return;
         }
+        // Ctrl+D: same two-step arming as the Delete button (first arms, second deletes).
+        if (ctrl && e.Key == Key.D && vm is not null)
+        {
+            vm.Tunnels.FirstOrDefault(t => t.IsEditing)?.DeleteCommand.Execute(null);
+            e.Handled = true;
+            return;
+        }
         // Ctrl+V outside a text field imports a config from the clipboard.
         if (ctrl && e.Key == Key.V
             && FocusManager?.GetFocusedElement() is not TextBox

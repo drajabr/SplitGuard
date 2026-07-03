@@ -47,7 +47,7 @@
 
     <Border DockPanel.Dock="Bottom" BorderBrush="#20808080" BorderThickness="0,1,0,0" Padding="14,5">
       <TextBlock FontSize="11" Opacity="0.5"
-                 Text="Add tunnel: drop a .conf or Ctrl+V  ·  New tunnel: Ctrl+N  ·  Raw config: Ctrl+E  ·  Verify with Resolve-DnsName (nslookup bypasses split DNS)" />
+                 Text="Add: drop a .conf or Ctrl+V  ·  New: Ctrl+N  ·  Raw config: Ctrl+E  ·  Delete: Ctrl+D twice  ·  Verify with ping or Resolve-DnsName (nslookup bypasses split DNS)" />
     </Border>
     <Border DockPanel.Dock="Bottom" BorderBrush="#20808080" BorderThickness="0,1,0,0" Padding="14,6"
             IsVisible="{Binding HasStatus}">
