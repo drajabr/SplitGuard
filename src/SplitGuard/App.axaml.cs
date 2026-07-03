@@ -97,6 +97,13 @@ public class App : Application
     void HookTunnels()
     {
         if (_vm is null) return;
+        // Unhook tunnels that left the collection (deleted / external vanished) so their
+        // handlers and references don't leak for the process lifetime.
+        foreach (var gone in _hooked.Where(t => !_vm.Tunnels.Contains(t)).ToList())
+        {
+            gone.PropertyChanged -= OnTunnelPropertyChanged;
+            _hooked.Remove(gone);
+        }
         foreach (var t in _vm.Tunnels)
         {
             if (!_hooked.Add(t)) continue;

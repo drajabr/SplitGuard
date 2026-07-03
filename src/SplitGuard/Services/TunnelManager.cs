@@ -129,10 +129,12 @@ public class TunnelManager : IDisposable
                 if (tunnel.Previous.TryGetValue(key, out var prev))
                 {
                     var dt = (now - prev.At).TotalSeconds;
+                    // Counters can reset on rekey/reconnect; clamp so ulong subtraction
+                    // never wraps into a bogus exabyte/sec spike.
                     if (dt > 0)
                     {
-                        up = (s.TxBytes - prev.Tx) / dt;
-                        down = (s.RxBytes - prev.Rx) / dt;
+                        if (s.TxBytes >= prev.Tx) up = (s.TxBytes - prev.Tx) / dt;
+                        if (s.RxBytes >= prev.Rx) down = (s.RxBytes - prev.Rx) / dt;
                     }
                 }
                 tunnel.Previous[key] = (s.TxBytes, s.RxBytes, now);

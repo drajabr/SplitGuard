@@ -4,7 +4,7 @@ Rules for AI agents and contributors. [SPEC.md](SPEC.md) holds every technical d
 
 ## Status
 
-Implemented through M6; compiles clean and packages via `build.ps1`. Driver/NRPT behavior not yet exercised on a live tunnel — treat runtime paths as unverified until M7's on-machine check.
+Release candidate: feature-complete, builds/packages clean, reviewed for threading and dead code. Driver/NRPT behavior still needs on-machine verification with a real endpoint + admin (M7) before tagging `v0.1.0`.
 
 ## Boundaries
 
