@@ -9,10 +9,10 @@
       <DockPanel Margin="10,4">
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
           <TextBlock Classes="muted" Text="{Binding HandshakeText}" IsVisible="{Binding ShowHandshake}" />
-          <Button Classes="link danger" Content="Remove peer" Command="{Binding RemovePeerCommand}" IsVisible="{Binding IsEditing}" FontSize="11.5" />
+          <Button Classes="link danger" Content="Remove peer" Command="{Binding RemovePeerCommand}" IsVisible="{Binding IsEditing}" FontSize="{DynamicResource Fs115}" />
         </StackPanel>
         <StackPanel Orientation="Horizontal" Spacing="8">
-          <TextBlock Classes="accentfg" FontSize="11.5" FontWeight="Medium" VerticalAlignment="Center" Text="Peer" />
+          <TextBlock Classes="accentfg" FontSize="{DynamicResource Fs115}" FontWeight="Medium" VerticalAlignment="Center" Text="Peer" />
         </StackPanel>
       </DockPanel>
       <Separator />
@@ -34,7 +34,7 @@
           <TextBox Grid.Column="2" Classes="mono synkey" PasswordChar="●" RevealPassword="{Binding #PskEye.IsChecked}"
                    Text="{Binding PresharedKey}" Watermark="preshared key (optional)" />
           <ToggleButton Grid.Column="3" Name="PskEye" Background="Transparent" BorderThickness="0" Padding="4">
-            <TextBlock Classes="glyph" Text="&#xE7B3;" FontSize="13" />
+            <TextBlock Classes="glyph" Text="&#xE7B3;" FontSize="{DynamicResource Fs13}" />
           </ToggleButton>
         </Grid>
 
@@ -53,7 +53,7 @@
                   </StackPanel>
                   <Button Classes="chipx"
                           Command="{Binding $parent[ItemsControl].DataContext.RemoveAllowedIpCommand}" CommandParameter="{Binding}">
-                    <TextBlock Classes="glyph" Text="&#xE711;" FontSize="9" Opacity="0.6" />
+                    <TextBlock Classes="glyph" Text="&#xE711;" FontSize="{DynamicResource Fs9}" Opacity="0.6" />
                   </Button>
                 </StackPanel>
               </Border>
@@ -92,7 +92,7 @@
                   <TextBlock Classes="mono syndomain" Text="{Binding}" />
                   <Button Classes="chipx"
                           Command="{Binding $parent[ItemsControl].DataContext.RemoveDomainCommand}" CommandParameter="{Binding}">
-                    <TextBlock Classes="glyph" Text="&#xE711;" FontSize="9" Opacity="0.6" />
+                    <TextBlock Classes="glyph" Text="&#xE711;" FontSize="{DynamicResource Fs9}" Opacity="0.6" />
                   </Button>
                 </StackPanel>
               </Border>

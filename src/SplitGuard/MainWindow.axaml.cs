@@ -32,9 +32,37 @@ public partial class MainWindow : Window, IDialogs
         ("amber", "#C77E16"),
         ("rose", "#C94F6D"),
     };
+    static readonly (string Name, string Family)[] FontSteps =
+    {
+        ("variable", "Segoe UI Variable Text, Segoe UI"),
+        ("classic", "Segoe UI"),
+        ("serif", "Georgia, Cambria, Times New Roman"),
+        ("mono", "Cascadia Mono, Consolas"),
+    };
+    static readonly (string Name, double Scale)[] SizeSteps =
+    {
+        ("small", 0.92),
+        ("normal", 1.0),
+        ("large", 1.12),
+    };
+    static readonly (string Name, double Scale)[] DensitySteps =
+    {
+        ("compact", 0.88),
+        ("cozy", 1.0),
+        ("comfy", 1.12),
+    };
+    static readonly (string Key, double Base)[] FontResources =
+    {
+        ("Fs9", 9), ("Fs11", 11), ("Fs115", 11.5), ("Fs12", 12), ("Fs125", 12.5),
+        ("Fs13", 13), ("Fs135", 13.5), ("Fs14", 14), ("Fs17", 17),
+    };
+
     int _themeIndex;
     int _contrastIndex = 1;
     int _accentIndex;
+    int _fontIndex;
+    int _sizeIndex = 1;
+    int _densityIndex = 1;
 
     public MainWindow()
     {
@@ -107,9 +135,38 @@ public partial class MainWindow : Window, IDialogs
         _themeIndex = Math.Max(0, Array.FindIndex(ThemeSteps, s => s.Name == prefs.Theme));
         _contrastIndex = Math.Max(0, Array.FindIndex(ContrastSteps, s => s.Name == prefs.Contrast));
         _accentIndex = Math.Max(0, Array.FindIndex(AccentSteps, s => s.Name == prefs.Accent));
+        _fontIndex = Math.Max(0, Array.FindIndex(FontSteps, s => s.Name == prefs.Font));
+        _sizeIndex = Math.Max(0, Array.FindIndex(SizeSteps, s => s.Name == prefs.FontSize));
+        _densityIndex = Math.Max(0, Array.FindIndex(DensitySteps, s => s.Name == prefs.Density));
         ApplyTheme();
         ApplyContrast();
         ApplyAccent();
+        ApplyFont();
+        ApplyFontSize();
+        ApplyDensity();
+    }
+
+    void ApplyFont()
+    {
+        var (name, family) = FontSteps[_fontIndex];
+        FontFamily = new FontFamily(family);
+        FontLabel.Text = name;
+    }
+
+    void ApplyFontSize()
+    {
+        var (name, scale) = SizeSteps[_sizeIndex];
+        var resources = Avalonia.Application.Current!.Resources;
+        foreach (var (key, baseSize) in FontResources)
+            resources[key] = baseSize * scale;
+        SizeLabel.Text = name;
+    }
+
+    void ApplyDensity()
+    {
+        var (name, scale) = DensitySteps[_densityIndex];
+        DensityHost.LayoutTransform = scale == 1.0 ? null : new ScaleTransform(scale, scale);
+        DensityLabel.Text = name;
     }
 
     void ApplyTheme()
@@ -216,6 +273,27 @@ public partial class MainWindow : Window, IDialogs
         _accentIndex = (_accentIndex + 1) % AccentSteps.Length;
         ApplyAccent();
         Persist(p => p.Accent = AccentSteps[_accentIndex].Name);
+    }
+
+    void OnFontClick(object? sender, RoutedEventArgs e)
+    {
+        _fontIndex = (_fontIndex + 1) % FontSteps.Length;
+        ApplyFont();
+        Persist(p => p.Font = FontSteps[_fontIndex].Name);
+    }
+
+    void OnSizeClick(object? sender, RoutedEventArgs e)
+    {
+        _sizeIndex = (_sizeIndex + 1) % SizeSteps.Length;
+        ApplyFontSize();
+        Persist(p => p.FontSize = SizeSteps[_sizeIndex].Name);
+    }
+
+    void OnDensityClick(object? sender, RoutedEventArgs e)
+    {
+        _densityIndex = (_densityIndex + 1) % DensitySteps.Length;
+        ApplyDensity();
+        Persist(p => p.Density = DensitySteps[_densityIndex].Name);
     }
 
     public async Task CopyToClipboardAsync(string text)

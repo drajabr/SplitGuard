@@ -19,36 +19,54 @@
           <Button Classes="icon" Name="ThemeButton" Click="OnThemeClick" ToolTip.Tip="Theme">
             <StackPanel Orientation="Horizontal" Spacing="5">
               <TextBlock Classes="glyph" Text="&#xE793;" Opacity="0.6" />
-              <TextBlock Name="ThemeLabel" FontSize="11.5" Opacity="0.65" VerticalAlignment="Center" Text="auto" />
+              <TextBlock Name="ThemeLabel" FontSize="{DynamicResource Fs115}" Opacity="0.65" VerticalAlignment="Center" Text="auto" />
             </StackPanel>
           </Button>
           <Button Classes="icon" Name="ContrastButton" Click="OnContrastClick" ToolTip.Tip="Text contrast">
             <StackPanel Orientation="Horizontal" Spacing="5">
               <TextBlock Classes="glyph" Text="&#xE706;" Opacity="0.6" />
-              <TextBlock Name="ContrastLabel" FontSize="11.5" Opacity="0.65" VerticalAlignment="Center" Text="normal" />
+              <TextBlock Name="ContrastLabel" FontSize="{DynamicResource Fs115}" Opacity="0.65" VerticalAlignment="Center" Text="normal" />
             </StackPanel>
           </Button>
           <Button Classes="icon" Name="AccentButton" Click="OnAccentClick" ToolTip.Tip="Accent color">
             <StackPanel Orientation="Horizontal" Spacing="5">
               <Ellipse Width="10" Height="10" Fill="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
-              <TextBlock Name="AccentLabel" FontSize="11.5" Opacity="0.65" VerticalAlignment="Center" Text="blue" />
+              <TextBlock Name="AccentLabel" FontSize="{DynamicResource Fs115}" Opacity="0.65" VerticalAlignment="Center" Text="blue" />
+            </StackPanel>
+          </Button>
+          <Button Classes="icon" Name="FontButton" Click="OnFontClick" ToolTip.Tip="Font family">
+            <StackPanel Orientation="Horizontal" Spacing="5">
+              <TextBlock Classes="glyph" Text="&#xE8D2;" Opacity="0.6" />
+              <TextBlock Name="FontLabel" FontSize="{DynamicResource Fs115}" Opacity="0.65" VerticalAlignment="Center" Text="variable" />
+            </StackPanel>
+          </Button>
+          <Button Classes="icon" Name="SizeButton" Click="OnSizeClick" ToolTip.Tip="Font size">
+            <StackPanel Orientation="Horizontal" Spacing="5">
+              <TextBlock Classes="glyph" Text="&#xE8E9;" Opacity="0.6" />
+              <TextBlock Name="SizeLabel" FontSize="{DynamicResource Fs115}" Opacity="0.65" VerticalAlignment="Center" Text="normal" />
+            </StackPanel>
+          </Button>
+          <Button Classes="icon" Name="DensityButton" Click="OnDensityClick" ToolTip.Tip="Display size">
+            <StackPanel Orientation="Horizontal" Spacing="5">
+              <TextBlock Classes="glyph" Text="&#xE71E;" Opacity="0.6" />
+              <TextBlock Name="DensityLabel" FontSize="{DynamicResource Fs115}" Opacity="0.65" VerticalAlignment="Center" Text="cozy" />
             </StackPanel>
           </Button>
         </StackPanel>
         <StackPanel Orientation="Horizontal" Spacing="10">
           <Image Name="LogoImage" Source="avares://SplitGuard/Assets/app.ico" Width="17" Height="17" VerticalAlignment="Center" />
-          <TextBlock FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" Text="SplitGuard" />
+          <TextBlock FontSize="{DynamicResource Fs135}" FontWeight="Medium" VerticalAlignment="Center" Text="SplitGuard" />
         </StackPanel>
       </DockPanel>
     </Border>
 
     <Border DockPanel.Dock="Top" Background="#26D83B01" Padding="14,8" IsVisible="{Binding GpoWarning}">
-      <TextBlock FontSize="12" TextWrapping="Wrap"
+      <TextBlock FontSize="{DynamicResource Fs12}" TextWrapping="Wrap"
                  Text="Group Policy DNS rules are active on this machine and override local ones — this tool's rules won't take effect." />
     </Border>
 
     <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="0,1,0,0" Padding="14,5">
-      <TextBlock FontSize="11" Opacity="0.5"
+      <TextBlock FontSize="{DynamicResource Fs11}" Opacity="0.5"
                  Text="Add: drop a .conf or Ctrl+V  ·  New: Ctrl+N  ·  Raw config: Ctrl+E  ·  Delete: Ctrl+D twice  ·  Verify with ping or Resolve-DnsName (nslookup bypasses split DNS)" />
     </Border>
     <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="0,1,0,0" Padding="14,6"
@@ -57,6 +75,7 @@
     </Border>
 
     <ScrollViewer>
+      <LayoutTransformControl Name="DensityHost">
       <StackPanel Margin="14,8,14,12">
         <ItemsControl ItemsSource="{Binding Tunnels}">
           <ItemsControl.ItemTemplate>
@@ -69,6 +88,7 @@
                    IsVisible="{Binding !Tunnels.Count}"
                    Text="No tunnels yet. Drop a WireGuard .conf file anywhere in this window, or copy a config and press Ctrl+V. Domains you attach to a peer resolve through that peer's DNS while connected; everything else keeps using your normal system DNS." />
       </StackPanel>
+      </LayoutTransformControl>
     </ScrollViewer>
   </DockPanel>
 </Window>
