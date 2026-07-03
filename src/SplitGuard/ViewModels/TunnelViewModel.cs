@@ -53,7 +53,11 @@ public class TunnelViewModel : ObservableObject
         AddAddressCommand = new RelayCommand(AddAddress);
         RemoveAddressCommand = new RelayCommand(p => Addresses.Remove((string)p!));
         GenerateKeyCommand = new RelayCommand(GenerateKey);
+        ToggleTextModeCommand = new RelayCommand(ToggleTextMode);
     }
+
+    // Created via Ctrl+N and never saved: cancelling deletes it instead of keeping a stub.
+    public bool IsDraft { get; set; }
 
     void LoadFromConfig()
     {
@@ -262,6 +266,85 @@ public class TunnelViewModel : ObservableObject
     public RelayCommand AddAddressCommand { get; private set; } = null!;
     public RelayCommand RemoveAddressCommand { get; private set; } = null!;
     public RelayCommand GenerateKeyCommand { get; private set; } = null!;
+    public RelayCommand ToggleTextModeCommand { get; private set; } = null!;
+
+    // Raw-config editing (Ctrl+E): the whole staged tunnel as wg-quick text,
+    // with per-peer DNS/Domains as SplitGuard extension keys.
+    bool _isTextMode;
+    public bool IsTextMode { get => _isTextMode; set => Set(ref _isTextMode, value); }
+
+    string _configText = "";
+    public string ConfigText { get => _configText; set => Set(ref _configText, value); }
+
+    void ToggleTextMode()
+    {
+        if (IsExternal || !IsEditing) return;
+        if (!IsTextMode)
+        {
+            ConfigText = SerializeStaged();
+            IsTextMode = true;
+        }
+        else
+        {
+            ApplyTextToFields();
+            IsTextMode = false;
+        }
+    }
+
+    string SerializeStaged()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("[Interface]");
+        sb.AppendLine($"PrivateKey = {PrivateKeyEdit.Trim()}");
+        if (ListenPortText.Trim().Length > 0) sb.AppendLine($"ListenPort = {ListenPortText.Trim()}");
+        if (AddressValues.Any()) sb.AppendLine($"Address = {string.Join(", ", AddressValues)}");
+        foreach (var p in Peers)
+        {
+            sb.AppendLine();
+            sb.AppendLine("[Peer]");
+            sb.AppendLine($"PublicKey = {p.PublicKey.Trim()}");
+            if (!string.IsNullOrWhiteSpace(p.PresharedKey)) sb.AppendLine($"PresharedKey = {p.PresharedKey.Trim()}");
+            if (!string.IsNullOrWhiteSpace(p.Endpoint)) sb.AppendLine($"Endpoint = {p.Endpoint.Trim()}");
+            if (p.AllowedIpValues.Any()) sb.AppendLine($"AllowedIPs = {string.Join(", ", p.AllowedIpValues)}");
+            if (p.ParsedKeepalive > 0) sb.AppendLine($"PersistentKeepalive = {p.ParsedKeepalive}");
+            if (p.HasDns) sb.AppendLine($"DNS = {p.Dns.Trim()}");
+            if (p.DomainValues.Any()) sb.AppendLine($"Domains = {string.Join(", ", p.DomainValues)}");
+        }
+        return sb.ToString();
+    }
+
+    void ApplyTextToFields()
+    {
+        var parsed = WireGuardConf.Parse(ConfigText);
+        PrivateKeyEdit = parsed.PrivateKey;
+        ListenPortText = parsed.ListenPort > 0 ? parsed.ListenPort.ToString() : "";
+        PeerViewModel.Fill(Addresses, parsed.Addresses);
+        Peers.Clear();
+        foreach (var p in parsed.Peers)
+        {
+            var vm = new PeerViewModel(this)
+            {
+                PublicKey = p.PublicKey,
+                PresharedKey = p.PresharedKey ?? "",
+                Endpoint = p.Endpoint,
+                Dns = p.Dns ?? "",
+                KeepaliveText = p.PersistentKeepalive > 0 ? p.PersistentKeepalive.ToString() : "",
+                IsEditing = true,
+            };
+            PeerViewModel.Fill(vm.AllowedIps, p.AllowedIps);
+            PeerViewModel.Fill(vm.Domains, p.Domains);
+            Peers.Add(vm);
+        }
+        // A tunnel with no peers can't be represented; keep one empty peer to edit.
+        if (Peers.Count == 0) Peers.Add(new PeerViewModel(this) { IsEditing = true });
+        // Interface-level DNS attaches to the peer containing it, mirroring import.
+        if (parsed.InterfaceDns is not null)
+        {
+            var target = WireGuardConf.PeerForDns(parsed);
+            var idx = target is null ? 0 : parsed.Peers.IndexOf(target);
+            if (idx >= 0 && idx < Peers.Count && !Peers[idx].HasDns) Peers[idx].Dns = parsed.InterfaceDns;
+        }
+    }
 
     void BeginEdit()
     {
@@ -292,6 +375,13 @@ public class TunnelViewModel : ObservableObject
     void CancelEdit()
     {
         DeleteArmed = false;
+        IsTextMode = false;
+        if (IsDraft)
+        {
+            IsEditing = false;
+            Host.RequestDelete(this);
+            return;
+        }
         IsEditing = false;
         PrivateKeyEdit = "";
         ValidationError = "";
@@ -308,6 +398,11 @@ public class TunnelViewModel : ObservableObject
 
     void SaveEdit()
     {
+        if (IsTextMode)
+        {
+            ApplyTextToFields();
+            IsTextMode = false;
+        }
         var error = Validate();
         if (error is not null)
         {
@@ -340,6 +435,7 @@ public class TunnelViewModel : ObservableObject
             }).ToList();
             foreach (var p in Peers) p.HasPsk = !string.IsNullOrWhiteSpace(p.PresharedKey);
         }
+        IsDraft = false;
         IsEditing = false;
         PrivateKeyEdit = "";
         foreach (var p in Peers) p.PresharedKey = "";

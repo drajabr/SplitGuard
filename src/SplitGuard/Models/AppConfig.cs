@@ -4,8 +4,16 @@ public class AppConfig
 {
     public int Version { get; set; } = 1;
     public PinnedDnsRef? PinnedDns { get; set; }
+    public UiPrefs Ui { get; set; } = new();
     public List<TunnelConfig> Tunnels { get; set; } = new();
     public List<ExternalRuleConfig> Externals { get; set; } = new();
+}
+
+public class UiPrefs
+{
+    public string Theme { get; set; } = "auto";
+    public string Contrast { get; set; } = "normal";
+    public string Accent { get; set; } = "blue";
 }
 
 public class TunnelConfig

@@ -23,7 +23,7 @@
         <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
           <Ellipse Classes="dot" Classes.up="{Binding IsConnected}" />
           <Grid VerticalAlignment="Center">
-            <TextBlock FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" Margin="8,0,0,0"
+            <TextBlock FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" Margin="9,0,0,0"
                        Text="{Binding Name}" IsVisible="{Binding !IsEditing}" />
             <TextBox Width="150" FontSize="13.5" FontWeight="Medium" Text="{Binding Name}" IsVisible="{Binding IsEditing}" />
           </Grid>
@@ -44,10 +44,14 @@
         </DockPanel>
       </Border>
 
-      <Border Classes="expandhost" Classes.expanded="{Binding IsEditing}" IsHitTestVisible="{Binding IsEditing}">
+      <Border Name="ExpandHost" Classes="expandhost" Classes.expanded="{Binding IsEditing}" IsHitTestVisible="{Binding IsEditing}">
       <StackPanel>
         <Separator />
-        <Grid ColumnDefinitions="3*,7*">
+
+        <TextBox Classes="mono" AcceptsReturn="True" TextWrapping="NoWrap" MinHeight="220"
+                 Margin="12,8" Text="{Binding ConfigText}" IsVisible="{Binding IsTextMode}" />
+
+        <Grid ColumnDefinitions="3*,7*" IsVisible="{Binding !IsTextMode}">
           <StackPanel Grid.Column="0" Margin="12,8" Spacing="8" IsVisible="{Binding ShowInterfaceSection}">
             <StackPanel Spacing="3">
               <TextBlock Classes="lbl" Text="Public key" />
@@ -133,8 +137,17 @@
             <Button Content="Cancel" Command="{Binding CancelEditCommand}" />
             <Button Classes="primary" Content="Save" Command="{Binding SaveEditCommand}" />
           </StackPanel>
-          <Button Classes="link danger" Classes.armed="{Binding DeleteArmed}" Content="{Binding DeleteLabel}"
-                  Command="{Binding DeleteCommand}" HorizontalAlignment="Left" FontSize="11.5" />
+          <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Left">
+            <Button Classes="icon" Command="{Binding ToggleTextModeCommand}" IsVisible="{Binding !IsExternal}"
+                    ToolTip.Tip="Toggle raw config editing (Ctrl+E)">
+              <Panel>
+                <TextBlock Classes="glyph" Text="&#xE70F;" Opacity="0.6" IsVisible="{Binding !IsTextMode}" />
+                <TextBlock Classes="glyph" Text="&#xE80A;" Opacity="0.6" IsVisible="{Binding IsTextMode}" />
+              </Panel>
+            </Button>
+            <Button Classes="link danger" Classes.armed="{Binding DeleteArmed}" Content="{Binding DeleteLabel}"
+                    Command="{Binding DeleteCommand}" FontSize="11.5" />
+          </StackPanel>
         </DockPanel>
       </StackPanel>
       </Border>

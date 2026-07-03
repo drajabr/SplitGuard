@@ -31,6 +31,7 @@ public class App : Application
             var window = new MainWindow();
             _vm = new MainViewModel(window);
             window.DataContext = _vm;
+            window.ApplyUiPrefs(_vm.Prefs);
             desktop.MainWindow = window;
             desktop.ShutdownRequested += (_, _) => _vm.OnExit();
 

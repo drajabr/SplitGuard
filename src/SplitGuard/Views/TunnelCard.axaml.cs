@@ -42,7 +42,8 @@ public partial class TunnelCard : UserControl
         while (element is not null && element != this)
         {
             if (element is Button or ToggleButton or ToggleSwitch or TextBox or ComboBox) return;
-            if (vm.IsEditing && element is Border b && (b.Classes.Contains("item") || b.Classes.Contains("peerblock"))) return;
+            // Clicks anywhere inside the expanded body never collapse the card.
+            if (element == ExpandHost) return;
             element = element.GetVisualParent();
         }
         if (vm.IsEditing) vm.CancelEditCommand.Execute(null);

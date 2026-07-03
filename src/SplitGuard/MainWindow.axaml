@@ -13,9 +13,24 @@
   <DockPanel>
     <Border DockPanel.Dock="Top" Padding="14,8,146,8" Name="HeaderBar" Background="Transparent">
       <DockPanel>
-        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
-          <Button Classes="icon" Name="ThemeButton" Click="OnThemeClick" ToolTip.Tip="Theme: auto">
-            <TextBlock Classes="glyph" Text="&#xE793;" Opacity="0.6" />
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
+          <Button Classes="icon" Name="ThemeButton" Click="OnThemeClick" ToolTip.Tip="Theme">
+            <StackPanel Orientation="Horizontal" Spacing="5">
+              <TextBlock Classes="glyph" Text="&#xE793;" Opacity="0.6" />
+              <TextBlock Name="ThemeLabel" FontSize="11.5" Opacity="0.65" VerticalAlignment="Center" Text="auto" />
+            </StackPanel>
+          </Button>
+          <Button Classes="icon" Name="ContrastButton" Click="OnContrastClick" ToolTip.Tip="Text contrast">
+            <StackPanel Orientation="Horizontal" Spacing="5">
+              <TextBlock Classes="glyph" Text="&#xE706;" Opacity="0.6" />
+              <TextBlock Name="ContrastLabel" FontSize="11.5" Opacity="0.65" VerticalAlignment="Center" Text="normal" />
+            </StackPanel>
+          </Button>
+          <Button Classes="icon" Name="AccentButton" Click="OnAccentClick" ToolTip.Tip="Accent color">
+            <StackPanel Orientation="Horizontal" Spacing="5">
+              <Ellipse Width="10" Height="10" Fill="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+              <TextBlock Name="AccentLabel" FontSize="11.5" Opacity="0.65" VerticalAlignment="Center" Text="blue" />
+            </StackPanel>
           </Button>
         </StackPanel>
         <StackPanel Orientation="Horizontal" Spacing="10">
@@ -30,6 +45,10 @@
                  Text="Group Policy DNS rules are active on this machine and override local ones — this tool's rules won't take effect." />
     </Border>
 
+    <Border DockPanel.Dock="Bottom" BorderBrush="#20808080" BorderThickness="0,1,0,0" Padding="14,5">
+      <TextBlock FontSize="11" Opacity="0.5"
+                 Text="Add tunnel: drop a .conf or Ctrl+V  ·  New empty tunnel: Ctrl+N  ·  Raw config while editing: Ctrl+E" />
+    </Border>
     <Border DockPanel.Dock="Bottom" BorderBrush="#20808080" BorderThickness="0,1,0,0" Padding="14,6"
             IsVisible="{Binding HasStatus}">
       <TextBlock Text="{Binding StatusText}" Classes="oktext" Classes.errtext="{Binding !StatusOk}" />

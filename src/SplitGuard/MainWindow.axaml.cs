@@ -18,7 +18,23 @@ public partial class MainWindow : Window, IDialogs
         ("slate", ThemeVariant.Dark, "#3C4148"),
         ("dark", ThemeVariant.Dark, null),
     };
+    static readonly (string Name, double Opacity)[] ContrastSteps =
+    {
+        ("soft", 0.45),
+        ("normal", 0.6),
+        ("high", 0.85),
+    };
+    static readonly (string Name, string Hex)[] AccentSteps =
+    {
+        ("blue", "#3378DD"),
+        ("teal", "#1D9E75"),
+        ("purple", "#7A5BD0"),
+        ("amber", "#C77E16"),
+        ("rose", "#C94F6D"),
+    };
     int _themeIndex;
+    int _contrastIndex = 1;
+    int _accentIndex;
 
     public MainWindow()
     {
@@ -49,10 +65,24 @@ public partial class MainWindow : Window, IDialogs
 
     protected override async void OnKeyDown(KeyEventArgs e)
     {
+        var vm = DataContext as MainViewModel;
+        var ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+        if (ctrl && e.Key == Key.N && vm is not null)
+        {
+            vm.CreateEmptyTunnel();
+            e.Handled = true;
+            return;
+        }
+        if (ctrl && e.Key == Key.E && vm is not null)
+        {
+            vm.Tunnels.FirstOrDefault(t => t.IsEditing)?.ToggleTextModeCommand.Execute(null);
+            e.Handled = true;
+            return;
+        }
         // Ctrl+V outside a text field imports a config from the clipboard.
-        if (e.Key == Key.V && e.KeyModifiers.HasFlag(KeyModifiers.Control)
+        if (ctrl && e.Key == Key.V
             && FocusManager?.GetFocusedElement() is not TextBox
-            && DataContext is MainViewModel vm && Clipboard is not null)
+            && vm is not null && Clipboard is not null)
         {
             var text = await Clipboard.GetTextAsync();
             if (MainViewModel.LooksLikeConfig(text))
@@ -65,14 +95,67 @@ public partial class MainWindow : Window, IDialogs
         base.OnKeyDown(e);
     }
 
-    void OnThemeClick(object? sender, RoutedEventArgs e)
+    public void ApplyUiPrefs(SplitGuard.Models.UiPrefs prefs)
     {
-        _themeIndex = (_themeIndex + 1) % ThemeSteps.Length;
+        _themeIndex = Math.Max(0, Array.FindIndex(ThemeSteps, s => s.Name == prefs.Theme));
+        _contrastIndex = Math.Max(0, Array.FindIndex(ContrastSteps, s => s.Name == prefs.Contrast));
+        _accentIndex = Math.Max(0, Array.FindIndex(AccentSteps, s => s.Name == prefs.Accent));
+        ApplyTheme();
+        ApplyContrast();
+        ApplyAccent();
+    }
+
+    void ApplyTheme()
+    {
         var (name, variant, background) = ThemeSteps[_themeIndex];
         Avalonia.Application.Current!.RequestedThemeVariant = variant;
         if (background is null) ClearValue(BackgroundProperty);
         else Background = new SolidColorBrush(Color.Parse(background));
-        ToolTip.SetTip(ThemeButton, $"Theme: {name}");
+        ThemeLabel.Text = name;
+    }
+
+    void ApplyContrast()
+    {
+        var (name, opacity) = ContrastSteps[_contrastIndex];
+        Avalonia.Application.Current!.Resources["DimOpacity"] = opacity;
+        ContrastLabel.Text = name;
+    }
+
+    void ApplyAccent()
+    {
+        var (name, hex) = AccentSteps[_accentIndex];
+        var color = Color.Parse(hex);
+        Avalonia.Application.Current!.Resources["AccentBrush"] = new SolidColorBrush(color);
+        Avalonia.Application.Current!.Resources["AccentDimBrush"] = new SolidColorBrush(color, 0.4);
+        AccentLabel.Text = name;
+    }
+
+    void Persist(Action<SplitGuard.Models.UiPrefs> update)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        update(vm.Prefs);
+        vm.PersistPrefs();
+    }
+
+    void OnThemeClick(object? sender, RoutedEventArgs e)
+    {
+        _themeIndex = (_themeIndex + 1) % ThemeSteps.Length;
+        ApplyTheme();
+        Persist(p => p.Theme = ThemeSteps[_themeIndex].Name);
+    }
+
+    void OnContrastClick(object? sender, RoutedEventArgs e)
+    {
+        _contrastIndex = (_contrastIndex + 1) % ContrastSteps.Length;
+        ApplyContrast();
+        Persist(p => p.Contrast = ContrastSteps[_contrastIndex].Name);
+    }
+
+    void OnAccentClick(object? sender, RoutedEventArgs e)
+    {
+        _accentIndex = (_accentIndex + 1) % AccentSteps.Length;
+        ApplyAccent();
+        Persist(p => p.Accent = AccentSteps[_accentIndex].Name);
     }
 
     public async Task CopyToClipboardAsync(string text)

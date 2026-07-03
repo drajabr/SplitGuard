@@ -24,10 +24,14 @@ public class MainViewModel : ObservableObject, ITunnelHost
     public MainViewModel(IDialogs dialogs)
     {
         _dialogs = dialogs;
+        _config = _store.Load(); // sync, so UI prefs are available before the window shows
         _tunnels.StatsUpdated += (name, stats) => Dispatcher.UIThread.Post(() =>
             Tunnels.FirstOrDefault(t => !t.IsExternal && t.Name == name)?.ApplyStats(stats));
         _external.AdaptersChanged += () => Dispatcher.UIThread.Post(() => _ = RefreshExternalsAsync());
     }
+
+    public UiPrefs Prefs => _config.Ui;
+    public void PersistPrefs() => _store.Save(_config);
 
     bool _gpoWarning;
     public bool GpoWarning { get => _gpoWarning; set => Set(ref _gpoWarning, value); }
@@ -41,7 +45,6 @@ public class MainViewModel : ObservableObject, ITunnelHost
 
     public async Task InitializeAsync()
     {
-        _config = _store.Load();
         GpoWarning = NrptService.IsGpoNrptActive();
         foreach (var t in _config.Tunnels)
             Tunnels.Add(new TunnelViewModel(this, t));
@@ -255,6 +258,23 @@ public class MainViewModel : ObservableObject, ITunnelHost
     }
 
     public void CopyText(string text) => _ = _dialogs.CopyToClipboardAsync(text);
+
+    // Ctrl+N: fresh keypair, one empty peer, straight into edit; cancel deletes it.
+    public void CreateEmptyTunnel()
+    {
+        var name = "tunnel";
+        for (int i = 2; _config.Tunnels.Any(t => t.Name == name); i++) name = $"tunnel-{i}";
+        var cfg = new TunnelConfig
+        {
+            Name = name,
+            PrivateKeyProtected = RuleStore.Protect(Convert.ToBase64String(Curve25519.GeneratePrivateKey())),
+            Peers = new List<PeerConfig> { new() },
+        };
+        _config.Tunnels.Add(cfg);
+        var vm = new TunnelViewModel(this, cfg) { IsDraft = true };
+        Tunnels.Add(vm);
+        vm.BeginEditCommand.Execute(null);
+    }
 
     // ---- add tunnel (drag-drop or Ctrl+V) --------------------------------------
 
