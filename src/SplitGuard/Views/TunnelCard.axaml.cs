@@ -12,36 +12,69 @@ namespace SplitGuard.Views;
 
 public partial class TunnelCard : UserControl
 {
-    // Minimal wg-quick highlighting: comments, [sections], keys. Mid-tone colors
-    // chosen to stay readable in both light and dark themes.
-    const string ConfXshd = """
+    // wg-quick highlighting sharing the fields-mode palette: property names in the
+    // accent color, values typed (keys purple, IPs blue, masks/ports amber, domains green).
+    static string BuildXshd(string prop, string section, string key, string ip, string num, string domain) => $$"""
         <SyntaxDefinition name="WgConf" xmlns="http://icsharpcode.net/sharpdevelop/syntaxdefinition/2008">
           <Color name="Comment" foreground="#6A9955" />
-          <Color name="Section" foreground="#C77E16" fontWeight="bold" />
-          <Color name="Key" foreground="#3E8ED0" />
+          <Color name="Section" foreground="{{section}}" fontWeight="bold" />
+          <Color name="Prop" foreground="{{prop}}" />
+          <Color name="Key64" foreground="{{key}}" />
+          <Color name="Ip" foreground="{{ip}}" />
+          <Color name="Num" foreground="{{num}}" />
+          <Color name="Domain" foreground="{{domain}}" />
           <RuleSet>
             <Span color="Comment" begin="#" />
             <Rule color="Section">\[[^\]]*\]</Rule>
-            <Rule color="Key">^\s*[A-Za-z]+(?=\s*=)</Rule>
+            <Rule color="Prop">^\s*[A-Za-z]+(?=\s*=)</Rule>
+            <Rule color="Key64">[A-Za-z0-9+/]{42,44}=</Rule>
+            <Rule color="Ip">\b\d{1,3}(\.\d{1,3}){3}\b</Rule>
+            <Rule color="Num">[/:]\d+\b</Rule>
+            <Rule color="Num">\b\d+\b</Rule>
+            <Rule color="Domain">\b(\*\.)?[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+\b</Rule>
           </RuleSet>
         </SyntaxDefinition>
         """;
 
-    static readonly IHighlightingDefinition ConfHighlighting = LoadHighlighting();
+    static IHighlightingDefinition _confHighlighting =
+        LoadHighlighting(BuildXshd("#3378DD", "#C77E16", "#9A6FD0", "#4098D7", "#C77E16", "#58A65C"));
 
-    static IHighlightingDefinition LoadHighlighting()
+    static event Action? HighlightingChanged;
+
+    public static void UpdateHighlighting(string prop, string section, string key, string ip, string num, string domain)
     {
-        using var reader = XmlReader.Create(new StringReader(ConfXshd));
+        _confHighlighting = LoadHighlighting(BuildXshd(prop, section, key, ip, num, domain));
+        HighlightingChanged?.Invoke();
+    }
+
+    static IHighlightingDefinition LoadHighlighting(string xshd)
+    {
+        using var reader = XmlReader.Create(new StringReader(xshd));
         return HighlightingLoader.Load(reader, HighlightingManager.Instance);
     }
 
     TunnelViewModel? _vm;
     bool _syncingEditor;
 
+    readonly Action _onHighlightingChanged;
+
+    protected override void OnAttachedToVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        HighlightingChanged += _onHighlightingChanged;
+    }
+
+    protected override void OnDetachedFromVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        HighlightingChanged -= _onHighlightingChanged;
+    }
+
     public TunnelCard()
     {
         InitializeComponent();
-        ConfEditor.SyntaxHighlighting = ConfHighlighting;
+        _onHighlightingChanged = () => ConfEditor.SyntaxHighlighting = _confHighlighting;
+        ConfEditor.SyntaxHighlighting = _confHighlighting;
         ConfEditor.TextChanged += (_, _) =>
         {
             if (_syncingEditor || _vm is null) return;

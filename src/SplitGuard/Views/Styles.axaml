@@ -8,7 +8,7 @@
     <Setter Property="FontSize" Value="13" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
     <Setter Property="Background" Value="#10808080" />
-    <Setter Property="BorderBrush" Value="#28808080" />
+    <Setter Property="BorderBrush" Value="{DynamicResource FieldBorderBrush}" />
   </Style>
   <Style Selector="TextBox.mono">
     <Setter Property="FontFamily" Value="Consolas,Courier New,monospace" />
@@ -21,7 +21,7 @@
     <Setter Property="MinWidth" Value="72" />
     <Setter Property="Height" Value="26" />
     <Setter Property="Background" Value="Transparent" />
-    <Setter Property="BorderBrush" Value="#38808080" />
+    <Setter Property="BorderBrush" Value="{DynamicResource FieldBorderBrush}" />
   </Style>
 
   <Style Selector="Button">
@@ -63,7 +63,7 @@
   </Style>
 
   <Style Selector="Border.card">
-    <Setter Property="BorderBrush" Value="#26808080" />
+    <Setter Property="BorderBrush" Value="{DynamicResource HairlineBrush}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="4" />
   </Style>
@@ -123,7 +123,7 @@
   </Style>
 
   <Style Selector="Border.peerblock">
-    <Setter Property="BorderBrush" Value="#20808080" />
+    <Setter Property="BorderBrush" Value="{DynamicResource HairlineBrush}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="4" />
   </Style>
@@ -190,28 +190,28 @@
   </Style>
 
   <Style Selector="TextBlock.synip">
-    <Setter Property="Foreground" Value="#4098D7" />
+    <Setter Property="Foreground" Value="{DynamicResource SynIpBrush}" />
   </Style>
   <Style Selector="TextBlock.syndomain">
-    <Setter Property="Foreground" Value="#58A65C" />
+    <Setter Property="Foreground" Value="{DynamicResource SynDomainBrush}" />
   </Style>
   <Style Selector="TextBlock.synkey">
-    <Setter Property="Foreground" Value="#9A6FD0" />
+    <Setter Property="Foreground" Value="{DynamicResource SynKeyBrush}" />
   </Style>
   <Style Selector="TextBlock.synnum">
-    <Setter Property="Foreground" Value="#C77E16" />
+    <Setter Property="Foreground" Value="{DynamicResource SynNumBrush}" />
   </Style>
   <Style Selector="TextBox.synip">
-    <Setter Property="Foreground" Value="#4098D7" />
+    <Setter Property="Foreground" Value="{DynamicResource SynIpBrush}" />
   </Style>
   <Style Selector="TextBox.syndomain">
-    <Setter Property="Foreground" Value="#58A65C" />
+    <Setter Property="Foreground" Value="{DynamicResource SynDomainBrush}" />
   </Style>
   <Style Selector="TextBox.synkey">
-    <Setter Property="Foreground" Value="#9A6FD0" />
+    <Setter Property="Foreground" Value="{DynamicResource SynKeyBrush}" />
   </Style>
   <Style Selector="TextBox.synnum">
-    <Setter Property="Foreground" Value="#C77E16" />
+    <Setter Property="Foreground" Value="{DynamicResource SynNumBrush}" />
   </Style>
 
   <Style Selector="ToggleSwitch">
@@ -220,7 +220,7 @@
     <Setter Property="MinWidth" Value="0" />
   </Style>
   <Style Selector="Separator">
-    <Setter Property="Background" Value="#1E808080" />
+    <Setter Property="Background" Value="{DynamicResource HairlineBrush}" />
     <Setter Property="Height" Value="1" />
     <Setter Property="Margin" Value="0" />
   </Style>

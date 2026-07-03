@@ -48,7 +48,7 @@
       <StackPanel>
         <Separator />
 
-        <Border Margin="12,8" CornerRadius="4" Background="#10808080" BorderBrush="#28808080" BorderThickness="1"
+        <Border Margin="12,8" CornerRadius="4" Background="#10808080" BorderBrush="{DynamicResource FieldBorderBrush}" BorderThickness="1"
                 IsVisible="{Binding IsTextMode}">
           <ae:TextEditor Name="ConfEditor" MinHeight="220" Padding="8,6"
                          FontFamily="Consolas,Courier New,monospace" FontSize="12"
@@ -123,7 +123,7 @@
             </StackPanel>
           </StackPanel>
 
-          <Border Grid.Column="1" Name="PeersHost" BorderBrush="#20808080" BorderThickness="1,0,0,0">
+          <Border Grid.Column="1" Name="PeersHost" BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="1,0,0,0">
             <StackPanel Margin="0,8,0,2">
               <ItemsControl ItemsSource="{Binding Peers}">
                 <ItemsControl.ItemTemplate>

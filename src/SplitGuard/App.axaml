@@ -6,6 +6,12 @@
     <x:Double x:Key="DimOpacity">0.6</x:Double>
     <SolidColorBrush x:Key="AccentBrush">#3378DD</SolidColorBrush>
     <SolidColorBrush x:Key="AccentDimBrush">#663378DD</SolidColorBrush>
+    <SolidColorBrush x:Key="HairlineBrush">#33808080</SolidColorBrush>
+    <SolidColorBrush x:Key="FieldBorderBrush">#40808080</SolidColorBrush>
+    <SolidColorBrush x:Key="SynIpBrush">#4098D7</SolidColorBrush>
+    <SolidColorBrush x:Key="SynDomainBrush">#58A65C</SolidColorBrush>
+    <SolidColorBrush x:Key="SynKeyBrush">#9A6FD0</SolidColorBrush>
+    <SolidColorBrush x:Key="SynNumBrush">#C77E16</SolidColorBrush>
   </Application.Resources>
   <Application.Styles>
     <FluentTheme />
