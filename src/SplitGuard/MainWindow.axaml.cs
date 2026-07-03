@@ -1,10 +1,12 @@
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Styling;
+using Avalonia.VisualTree;
 using SplitGuard.ViewModels;
 
 namespace SplitGuard.Views;
@@ -71,14 +73,20 @@ public partial class MainWindow : Window, IDialogs
     {
         InitializeComponent();
         // The header lives inside the extended title bar area — make it draggable.
-        HeaderBar.PointerPressed += (_, e) =>
-        {
-            if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed && e.Source is not Button)
-                BeginMoveDrag(e);
-        };
+        // Tunnel so we see the press before children; walk up from the hit element and
+        // only skip the drag when the press lands on an actual interactive control.
+        HeaderBar.AddHandler(PointerPressedEvent, OnHeaderPressed, RoutingStrategies.Tunnel);
         AddHandler(DragDrop.DragOverEvent, (_, e) =>
             e.DragEffects = e.Data.Contains(DataFormats.Files) ? DragDropEffects.Copy : DragDropEffects.None);
         AddHandler(DragDrop.DropEvent, OnDrop);
+    }
+
+    void OnHeaderPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        for (var el = e.Source as Avalonia.Visual; el is not null && el != HeaderBar; el = el.GetVisualParent())
+            if (el is Button or ToggleButton or ComboBox) return;
+        BeginMoveDrag(e);
     }
 
     async void OnDrop(object? sender, DragEventArgs e)
