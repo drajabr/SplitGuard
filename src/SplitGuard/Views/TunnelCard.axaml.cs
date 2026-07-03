@@ -27,14 +27,17 @@ public partial class TunnelCard : UserControl
                 PeersHost.BorderThickness = new Avalonia.Thickness(1, 0, 0, 0);
             }
         };
-        AddHandler(Gestures.TappedEvent, OnTapped);
+        // PointerPressed instead of Tapped: Tapped suppresses the second of two fast
+        // clicks (double-tap detection), which made rapid expand/collapse feel dead.
+        AddHandler(PointerPressedEvent, OnCardPressed, handledEventsToo: false);
     }
 
     // Clicking blank card space toggles: collapsed → edit, editing → cancel/collapse.
     // Clicks on controls, chips, and peer blocks never count as blank space.
-    void OnTapped(object? sender, TappedEventArgs e)
+    void OnCardPressed(object? sender, PointerPressedEventArgs e)
     {
         if (DataContext is not TunnelViewModel vm) return;
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
         var element = e.Source as Avalonia.Visual;
         while (element is not null && element != this)
         {

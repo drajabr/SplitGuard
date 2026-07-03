@@ -18,7 +18,7 @@
             <TextBlock Classes="mono" Text="{Binding DownRate}" Opacity="0.75" />
           </StackPanel>
           <TextBlock Classes="muted" Text="Disconnected" IsVisible="{Binding !IsConnected}" />
-          <ToggleSwitch IsChecked="{Binding IsConnected}" IsVisible="{Binding ShowToggle}" />
+          <ToggleSwitch IsChecked="{Binding IsConnected}" IsVisible="{Binding !IsExternal}" IsEnabled="{Binding !IsEditing}" />
         </StackPanel>
         <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
           <Ellipse Classes="dot" Classes.up="{Binding IsConnected}" />
