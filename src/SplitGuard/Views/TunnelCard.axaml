@@ -23,7 +23,7 @@
         </StackPanel>
         <Grid VerticalAlignment="Center" ColumnDefinitions="Auto,Auto,Auto,*">
           <Ellipse Grid.Column="0" Classes="dot" Classes.up="{Binding IsConnected}" />
-          <TextBox Grid.Column="1" Width="150" Margin="10,0,0,0" VerticalAlignment="Center"
+          <TextBox Grid.Column="1" MinWidth="60" HorizontalAlignment="Left" Margin="10,0,0,0" VerticalAlignment="Center"
                    FontSize="{DynamicResource Fs135}" FontWeight="Medium"
                    Foreground="{DynamicResource AccentBrush}" Text="{Binding Name}"
                    Classes.plainname="{Binding !IsEditing}"
