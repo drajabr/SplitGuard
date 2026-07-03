@@ -14,9 +14,9 @@ public class UiPrefs
     public string Theme { get; set; } = "auto";
     public string Contrast { get; set; } = "normal";
     public string Accent { get; set; } = "blue";
-    public string Font { get; set; } = "variable";
-    public string FontSize { get; set; } = "normal";
-    public string Density { get; set; } = "cozy";
+    public string Font { get; set; } = "segoe";
+    public string FontSize { get; set; } = "100%";
+    public string Density { get; set; } = "100%";
 }
 
 public class TunnelConfig

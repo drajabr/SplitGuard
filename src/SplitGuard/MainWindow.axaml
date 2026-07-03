@@ -37,19 +37,19 @@
           <Button Classes="icon" Name="FontButton" Click="OnFontClick" ToolTip.Tip="Font family">
             <StackPanel Orientation="Horizontal" Spacing="5">
               <TextBlock Classes="glyph" Text="&#xE8D2;" Opacity="0.6" />
-              <TextBlock Name="FontLabel" FontSize="{DynamicResource Fs115}" Opacity="0.65" VerticalAlignment="Center" Text="variable" />
+              <TextBlock Name="FontLabel" FontSize="{DynamicResource Fs115}" Opacity="0.65" VerticalAlignment="Center" Text="segoe" />
             </StackPanel>
           </Button>
           <Button Classes="icon" Name="SizeButton" Click="OnSizeClick" ToolTip.Tip="Font size">
             <StackPanel Orientation="Horizontal" Spacing="5">
               <TextBlock Classes="glyph" Text="&#xE8E9;" Opacity="0.6" />
-              <TextBlock Name="SizeLabel" FontSize="{DynamicResource Fs115}" Opacity="0.65" VerticalAlignment="Center" Text="normal" />
+              <TextBlock Name="SizeLabel" FontSize="{DynamicResource Fs115}" Opacity="0.65" VerticalAlignment="Center" Text="100%" />
             </StackPanel>
           </Button>
           <Button Classes="icon" Name="DensityButton" Click="OnDensityClick" ToolTip.Tip="Display size">
             <StackPanel Orientation="Horizontal" Spacing="5">
               <TextBlock Classes="glyph" Text="&#xE71E;" Opacity="0.6" />
-              <TextBlock Name="DensityLabel" FontSize="{DynamicResource Fs115}" Opacity="0.65" VerticalAlignment="Center" Text="cozy" />
+              <TextBlock Name="DensityLabel" FontSize="{DynamicResource Fs115}" Opacity="0.65" VerticalAlignment="Center" Text="100%" />
             </StackPanel>
           </Button>
         </StackPanel>
@@ -74,7 +74,7 @@
       <TextBlock Text="{Binding StatusText}" Classes="oktext" Classes.errtext="{Binding !StatusOk}" />
     </Border>
 
-    <ScrollViewer>
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
       <LayoutTransformControl Name="DensityHost">
       <StackPanel Margin="14,8,14,12">
         <ItemsControl ItemsSource="{Binding Tunnels}">
