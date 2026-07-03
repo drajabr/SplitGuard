@@ -3,6 +3,7 @@
              xmlns:sys="clr-namespace:System;assembly=System.Runtime"
              xmlns:vm="clr-namespace:SplitGuard.ViewModels"
              xmlns:views="clr-namespace:SplitGuard.Views"
+             xmlns:ae="using:AvaloniaEdit"
              x:Class="SplitGuard.Views.TunnelCard">
   <Border Classes="card" Classes.editing="{Binding IsEditing}" Background="Transparent">
     <StackPanel>
@@ -46,8 +47,15 @@
       <StackPanel>
         <Separator />
 
-        <TextBox Classes="mono" AcceptsReturn="True" TextWrapping="NoWrap" MinHeight="220"
-                 Margin="12,8" Text="{Binding ConfigText}" IsVisible="{Binding IsTextMode}" />
+        <Border Margin="12,8" CornerRadius="4" Background="#10808080" BorderBrush="#28808080" BorderThickness="1"
+                IsVisible="{Binding IsTextMode}">
+          <ae:TextEditor Name="ConfEditor" MinHeight="220" Padding="8,6"
+                         FontFamily="Consolas,Courier New,monospace" FontSize="12"
+                         Background="Transparent"
+                         ShowLineNumbers="False"
+                         HorizontalScrollBarVisibility="Auto"
+                         VerticalScrollBarVisibility="Auto" />
+        </Border>
 
         <Grid ColumnDefinitions="3*,7*" IsVisible="{Binding !IsTextMode}">
           <StackPanel Grid.Column="0" Margin="12,8" Spacing="8" IsVisible="{Binding ShowInterfaceSection}">

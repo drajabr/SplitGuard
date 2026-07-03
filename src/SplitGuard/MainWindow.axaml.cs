@@ -125,10 +125,28 @@ public partial class MainWindow : Window, IDialogs
     {
         var (name, hex) = AccentSteps[_accentIndex];
         var color = Color.Parse(hex);
-        Avalonia.Application.Current!.Resources["AccentBrush"] = new SolidColorBrush(color);
-        Avalonia.Application.Current!.Resources["AccentDimBrush"] = new SolidColorBrush(color, 0.4);
+        var resources = Avalonia.Application.Current!.Resources;
+        resources["AccentBrush"] = new SolidColorBrush(color);
+        resources["AccentDimBrush"] = new SolidColorBrush(color, 0.4);
+        // Fluent's own accent: recolors toggle switches, focus rings, selection, etc.
+        resources["SystemAccentColor"] = color;
+        resources["SystemAccentColorDark1"] = Shade(color, 0.85);
+        resources["SystemAccentColorDark2"] = Shade(color, 0.70);
+        resources["SystemAccentColorDark3"] = Shade(color, 0.55);
+        resources["SystemAccentColorLight1"] = Tint(color, 0.15);
+        resources["SystemAccentColorLight2"] = Tint(color, 0.30);
+        resources["SystemAccentColorLight3"] = Tint(color, 0.45);
         AccentLabel.Text = name;
     }
+
+    static Color Shade(Color c, double factor) =>
+        Color.FromRgb((byte)(c.R * factor), (byte)(c.G * factor), (byte)(c.B * factor));
+
+    static Color Tint(Color c, double factor) =>
+        Color.FromRgb(
+            (byte)(c.R + (255 - c.R) * factor),
+            (byte)(c.G + (255 - c.G) * factor),
+            (byte)(c.B + (255 - c.B) * factor));
 
     void Persist(Action<SplitGuard.Models.UiPrefs> update)
     {
