@@ -40,6 +40,10 @@ public class RelayCommand : ICommand
     public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
 }
 
+// Sentinel item rendered as the inline "+" add box at the end of a chip list,
+// so it wraps together with the chips instead of overflowing.
+public sealed class AddSlot { }
+
 public static class Format
 {
     public static string Rate(double bytesPerSecond) => bytesPerSecond switch

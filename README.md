@@ -16,7 +16,6 @@ WireGuard's `DNS =` setting is all-or-nothing: it takes over DNS for the whole m
 - Per-peer DNS and domain lists; add or remove domains live while connected
 - Pin any peer's DNS as the device-wide resolver, with smart fallback and auto-failover
 - Works alongside tunnels managed by the official WireGuard app (attach domains to them too)
-- Built-in resolution tester so you can verify the split actually works
 - Everything not listed resolves via your normal system DNS — guaranteed untouched
 
 ## Install
@@ -25,11 +24,11 @@ Download the latest zip from the Releases page, extract, and run `WgSplitDns.exe
 
 ## Usage
 
-1. **Add tunnel** — import a `.conf` file or paste a config.
+1. **Add a tunnel** — drop a `.conf` file onto the window, or copy a config and press Ctrl+V.
 2. Toggle the tunnel on — connection state, handshake, and traffic show on the card.
-3. Add domains to a peer (e.g. `*.corp.example`) — they resolve through that peer's DNS immediately. Optionally pin one DNS as the device-wide resolver.
+3. Edit the tunnel (pencil) to add domains to a peer (e.g. `*.corp.example`) — on save they resolve through that peer's DNS. Optionally pin one DNS as the device-wide resolver.
 
-Verify with the test bar at the bottom: enter a hostname, pick "Auto (effective)", and see which server answered.
+Verify resolution with PowerShell's `Resolve-DnsName <host>` (not `nslookup` — see caveats).
 
 ## How it works
 
@@ -49,7 +48,7 @@ Output: `dist/WgSplitDns-win-x64.zip`. The official signed `wireguard.dll` is fe
 
 ## Caveats
 
-- **Don't test with `nslookup`** — it bypasses Windows DNS policy by design. Use the in-app tester or `Resolve-DnsName`.
+- **Don't test with `nslookup`** — it bypasses Windows DNS policy by design. Use `Resolve-DnsName` in PowerShell.
 - Browsers with "secure DNS" (DoH) enabled bypass any local DNS mechanism, including this one.
 - On domain-joined machines, Group Policy DNS policy overrides local rules — the app warns you if that's the case.
 - A tunnel's `DNS =` config line is used as that peer's suggested DNS server; it is deliberately never applied as global DNS.

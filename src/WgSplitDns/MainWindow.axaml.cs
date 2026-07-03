@@ -78,39 +78,6 @@ public partial class MainWindow : Window, IDialogs
         ToolTip.SetTip(ThemeButton, $"Theme: {name}");
     }
 
-    public async Task<bool> ConfirmAsync(string title, string message)
-    {
-        var dialog = new Window
-        {
-            Title = title,
-            Width = 380,
-            SizeToContent = SizeToContent.Height,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            CanResize = false,
-        };
-        var yes = new Button { Content = "Delete", Classes = { "primary" } };
-        var no = new Button { Content = "Cancel" };
-        yes.Click += (_, _) => dialog.Close(true);
-        no.Click += (_, _) => dialog.Close(false);
-        dialog.Content = new StackPanel
-        {
-            Margin = new Avalonia.Thickness(16),
-            Spacing = 14,
-            Children =
-            {
-                new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap },
-                new StackPanel
-                {
-                    Orientation = Orientation.Horizontal,
-                    HorizontalAlignment = HorizontalAlignment.Right,
-                    Spacing = 8,
-                    Children = { no, yes },
-                },
-            },
-        };
-        return await dialog.ShowDialog<bool?>(this) == true;
-    }
-
     public async Task CopyToClipboardAsync(string text)
     {
         if (Clipboard is not null)

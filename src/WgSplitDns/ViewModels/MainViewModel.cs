@@ -7,13 +7,7 @@ namespace WgSplitDns.ViewModels;
 
 public interface IDialogs
 {
-    Task<bool> ConfirmAsync(string title, string message);
     Task CopyToClipboardAsync(string text);
-}
-
-public record TestTarget(string Label, string? Server)
-{
-    public override string ToString() => Label;
 }
 
 public class MainViewModel : ObservableObject, ITunnelHost
@@ -26,12 +20,10 @@ public class MainViewModel : ObservableObject, ITunnelHost
     AppConfig _config = new();
 
     public ObservableCollection<TunnelViewModel> Tunnels { get; } = new();
-    public ObservableCollection<TestTarget> TestTargets { get; } = new();
 
     public MainViewModel(IDialogs dialogs)
     {
         _dialogs = dialogs;
-        TestCommand = new RelayCommand(() => _ = RunTestAsync(), () => !string.IsNullOrWhiteSpace(TestHost));
         _tunnels.StatsUpdated += (name, stats) => Dispatcher.UIThread.Post(() =>
             Tunnels.FirstOrDefault(t => !t.IsExternal && t.Name == name)?.ApplyStats(stats));
         _external.AdaptersChanged += () => Dispatcher.UIThread.Post(() => _ = RefreshExternalsAsync());
@@ -40,24 +32,12 @@ public class MainViewModel : ObservableObject, ITunnelHost
     bool _gpoWarning;
     public bool GpoWarning { get => _gpoWarning; set => Set(ref _gpoWarning, value); }
 
-    string _testHost = "";
-    public string TestHost
-    {
-        get => _testHost;
-        set { if (Set(ref _testHost, value)) TestCommand.RaiseCanExecuteChanged(); }
-    }
+    string _statusText = "";
+    public string StatusText { get => _statusText; set { if (Set(ref _statusText, value)) Raise(nameof(HasStatus)); } }
+    public bool HasStatus => StatusText.Length > 0;
 
-    TestTarget? _selectedTestTarget;
-    public TestTarget? SelectedTestTarget { get => _selectedTestTarget; set => Set(ref _selectedTestTarget, value); }
-
-    string _testResult = "";
-    public string TestResult { get => _testResult; set { if (Set(ref _testResult, value)) Raise(nameof(HasTestResult)); } }
-    public bool HasTestResult => TestResult.Length > 0;
-
-    bool _testOk;
-    public bool TestOk { get => _testOk; set => Set(ref _testOk, value); }
-
-    public RelayCommand TestCommand { get; }
+    bool _statusOk;
+    public bool StatusOk { get => _statusOk; set => Set(ref _statusOk, value); }
 
     public async Task InitializeAsync()
     {
@@ -68,7 +48,6 @@ public class MainViewModel : ObservableObject, ITunnelHost
         await RefreshExternalsAsync();
         await Task.Run(Reconcile);
         RefreshPins();
-        RebuildTestTargets();
         await Task.Run(RefreshCatchAll);
     }
 
@@ -95,7 +74,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
         }
         catch (Exception ex)
         {
-            Dispatcher.UIThread.Post(() => { TestResult = $"NRPT reconcile failed: {ex.Message}"; TestOk = false; });
+            Dispatcher.UIThread.Post(() => { StatusText = $"NRPT reconcile failed: {ex.Message}"; StatusOk = false; });
         }
     }
 
@@ -212,14 +191,14 @@ public class MainViewModel : ObservableObject, ITunnelHost
         }
         catch (Exception ex)
         {
-            Dispatcher.UIThread.Post(() => { TestResult = $"Device DNS update failed: {ex.Message}"; TestOk = false; });
+            Dispatcher.UIThread.Post(() => { StatusText = $"Device DNS update failed: {ex.Message}"; StatusOk = false; });
         }
     }
 
     public bool IsDomainInUse(string domain, PeerViewModel except) =>
         Tunnels.SelectMany(t => t.Peers)
             .Where(p => !ReferenceEquals(p, except))
-            .SelectMany(p => p.Domains)
+            .SelectMany(p => p.DomainValues)
             .Contains(domain, StringComparer.OrdinalIgnoreCase);
 
     // ---- edit/save/delete ---------------------------------------------------
@@ -228,7 +207,6 @@ public class MainViewModel : ObservableObject, ITunnelHost
     {
         _store.Save(_config);
         RefreshPins();
-        RebuildTestTargets();
         _ = Task.Run(() =>
         {
             if (vm.IsExternal)
@@ -263,10 +241,8 @@ public class MainViewModel : ObservableObject, ITunnelHost
             _nrpt.ApplyPeerRules(ExtName(vm.Name), vm.Name, ext.Domains, ext.Dns);
     }
 
-    public async void RequestDelete(TunnelViewModel vm)
+    public void RequestDelete(TunnelViewModel vm)
     {
-        if (!await _dialogs.ConfirmAsync("Delete tunnel", $"Delete '{vm.Name}' and its DNS rules? This cannot be undone."))
-            return;
         if (vm.IsConnected && !vm.IsExternal) RequestDisconnect(vm);
         if (_config.PinnedDns?.TunnelName == (vm.IsExternal ? ExtName(vm.Name) : vm.Name))
             _config.PinnedDns = null;
@@ -274,7 +250,6 @@ public class MainViewModel : ObservableObject, ITunnelHost
         else _config.Tunnels.Remove(vm.Config!);
         _store.Save(_config);
         Tunnels.Remove(vm);
-        RebuildTestTargets();
         _ = Task.Run(RefreshCatchAll);
     }
 
@@ -290,8 +265,8 @@ public class MainViewModel : ObservableObject, ITunnelHost
         var parsed = WireGuardConf.Parse(text);
         if (!PeerViewModel.IsValidKey(parsed.PrivateKey))
         {
-            TestResult = "Import failed: config has no valid PrivateKey";
-            TestOk = false;
+            StatusText = "Import failed: config has no valid PrivateKey";
+            StatusOk = false;
             return;
         }
         var name = suggestedName ?? parsed.Name ?? "tunnel";
@@ -317,9 +292,8 @@ public class MainViewModel : ObservableObject, ITunnelHost
         _config.Tunnels.Add(cfg);
         _store.Save(_config);
         Tunnels.Add(new TunnelViewModel(this, cfg));
-        RebuildTestTargets();
-        TestResult = $"Tunnel '{name}' added";
-        TestOk = true;
+        StatusText = $"Tunnel '{name}' added";
+        StatusOk = true;
     }
 
     // ---- externals -------------------------------------------------------------
@@ -372,56 +346,6 @@ public class MainViewModel : ObservableObject, ITunnelHost
             }
         }
         RefreshPins();
-        RebuildTestTargets();
-    }
-
-    // ---- test bar -----------------------------------------------------------------
-
-    void RebuildTestTargets()
-    {
-        var previous = SelectedTestTarget?.Label;
-        TestTargets.Clear();
-        TestTargets.Add(new TestTarget("Auto (effective)", null));
-        foreach (var t in Tunnels)
-        {
-            var withDns = t.Peers.Where(p => p.HasDns).ToList();
-            for (int i = 0; i < withDns.Count; i++)
-            {
-                var label = withDns.Count == 1 ? $"{t.Name} — {withDns[i].Dns}" : $"{t.Name} (peer {i + 1}) — {withDns[i].Dns}";
-                TestTargets.Add(new TestTarget(label, withDns[i].Dns.Trim()));
-            }
-        }
-        TestTargets.Add(new TestTarget("System DNS", "system"));
-        SelectedTestTarget = TestTargets.FirstOrDefault(t => t.Label == previous) ?? TestTargets[0];
-    }
-
-    async Task RunTestAsync()
-    {
-        var host = TestHost.Trim();
-        var target = SelectedTestTarget ?? TestTargets[0];
-        TestResult = "testing…";
-        TestOk = true;
-        TestResult2(await RunTargetAsync(host, target));
-    }
-
-    async Task<TestResult> RunTargetAsync(string host, TestTarget target)
-    {
-        if (target.Server is null)
-            return await TestService.ResolveAutoAsync(host);
-        if (target.Server == "system")
-        {
-            var server = SystemDns.Snapshot().FirstOrDefault();
-            if (server is null) return new TestResult(false, "No system DNS server found");
-            return await TestService.ResolveDirectAsync(host, server, "system");
-        }
-        var label = target.Label.Contains(" — ") ? target.Label[..target.Label.IndexOf(" — ", StringComparison.Ordinal)] : target.Label;
-        return await TestService.ResolveDirectAsync(host, target.Server, label);
-    }
-
-    void TestResult2(TestResult result)
-    {
-        TestOk = result.Success;
-        TestResult = result.Message;
     }
 
     // ---- shutdown --------------------------------------------------------------------

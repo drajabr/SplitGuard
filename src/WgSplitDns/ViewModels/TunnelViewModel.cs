@@ -38,7 +38,7 @@ public class TunnelViewModel : ObservableObject
         InitCommands();
         Name = external.AdapterName;
         var peer = new PeerViewModel(this) { Dns = external.Dns ?? "" };
-        foreach (var d in external.Domains) peer.Domains.Add(d);
+        PeerViewModel.Fill(peer.Domains, external.Domains);
         Peers.Add(peer);
     }
 
@@ -47,7 +47,7 @@ public class TunnelViewModel : ObservableObject
         BeginEditCommand = new RelayCommand(BeginEdit);
         CancelEditCommand = new RelayCommand(CancelEdit);
         SaveEditCommand = new RelayCommand(SaveEdit);
-        DeleteCommand = new RelayCommand(() => Host.RequestDelete(this));
+        DeleteCommand = new RelayCommand(DeleteClicked);
         CopyPublicKeyCommand = new RelayCommand(() => Host.CopyText(PublicKeyFull));
         AddPeerCommand = new RelayCommand(AddPeer);
         AddAddressCommand = new RelayCommand(AddAddress);
@@ -59,8 +59,7 @@ public class TunnelViewModel : ObservableObject
     {
         Name = Config!.Name;
         ListenPortText = Config.ListenPort > 0 ? Config.ListenPort.ToString() : "";
-        Addresses.Clear();
-        foreach (var a in Config.Addresses) Addresses.Add(a);
+        PeerViewModel.Fill(Addresses, Config.Addresses);
         Peers.Clear();
         foreach (var p in Config.Peers)
         {
@@ -72,8 +71,8 @@ public class TunnelViewModel : ObservableObject
                 HasPsk = p.PresharedKeyProtected is not null,
                 KeepaliveText = p.PersistentKeepalive > 0 ? p.PersistentKeepalive.ToString() : "",
             };
-            foreach (var ip in p.AllowedIps) vm.AllowedIps.Add(ip);
-            foreach (var d in p.Domains) vm.Domains.Add(d);
+            PeerViewModel.Fill(vm.AllowedIps, p.AllowedIps);
+            PeerViewModel.Fill(vm.Domains, p.Domains);
             Peers.Add(vm);
         }
         RefreshPublicKey();
@@ -92,7 +91,8 @@ public class TunnelViewModel : ObservableObject
     public string PublicKeyShort =>
         PublicKeyFull.Length > 12 ? $"{PublicKeyFull[..5]}…{PublicKeyFull[^5..]}" : PublicKeyFull;
 
-    public ObservableCollection<string> Addresses { get; } = new();
+    public ObservableCollection<object> Addresses { get; } = new() { new AddSlot() };
+    public IEnumerable<string> AddressValues => Addresses.OfType<string>();
     public ObservableCollection<PeerViewModel> Peers { get; } = new();
 
     string _newAddress = "";
@@ -168,6 +168,32 @@ public class TunnelViewModel : ObservableObject
     string _validationError = "";
     public string ValidationError { get => _validationError; set => Set(ref _validationError, value); }
 
+    // Two-click delete: first click arms (bold "Delete?"), second within 3 s deletes.
+    bool _deleteArmed;
+    public bool DeleteArmed
+    {
+        get => _deleteArmed;
+        set { if (Set(ref _deleteArmed, value)) Raise(nameof(DeleteLabel)); }
+    }
+
+    public string DeleteLabel => DeleteArmed ? "Delete?" : "Delete";
+
+    int _armVersion;
+
+    async void DeleteClicked()
+    {
+        if (DeleteArmed)
+        {
+            DeleteArmed = false;
+            Host.RequestDelete(this);
+            return;
+        }
+        DeleteArmed = true;
+        var version = ++_armVersion;
+        await Task.Delay(3000);
+        if (version == _armVersion) DeleteArmed = false;
+    }
+
     string _headerHandshake = "";
     public string HeaderHandshake { get => _headerHandshake; set => Set(ref _headerHandshake, value); }
 
@@ -209,20 +235,20 @@ public class TunnelViewModel : ObservableObject
     // Everything that requires a tunnel reconnect when it changes (DNS/domains excluded).
     string ConnSnapshot() => string.Join("|",
         Name.Trim(), PrivateKeyEdit.Trim(), ListenPortText.Trim(),
-        string.Join(",", Addresses),
+        string.Join(",", AddressValues),
         string.Join(";", Peers.Select(p =>
-            $"{p.PublicKey.Trim()},{p.PresharedKey.Trim()},{p.Endpoint.Trim()},{string.Join("+", p.AllowedIps)},{p.ParsedKeepalive}")));
+            $"{p.PublicKey.Trim()},{p.PresharedKey.Trim()},{p.Endpoint.Trim()},{string.Join("+", p.AllowedIpValues)},{p.ParsedKeepalive}")));
 
     void CancelEdit()
     {
+        DeleteArmed = false;
         IsEditing = false;
         PrivateKeyEdit = "";
         ValidationError = "";
         if (IsExternal)
         {
             Peers[0].Dns = External!.Dns ?? "";
-            Peers[0].Domains.Clear();
-            foreach (var d in External.Domains) Peers[0].Domains.Add(d);
+            PeerViewModel.Fill(Peers[0].Domains, External.Domains);
         }
         else
         {
@@ -244,23 +270,23 @@ public class TunnelViewModel : ObservableObject
         if (IsExternal)
         {
             External!.Dns = Peers[0].HasDns ? Peers[0].Dns.Trim() : null;
-            External.Domains = Peers[0].Domains.ToList();
+            External.Domains = Peers[0].DomainValues.ToList();
         }
         else
         {
             Config!.Name = Name.Trim();
             Config.PrivateKeyProtected = RuleStore.Protect(PrivateKeyEdit.Trim());
             Config.ListenPort = ushort.TryParse(ListenPortText.Trim(), out var lp) ? lp : (ushort)0;
-            Config.Addresses = Addresses.ToList();
+            Config.Addresses = AddressValues.ToList();
             Config.Peers = Peers.Select(p => new PeerConfig
             {
                 PublicKey = p.PublicKey.Trim(),
                 PresharedKeyProtected = string.IsNullOrWhiteSpace(p.PresharedKey) ? null : RuleStore.Protect(p.PresharedKey.Trim()),
                 Endpoint = p.Endpoint.Trim(),
-                AllowedIps = p.AllowedIps.ToList(),
+                AllowedIps = p.AllowedIpValues.ToList(),
                 PersistentKeepalive = p.ParsedKeepalive,
                 Dns = p.HasDns ? p.Dns.Trim() : null,
-                Domains = p.Domains.ToList(),
+                Domains = p.DomainValues.ToList(),
             }).ToList();
             foreach (var p in Peers) p.HasPsk = !string.IsNullOrWhiteSpace(p.PresharedKey);
         }
@@ -278,8 +304,8 @@ public class TunnelViewModel : ObservableObject
             if (!PeerViewModel.IsValidKey(PrivateKeyEdit)) return "Private key must be a valid 32-byte base64 key";
             if (ListenPortText.Trim().Length > 0 && !ushort.TryParse(ListenPortText.Trim(), out _))
                 return $"Listen port must be 0-65535 — got '{ListenPortText}'";
-            if (Addresses.Count == 0) return "Tunnel needs at least one address";
-            foreach (var a in Addresses)
+            if (!AddressValues.Any()) return "Tunnel needs at least one address";
+            foreach (var a in AddressValues)
                 if (!WireGuardConf.TryParseCidr(a, out _, out _)) return $"Invalid address: {a}";
             if (Peers.Count == 0) return "Tunnel needs at least one peer";
         }
@@ -288,7 +314,7 @@ public class TunnelViewModel : ObservableObject
             var err = p.Validate();
             if (err is not null) return err;
         }
-        var all = Peers.SelectMany(p => p.Domains).ToList();
+        var all = Peers.SelectMany(p => p.DomainValues).ToList();
         var dup = all.GroupBy(d => d, StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1);
         if (dup is not null) return $"Domain listed twice: {dup.Key}";
         return null;
@@ -309,7 +335,7 @@ public class TunnelViewModel : ObservableObject
             AddressAddError = true;
             return;
         }
-        Addresses.Add(cidr);
+        Addresses.Insert(Addresses.Count - 1, cidr);
         NewAddress = "";
     }
 

@@ -16,7 +16,6 @@ One window, plain MVVM (hand-rolled `INotifyPropertyChanged`, no framework). Ser
 | `NrptService` | All NRPT reads/writes, catch-all chain, reconciliation, GPO detection, cache flush | Touch untagged rules; set adapter DNS; leave a dead catch-all |
 | `RuleStore` | config.json + DPAPI for secrets | Persist or log secrets in plaintext |
 | `TunnelService` | External-adapter detection, suspend/resume of their rules | Modify external tunnels |
-| `TestService` | Test-bar resolution | Touch system state |
 
 UI never calls Win32/CIM directly.
 
@@ -40,7 +39,7 @@ Avalonia 11 Fluent, stock controls + the single shared style set in `Views/Style
 ## Verify
 
 - Build: `.\build.ps1` (needs .NET 8 SDK only). Dev loop: `dotnet build src/WgSplitDns`. App requires elevation (manifest → UAC).
-- NRPT state: `Get-DnsClientNrptRule` (look for the tag). Resolution: in-app test bar or `Resolve-DnsName` — **never `nslookup`** (it bypasses NRPT).
+- NRPT state: `Get-DnsClientNrptRule` (look for the tag). Resolution: `Resolve-DnsName` — **never `nslookup`** (it bypasses NRPT). There is deliberately no in-app tester (removed from scope).
 - CI: push/PR builds; tag `v*` releases.
 
 ## Definition of done (any change)

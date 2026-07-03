@@ -52,6 +52,9 @@
   <Style Selector="Button.danger">
     <Setter Property="Foreground" Value="#C42B1C" />
   </Style>
+  <Style Selector="Button.danger.armed">
+    <Setter Property="FontWeight" Value="Bold" />
+  </Style>
   <Style Selector="Button.primary">
     <Setter Property="Background" Value="#3378DD" />
     <Setter Property="Foreground" Value="White" />

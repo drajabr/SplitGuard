@@ -11,6 +11,8 @@ public partial class PeerViewModel : ObservableObject
     public PeerViewModel(TunnelViewModel tunnel)
     {
         _tunnel = tunnel;
+        AllowedIps.Add(new AddSlot());
+        Domains.Add(new AddSlot());
         AddDomainCommand = new RelayCommand(AddDomain);
         RemoveDomainCommand = new RelayCommand(p => RemoveDomain((string)p!));
         AddAllowedIpCommand = new RelayCommand(AddAllowedIp);
@@ -52,8 +54,19 @@ public partial class PeerViewModel : ObservableObject
 
     public ushort ParsedKeepalive => ushort.TryParse(KeepaliveText.Trim(), out var v) ? v : (ushort)0;
 
-    public ObservableCollection<string> AllowedIps { get; } = new();
-    public ObservableCollection<string> Domains { get; } = new();
+    // Strings plus a trailing AddSlot (the inline "+" box).
+    public ObservableCollection<object> AllowedIps { get; } = new();
+    public ObservableCollection<object> Domains { get; } = new();
+
+    public IEnumerable<string> AllowedIpValues => AllowedIps.OfType<string>();
+    public IEnumerable<string> DomainValues => Domains.OfType<string>();
+
+    public static void Fill(ObservableCollection<object> list, IEnumerable<string> values)
+    {
+        list.Clear();
+        foreach (var v in values) list.Add(v);
+        list.Add(new AddSlot());
+    }
 
     string _newDomain = "";
     public string NewDomain
@@ -76,7 +89,13 @@ public partial class PeerViewModel : ObservableObject
     public bool AllowedIpAddError { get => _allowedIpAddError; set => Set(ref _allowedIpAddError, value); }
 
     bool _isEditing;
-    public bool IsEditing { get => _isEditing; set => Set(ref _isEditing, value); }
+    public bool IsEditing
+    {
+        get => _isEditing;
+        set { if (Set(ref _isEditing, value)) Raise(nameof(ShowKeysRow)); }
+    }
+
+    public bool ShowKeysRow => IsEditing && !IsExternal;
 
     public bool IsExternal => _tunnel.IsExternal;
 
@@ -117,7 +136,7 @@ public partial class PeerViewModel : ObservableObject
             DomainAddError = true;
             return;
         }
-        Domains.Add(domain);
+        Domains.Insert(Domains.Count - 1, domain);
         NewDomain = "";
     }
 
@@ -131,7 +150,7 @@ public partial class PeerViewModel : ObservableObject
             AllowedIpAddError = true;
             return;
         }
-        AllowedIps.Add(cidr);
+        AllowedIps.Insert(AllowedIps.Count - 1, cidr);
         NewAllowedIp = "";
     }
 
@@ -142,13 +161,13 @@ public partial class PeerViewModel : ObservableObject
         if (!IsValidKey(PublicKey)) return "Peer public key must be a valid 32-byte base64 key";
         if (!string.IsNullOrEmpty(PresharedKey) && !IsValidKey(PresharedKey)) return "Preshared key must be a valid 32-byte base64 key";
         if (!IsValidEndpoint(Endpoint)) return $"Endpoint must be host:port — got '{Endpoint}'";
-        if (AllowedIps.Count == 0) return "Peer needs at least one allowed IP";
-        foreach (var cidr in AllowedIps)
+        if (!AllowedIpValues.Any()) return "Peer needs at least one allowed IP";
+        foreach (var cidr in AllowedIpValues)
             if (!Models.WireGuardConf.TryParseCidr(cidr, out _, out _)) return $"Invalid allowed IP: {cidr}";
         if (HasDns && !IPAddress.TryParse(Dns.Trim(), out _)) return $"Invalid DNS server: {Dns}";
         if (KeepaliveText.Trim().Length > 0 && !ushort.TryParse(KeepaliveText.Trim(), out _))
             return $"Keepalive must be seconds (0-65535) — got '{KeepaliveText}'";
-        foreach (var d in Domains)
+        foreach (var d in DomainValues)
             if (!IsValidDomain(d)) return $"Invalid domain: {d}";
         return null;
     }
@@ -156,7 +175,7 @@ public partial class PeerViewModel : ObservableObject
     public string? DnsRouteWarning()
     {
         if (!HasDns || IsExternal || !IPAddress.TryParse(Dns.Trim(), out var ip)) return null;
-        return AllowedIps.Any(c => Models.WireGuardConf.CidrContains(c, ip))
+        return AllowedIpValues.Any(c => Models.WireGuardConf.CidrContains(c, ip))
             ? null
             : $"DNS {Dns} is outside this peer's allowed IPs — queries would leak outside the tunnel";
     }

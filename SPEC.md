@@ -45,10 +45,9 @@ Catch-all chain: pinned server → other *connected* peers' DNS → `Services/Sy
 
 `NetworkInterface.GetAllNetworkInterfaces()` where Description contains `"WireGuard Tunnel"` and name not in our pool → read-only card (no toggle/pencil-connection edits; DNS+domains+pin editable). Up/down via `NetworkChange` events → suspend/resume that card's NRPT rules.
 
-## Test bar (`Services/TestService.cs`)
+## Test bar — REMOVED (owner decision)
 
-- Auto: `[DllImport("dnsapi")] DnsQuery_W(name, DNS_TYPE_A, DNS_QUERY_STANDARD, ...)` — goes through the OS resolver, honors NRPT.
-- Direct server / System DNS entries: minimal UDP DNS client (hand-rolled A query, id randomized, 2 s timeout, one retry). Result: `ips · answered by <server> (<peerLabel>) in <ms>` or the error, single line.
+Resolution testing was cut from scope; users verify with `Resolve-DnsName`. A slim bottom status line (`StatusText`/`StatusOk`) shows import results and NRPT errors instead.
 
 ## UI (Avalonia, Fluent theme)
 

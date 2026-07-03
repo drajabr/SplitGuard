@@ -1,5 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:sys="clr-namespace:System;assembly=System.Runtime"
+             xmlns:vm="clr-namespace:WgSplitDns.ViewModels"
              xmlns:views="clr-namespace:WgSplitDns.Views"
              x:Class="WgSplitDns.Views.TunnelCard">
   <Border Classes="card" Classes.editing="{Binding IsEditing}">
@@ -20,7 +22,8 @@
           <Button Classes="icon" Command="{Binding BeginEditCommand}" IsVisible="{Binding !IsEditing}" ToolTip.Tip="Edit">
             <TextBlock Classes="glyph" Text="&#xE70F;" Opacity="0.6" />
           </Button>
-          <Button Classes="link danger" Content="Delete" Command="{Binding DeleteCommand}" IsVisible="{Binding IsEditing}" FontSize="11.5" />
+          <Button Classes="link danger" Classes.armed="{Binding DeleteArmed}" Content="{Binding DeleteLabel}"
+                  Command="{Binding DeleteCommand}" IsVisible="{Binding IsEditing}" FontSize="11.5" />
           <Button Content="Cancel" Command="{Binding CancelEditCommand}" IsVisible="{Binding IsEditing}" />
           <Button Classes="primary" Content="Save" Command="{Binding SaveEditCommand}" IsVisible="{Binding IsEditing}" />
         </StackPanel>
@@ -54,50 +57,50 @@
           </StackPanel>
 
           <StackPanel Spacing="3" IsVisible="{Binding IsEditing}">
-            <TextBlock Classes="lbl" Text="Private key" />
-            <StackPanel Orientation="Horizontal" Spacing="4">
-              <TextBox Classes="mono" MinWidth="120" HorizontalAlignment="Stretch" PasswordChar="●"
+            <TextBlock Classes="lbl" Text="Private key · listen port" />
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+              <TextBox Grid.Column="0" Classes="mono" PasswordChar="●"
                        RevealPassword="{Binding #PrivEye.IsChecked}" Text="{Binding PrivateKeyEdit}" />
-              <ToggleButton Name="PrivEye" Background="Transparent" BorderThickness="0" Padding="4">
+              <ToggleButton Grid.Column="1" Name="PrivEye" Background="Transparent" BorderThickness="0" Padding="4" ToolTip.Tip="Reveal">
                 <TextBlock Classes="glyph" Text="&#xE7B3;" FontSize="13" />
               </ToggleButton>
-              <Button Classes="link" Content="generate" Command="{Binding GenerateKeyCommand}" FontSize="11.5" />
-            </StackPanel>
-          </StackPanel>
-
-          <StackPanel Spacing="3" IsVisible="{Binding IsEditing}">
-            <TextBlock Classes="lbl" Text="Listen port" />
-            <TextBox Classes="mono" Width="90" HorizontalAlignment="Left" Text="{Binding ListenPortText}" Watermark="auto" />
+              <Button Grid.Column="2" Classes="icon" Command="{Binding GenerateKeyCommand}" ToolTip.Tip="Generate new keypair">
+                <TextBlock Classes="glyph" Text="&#xE72C;" FontSize="13" Opacity="0.6" />
+              </Button>
+              <TextBox Grid.Column="3" Classes="mono" Width="56" Text="{Binding ListenPortText}" Watermark="port" ToolTip.Tip="Listen port (blank = automatic)" Margin="4,0,0,0" />
+            </Grid>
           </StackPanel>
 
           <StackPanel Spacing="3">
             <TextBlock Classes="lbl" Text="Address" />
-            <WrapPanel>
-              <ItemsControl ItemsSource="{Binding Addresses}">
-                <ItemsControl.ItemsPanel>
-                  <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate>
-                    <Border Classes="item" Margin="0,0,6,4">
-                      <StackPanel Orientation="Horizontal" Spacing="6">
-                        <TextBlock Classes="mono" Text="{Binding}" />
-                        <Button Classes="chipx" IsVisible="{Binding $parent[views:TunnelCard].DataContext.IsEditing}"
-                                Command="{Binding $parent[views:TunnelCard].DataContext.RemoveAddressCommand}" CommandParameter="{Binding}">
-                          <TextBlock Classes="glyph" Text="&#xE711;" FontSize="9" Opacity="0.6" />
-                        </Button>
-                      </StackPanel>
-                    </Border>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-              <TextBox Classes="mono addbox" Classes.error="{Binding AddressAddError}" Watermark="+ add"
-                       Text="{Binding NewAddress}" IsVisible="{Binding IsEditing}">
-                <TextBox.KeyBindings>
-                  <KeyBinding Gesture="Enter" Command="{Binding AddAddressCommand}" />
-                </TextBox.KeyBindings>
-              </TextBox>
-            </WrapPanel>
+            <ItemsControl ItemsSource="{Binding Addresses}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.DataTemplates>
+                <DataTemplate DataType="sys:String">
+                  <Border Classes="item" Margin="0,0,6,4">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <TextBlock Classes="mono" Text="{Binding}" />
+                      <Button Classes="chipx" IsVisible="{Binding $parent[ItemsControl].DataContext.IsEditing}"
+                              Command="{Binding $parent[ItemsControl].DataContext.RemoveAddressCommand}" CommandParameter="{Binding}">
+                        <TextBlock Classes="glyph" Text="&#xE711;" FontSize="9" Opacity="0.6" />
+                      </Button>
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+                <DataTemplate DataType="vm:AddSlot">
+                  <TextBox Classes="mono addbox" Margin="0,0,6,4" Watermark="+"
+                           Classes.error="{Binding $parent[ItemsControl].DataContext.AddressAddError}"
+                           Text="{Binding $parent[ItemsControl].DataContext.NewAddress}"
+                           IsVisible="{Binding $parent[ItemsControl].DataContext.IsEditing}">
+                    <TextBox.KeyBindings>
+                      <KeyBinding Gesture="Enter" Command="{Binding $parent[ItemsControl].DataContext.AddAddressCommand}" />
+                    </TextBox.KeyBindings>
+                  </TextBox>
+                </DataTemplate>
+              </ItemsControl.DataTemplates>
+            </ItemsControl>
           </StackPanel>
         </StackPanel>
 

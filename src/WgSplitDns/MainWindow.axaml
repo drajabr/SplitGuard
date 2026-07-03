@@ -30,22 +30,9 @@
                  Text="Group Policy DNS rules are active on this machine and override local ones — this tool's rules won't take effect." />
     </Border>
 
-    <Border DockPanel.Dock="Bottom" BorderBrush="#20808080" BorderThickness="0,1,0,0" Padding="14,10">
-      <StackPanel Spacing="6">
-        <Grid ColumnDefinitions="Auto,8,2*,8,*,8,Auto">
-          <TextBlock Grid.Column="0" Classes="glyph" Text="&#xEA37;" Opacity="0.55" VerticalAlignment="Center" />
-          <TextBox Grid.Column="2" Classes="mono" Text="{Binding TestHost}" Watermark="hostname to resolve">
-            <TextBox.KeyBindings>
-              <KeyBinding Gesture="Enter" Command="{Binding TestCommand}" />
-            </TextBox.KeyBindings>
-          </TextBox>
-          <ComboBox Grid.Column="4" ItemsSource="{Binding TestTargets}" SelectedItem="{Binding SelectedTestTarget}"
-                    HorizontalAlignment="Stretch" FontSize="12" VerticalAlignment="Center" />
-          <Button Grid.Column="6" Content="Test" Command="{Binding TestCommand}" />
-        </Grid>
-        <TextBlock Margin="24,0,0,0" Text="{Binding TestResult}" IsVisible="{Binding HasTestResult}"
-                   Classes="oktext" Classes.errtext="{Binding !TestOk}" />
-      </StackPanel>
+    <Border DockPanel.Dock="Bottom" BorderBrush="#20808080" BorderThickness="0,1,0,0" Padding="14,6"
+            IsVisible="{Binding HasStatus}">
+      <TextBlock Text="{Binding StatusText}" Classes="oktext" Classes.errtext="{Binding !StatusOk}" />
     </Border>
 
     <ScrollViewer>
