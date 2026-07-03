@@ -92,10 +92,10 @@
           </Border>
           <TextBox Classes="mono" Width="160" Text="{Binding Dns}" IsVisible="{Binding IsEditing}" Watermark="optional" />
           <Button Classes="icon" Command="{Binding TogglePinCommand}" IsEnabled="{Binding PinEnabled}"
-                  IsVisible="{Binding !IsEditing}" ToolTip.Tip="Pin as device-wide DNS">
+                  ToolTip.Tip="Pin as device-wide DNS (applies immediately)">
             <TextBlock Classes="glyph pinicon" Classes.pinned="{Binding IsPinned}" Text="&#xE718;" />
           </Button>
-          <TextBlock Classes="accent" Text="{Binding PinCaption}" IsVisible="{Binding !IsEditing}" />
+          <TextBlock Classes="accent" Text="{Binding PinCaption}" />
         </StackPanel>
 
         <TextBlock Grid.Row="4" Grid.Column="0" Classes="lbl" Text="Domains" />

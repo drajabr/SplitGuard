@@ -30,7 +30,7 @@ public partial class TunnelCard : UserControl
         AddHandler(Gestures.TappedEvent, OnTapped);
     }
 
-    // Clicking the card (outside interactive controls) toggles expand; never while editing.
+    // Clicking a collapsed card (outside interactive controls) opens edit mode.
     void OnTapped(object? sender, TappedEventArgs e)
     {
         if (DataContext is not TunnelViewModel vm || vm.IsEditing) return;
@@ -40,6 +40,6 @@ public partial class TunnelCard : UserControl
             if (element is Button or ToggleButton or ToggleSwitch or TextBox or ComboBox) return;
             element = element.GetVisualParent();
         }
-        vm.IsExpanded = !vm.IsExpanded;
+        vm.BeginEditCommand.Execute(null);
     }
 }

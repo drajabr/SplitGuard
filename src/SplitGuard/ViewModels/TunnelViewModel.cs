@@ -150,6 +150,8 @@ public class TunnelViewModel : ObservableObject
 
     public bool StatsVisible => IsConnected;
 
+    // Expanded IS edit mode: clicking the card or the pencil opens editing;
+    // Cancel/Save collapse it again. There is no read-only expanded state.
     bool _isEditing;
     public bool IsEditing
     {
@@ -158,26 +160,12 @@ public class TunnelViewModel : ObservableObject
         {
             if (!Set(ref _isEditing, value)) return;
             foreach (var p in Peers) p.IsEditing = value;
-            if (value) IsExpanded = true;
             Raise(nameof(ShowToggle));
             Raise(nameof(ShowPencil));
-            Raise(nameof(ShowChevron));
         }
     }
 
-    bool _isExpanded;
-    public bool IsExpanded
-    {
-        get => _isExpanded;
-        set
-        {
-            if (!Set(ref _isExpanded, value)) return;
-            Raise(nameof(ShowPencil));
-        }
-    }
-
-    public bool ShowPencil => !IsEditing; // clicking edit on a collapsed card expands it
-    public bool ShowChevron => !IsEditing;
+    public bool ShowPencil => !IsEditing;
 
     public string CollapsedSummary =>
         Peers.Select(p => p.Endpoint).FirstOrDefault(e => !string.IsNullOrWhiteSpace(e)) ?? "";
