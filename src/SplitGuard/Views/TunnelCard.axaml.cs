@@ -77,7 +77,9 @@ public partial class TunnelCard : UserControl
         // Push VM text into the editor when entering text mode (or on external updates).
         if (e.PropertyName is nameof(TunnelViewModel.ConfigText) or nameof(TunnelViewModel.IsTextMode))
         {
-            if (_vm is null || ConfEditor.Text == _vm.ConfigText) return;
+            if (_vm is null) return;
+            // Always push on mode entry; otherwise only when the texts diverge.
+            if (e.PropertyName == nameof(TunnelViewModel.ConfigText) && ConfEditor.Text == _vm.ConfigText) return;
             _syncingEditor = true;
             ConfEditor.Text = _vm.ConfigText;
             _syncingEditor = false;
