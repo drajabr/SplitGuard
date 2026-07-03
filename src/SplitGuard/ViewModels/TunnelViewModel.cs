@@ -73,7 +73,6 @@ public class TunnelViewModel : ObservableObject
                 PublicKey = p.PublicKey,
                 Endpoint = p.Endpoint,
                 Dns = p.Dns ?? "",
-                HasPsk = p.PresharedKeyProtected is not null,
                 KeepaliveText = p.PersistentKeepalive > 0 ? p.PersistentKeepalive.ToString() : "",
             };
             PeerViewModel.Fill(vm.AllowedIps, p.AllowedIps);
@@ -111,13 +110,7 @@ public class TunnelViewModel : ObservableObject
     public bool AddressAddError { get => _addressAddError; set => Set(ref _addressAddError, value); }
 
     string _listenPortText = "";
-    public string ListenPortText
-    {
-        get => _listenPortText;
-        set { if (Set(ref _listenPortText, value)) Raise(nameof(ListenPortDisplay)); }
-    }
-
-    public string ListenPortDisplay => ListenPortText.Trim().Length > 0 ? $"port {ListenPortText.Trim()}" : "port auto";
+    public string ListenPortText { get => _listenPortText; set => Set(ref _listenPortText, value); }
 
     string _connSnapshot = "";
 
@@ -165,19 +158,14 @@ public class TunnelViewModel : ObservableObject
         {
             if (!Set(ref _isEditing, value)) return;
             foreach (var p in Peers) p.IsEditing = value;
-            Raise(nameof(ShowToggle));
         }
     }
 
     public string CollapsedSummary =>
         Peers.Select(p => p.Endpoint).FirstOrDefault(e => !string.IsNullOrWhiteSpace(e)) ?? "";
 
-    // Second collapsed line, syntax-colored in the view: addresses (IP color) and
-    // the resolved domains (domain color). Nothing else.
-    public string CollapsedAddresses => string.Join(", ", AddressValues);
-
+    // Collapsed detail tokens (built + syntax-colored in the view).
     public IEnumerable<string> AllDomains => Peers.SelectMany(p => p.DomainValues).Distinct();
-    public string CollapsedDomains => string.Join(", ", AllDomains);
 
     public string CollapsedAllowedIps
     {
@@ -188,15 +176,13 @@ public class TunnelViewModel : ObservableObject
         }
     }
 
+    // Raised whenever collapsed-view content changes; the view rebuilds its detail row.
     public void NotifyPresentation()
     {
         Raise(nameof(CollapsedSummary));
-        Raise(nameof(CollapsedAddresses));
-        Raise(nameof(CollapsedDomains));
         Raise(nameof(CollapsedAllowedIps));
     }
 
-    public bool ShowToggle => !IsEditing && !IsExternal;
     public bool ShowInterfaceSection => !IsExternal;
 
 
@@ -418,7 +404,6 @@ public class TunnelViewModel : ObservableObject
                 Dns = p.HasDns ? p.Dns.Trim() : null,
                 Domains = p.DomainValues.ToList(),
             }).ToList();
-            foreach (var p in Peers) p.HasPsk = !string.IsNullOrWhiteSpace(p.PresharedKey);
         }
         IsDraft = false;
         IsEditing = false;

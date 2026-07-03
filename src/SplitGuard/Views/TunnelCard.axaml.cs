@@ -109,7 +109,7 @@ public partial class TunnelCard : UserControl
             ConfEditor.Text = _vm.ConfigText;
             _syncingEditor = false;
         }
-        if (e.PropertyName is nameof(TunnelViewModel.CollapsedAddresses) or nameof(TunnelViewModel.CollapsedDomains))
+        if (e.PropertyName == nameof(TunnelViewModel.CollapsedSummary))
             BuildDetail();
     }
 

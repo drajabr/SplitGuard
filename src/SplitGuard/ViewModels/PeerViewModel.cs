@@ -22,25 +22,10 @@ public partial class PeerViewModel : ObservableObject
     }
 
     string _publicKey = "";
-    public string PublicKey
-    {
-        get => _publicKey;
-        set { if (Set(ref _publicKey, value)) { Raise(nameof(KeyShort)); } }
-    }
-
-    public string KeyShort => PublicKey.Length > 12 ? $"{PublicKey[..5]}…{PublicKey[^5..]}" : PublicKey;
+    public string PublicKey { get => _publicKey; set => Set(ref _publicKey, value); }
 
     string _presharedKey = "";
     public string PresharedKey { get => _presharedKey; set => Set(ref _presharedKey, value); }
-
-    bool _hasPsk;
-    public bool HasPsk
-    {
-        get => _hasPsk;
-        set { if (Set(ref _hasPsk, value)) Raise(nameof(PskDisplay)); }
-    }
-
-    public string PskDisplay => HasPsk ? "••••••••" : "no preshared key";
 
     string _endpoint = "";
     public string Endpoint { get => _endpoint; set => Set(ref _endpoint, value); }
@@ -56,15 +41,9 @@ public partial class PeerViewModel : ObservableObject
     public bool PinEnabled => HasDns;
 
     string _keepaliveText = "";
-    public string KeepaliveText
-    {
-        get => _keepaliveText;
-        set { if (Set(ref _keepaliveText, value)) { Raise(nameof(KeepaliveDisplay)); Raise(nameof(HasKeepalive)); } }
-    }
+    public string KeepaliveText { get => _keepaliveText; set => Set(ref _keepaliveText, value); }
 
     public ushort ParsedKeepalive => ushort.TryParse(KeepaliveText.Trim(), out var v) ? v : (ushort)0;
-    public bool HasKeepalive => ParsedKeepalive > 0;
-    public string KeepaliveDisplay => HasKeepalive ? $"{ParsedKeepalive}s keepalive" : "";
 
     // Strings plus a trailing AddSlot (the inline "+" box).
     public ObservableCollection<object> AllowedIps { get; } = new();

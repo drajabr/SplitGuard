@@ -19,6 +19,9 @@ public class NrptService
 
     [DllImport("dnsapi")] static extern bool DnsFlushResolverCache();
 
+    // Mutations arrive from background threads (connect/disconnect/save); serialize them
+    // so concurrent CIM/PowerShell calls never interleave.
+    readonly object _gate = new();
     INrptBackend? _backend;
 
     INrptBackend Backend => _backend ??= SelectBackend();
@@ -47,57 +50,81 @@ public class NrptService
 
     public void ApplyDomain(string tunnelName, string peerPublicKey, string domain, string dnsServer)
     {
-        Backend.Add(RuleId(tunnelName, peerPublicKey, domain), new[] { DomainToNamespace(domain) }, new[] { dnsServer });
-        Flush();
+        lock (_gate)
+        {
+            Backend.Add(RuleId(tunnelName, peerPublicKey, domain), new[] { DomainToNamespace(domain) }, new[] { dnsServer });
+            Flush();
+        }
     }
 
     public void RemoveDomain(string tunnelName, string peerPublicKey, string domain)
     {
-        Backend.Remove(RuleId(tunnelName, peerPublicKey, domain));
-        Flush();
+        lock (_gate)
+        {
+            Backend.Remove(RuleId(tunnelName, peerPublicKey, domain));
+            Flush();
+        }
     }
 
     public void ApplyPeerRules(string tunnelName, string peerPublicKey, IEnumerable<string> domains, string dnsServer)
     {
-        foreach (var d in domains)
-            Backend.Add(RuleId(tunnelName, peerPublicKey, d), new[] { DomainToNamespace(d) }, new[] { dnsServer });
-        Flush();
+        lock (_gate)
+        {
+            foreach (var d in domains)
+                Backend.Add(RuleId(tunnelName, peerPublicKey, d), new[] { DomainToNamespace(d) }, new[] { dnsServer });
+            Flush();
+        }
     }
 
     public void RemovePeerRules(string tunnelName, string peerPublicKey)
     {
-        var prefix = $"WGSDNS|{tunnelName}|{Short(peerPublicKey)}|";
-        foreach (var rule in Backend.GetTagged().Where(r => r.Id.StartsWith(prefix)))
-            Backend.Remove(rule.Id);
-        Flush();
+        lock (_gate)
+        {
+            var prefix = $"WGSDNS|{tunnelName}|{Short(peerPublicKey)}|";
+            foreach (var rule in Backend.GetTagged().Where(r => r.Id.StartsWith(prefix)))
+                Backend.Remove(rule.Id);
+            Flush();
+        }
     }
 
     public void SetCatchAll(string[] orderedServers)
     {
-        Backend.Remove(CatchAllId);
-        if (orderedServers.Length > 0)
-            Backend.Add(CatchAllId, new[] { "." }, orderedServers);
-        Flush();
+        lock (_gate)
+        {
+            Backend.Remove(CatchAllId);
+            if (orderedServers.Length > 0)
+                Backend.Add(CatchAllId, new[] { "." }, orderedServers);
+            Flush();
+        }
     }
 
     public void RemoveCatchAll()
     {
-        Backend.Remove(CatchAllId);
-        Flush();
+        lock (_gate)
+        {
+            Backend.Remove(CatchAllId);
+            Flush();
+        }
     }
 
-    public List<NrptRule> GetTaggedRules() => Backend.GetTagged();
+    public List<NrptRule> GetTaggedRules() { lock (_gate) return Backend.GetTagged(); }
 
     public void RemoveTagged(IEnumerable<string> ids)
     {
-        foreach (var id in ids) Backend.Remove(id);
-        Flush();
+        lock (_gate)
+        {
+            foreach (var id in ids) Backend.Remove(id);
+            Flush();
+        }
     }
 
     public void RemoveAllTagged()
     {
-        foreach (var rule in Backend.GetTagged()) Backend.Remove(rule.Id);
-        Flush();
+        lock (_gate)
+        {
+            foreach (var rule in Backend.GetTagged()) Backend.Remove(rule.Id);
+            Flush();
+        }
     }
 
     public static bool IsGpoNrptActive()

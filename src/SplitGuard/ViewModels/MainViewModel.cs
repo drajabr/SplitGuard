@@ -168,27 +168,16 @@ public class MainViewModel : ObservableObject, ITunnelHost
         }
     }
 
-    // The single catch-all rule: pinned server first, then other live tunnel DNS, then system DNS.
+    // The single catch-all rule: pinned server first, then other live tunnel DNS, then
+    // system DNS. Called from background threads, so the view-model collections are read
+    // via a UI-thread snapshot; only the NRPT I/O runs on the calling background thread.
     void RefreshCatchAll()
     {
         try
         {
-            if (_config.PinnedDns is null)
-            {
-                _nrpt.RemoveCatchAll();
-                return;
-            }
-            var servers = new List<string>();
-            foreach (var t in Tunnels.Where(t => t.IsConnected))
-            {
-                foreach (var p in t.Peers.Where(p => p.HasDns))
-                {
-                    var isPinnedPeer = _config.PinnedDns.TunnelName == (t.IsExternal ? ExtName(t.Name) : t.Name)
-                        && _config.PinnedDns.PeerPublicKey == (t.IsExternal ? t.Name : p.PublicKey);
-                    if (isPinnedPeer) servers.Insert(0, p.Dns.Trim());
-                    else servers.Add(p.Dns.Trim());
-                }
-            }
+            var tunnelServers = Dispatcher.UIThread.Invoke(SnapshotPinnedChain);
+            if (tunnelServers is null) { _nrpt.RemoveCatchAll(); return; }
+            var servers = new List<string>(tunnelServers);
             servers.AddRange(SystemDns.Snapshot());
             var chain = servers.Distinct().ToArray();
             if (chain.Length == 0) _nrpt.RemoveCatchAll();
@@ -198,6 +187,24 @@ public class MainViewModel : ObservableObject, ITunnelHost
         {
             Dispatcher.UIThread.Post(() => { StatusText = $"Device DNS update failed: {ex.Message}"; StatusOk = false; });
         }
+    }
+
+    // UI-thread only: ordered connected-peer DNS (pinned first), or null when nothing is pinned.
+    List<string>? SnapshotPinnedChain()
+    {
+        if (_config.PinnedDns is null) return null;
+        var servers = new List<string>();
+        foreach (var t in Tunnels.Where(t => t.IsConnected))
+        {
+            foreach (var p in t.Peers.Where(p => p.HasDns))
+            {
+                var isPinnedPeer = _config.PinnedDns.TunnelName == (t.IsExternal ? ExtName(t.Name) : t.Name)
+                    && _config.PinnedDns.PeerPublicKey == (t.IsExternal ? t.Name : p.PublicKey);
+                if (isPinnedPeer) servers.Insert(0, p.Dns.Trim());
+                else servers.Add(p.Dns.Trim());
+            }
+        }
+        return servers;
     }
 
     public void EditStarted(TunnelViewModel tunnel)
@@ -319,7 +326,9 @@ public class MainViewModel : ObservableObject, ITunnelHost
                 Endpoint = p.Endpoint,
                 AllowedIps = p.AllowedIps.ToList(),
                 PersistentKeepalive = p.PersistentKeepalive,
-                Dns = ReferenceEquals(p, dnsPeer) ? parsed.InterfaceDns : null,
+                // Prefer the peer's own DNS extension; fall back to the interface DNS on its peer.
+                Dns = p.Dns ?? (ReferenceEquals(p, dnsPeer) ? parsed.InterfaceDns : null),
+                Domains = p.Domains.ToList(),
             }).ToList(),
         };
         _config.Tunnels.Add(cfg);
