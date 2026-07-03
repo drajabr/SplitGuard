@@ -65,26 +65,6 @@ public partial class MainWindow : Window, IDialogs
         base.OnKeyDown(e);
     }
 
-    async void OnAddClick(object? sender, RoutedEventArgs e)
-    {
-        if (DataContext is not MainViewModel vm) return;
-        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-        {
-            Title = "Add tunnel",
-            AllowMultiple = true,
-            FileTypeFilter = new[]
-            {
-                new FilePickerFileType("WireGuard config") { Patterns = new[] { "*.conf" } },
-            },
-        });
-        foreach (var file in files)
-        {
-            await using var stream = await file.OpenReadAsync();
-            using var reader = new StreamReader(stream);
-            vm.AddTunnelFromText(await reader.ReadToEndAsync(), Path.GetFileNameWithoutExtension(file.Name));
-        }
-    }
-
     void OnThemeClick(object? sender, RoutedEventArgs e)
     {
         _themeIndex = (_themeIndex + 1) % ThemeSteps.Length;

@@ -83,6 +83,22 @@
   <Style Selector="Border.item > TextBlock">
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
+  <Style Selector="Border.expandhost">
+    <Setter Property="ClipToBounds" Value="True" />
+    <Setter Property="MaxHeight" Value="0" />
+    <Setter Property="Opacity" Value="0" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <DoubleTransition Property="MaxHeight" Duration="0:0:0.22" Easing="CubicEaseOut" />
+        <DoubleTransition Property="Opacity" Duration="0:0:0.18" />
+      </Transitions>
+    </Setter>
+  </Style>
+  <Style Selector="Border.expandhost.expanded">
+    <Setter Property="MaxHeight" Value="900" />
+    <Setter Property="Opacity" Value="1" />
+  </Style>
+
   <Style Selector="Border.peerblock">
     <Setter Property="BorderBrush" Value="#20808080" />
     <Setter Property="BorderThickness" Value="1" />

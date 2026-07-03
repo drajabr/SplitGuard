@@ -176,24 +176,37 @@ public class TunnelViewModel : ObservableObject
         }
     }
 
-    public bool ShowPencil => IsExpanded && !IsEditing;
+    public bool ShowPencil => !IsEditing; // clicking edit on a collapsed card expands it
     public bool ShowChevron => !IsEditing;
 
-    public string CollapsedSummary
+    public string CollapsedSummary =>
+        Peers.Select(p => p.Endpoint).FirstOrDefault(e => !string.IsNullOrWhiteSpace(e)) ?? "";
+
+    // Second collapsed line: what this tunnel's split DNS actually does.
+    public string CollapsedDetail
     {
         get
         {
             var parts = new List<string>();
-            var endpoint = Peers.Select(p => p.Endpoint).FirstOrDefault(e => !string.IsNullOrWhiteSpace(e));
-            if (endpoint is not null) parts.Add(endpoint);
-            var domains = Peers.SelectMany(p => p.DomainValues).Count();
-            parts.Add(domains == 1 ? "1 domain" : $"{domains} domains");
+            foreach (var p in Peers)
+            {
+                var domains = p.DomainValues.ToList();
+                if (!p.HasDns && domains.Count == 0) continue;
+                var list = domains.Count == 0
+                    ? "no domains"
+                    : string.Join(", ", domains.Take(4)) + (domains.Count > 4 ? $" +{domains.Count - 4}" : "");
+                parts.Add(p.HasDns ? $"{p.Dns} → {list}" : list);
+            }
             if (Peers.Any(p => p.IsPinned)) parts.Add("device DNS");
-            return string.Join(" · ", parts);
+            return parts.Count == 0 ? "no split DNS configured" : string.Join("  ·  ", parts);
         }
     }
 
-    public void NotifyPresentation() => Raise(nameof(CollapsedSummary));
+    public void NotifyPresentation()
+    {
+        Raise(nameof(CollapsedSummary));
+        Raise(nameof(CollapsedDetail));
+    }
 
     public bool ShowToggle => !IsEditing && !IsExternal;
     public bool ShowInterfaceSection => !IsExternal;

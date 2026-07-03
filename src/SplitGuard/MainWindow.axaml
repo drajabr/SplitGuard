@@ -14,9 +14,6 @@
     <Border DockPanel.Dock="Top" Padding="14,8,146,8" Name="HeaderBar" Background="Transparent">
       <DockPanel>
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
-          <Button Classes="icon" Name="AddButton" Click="OnAddClick" ToolTip.Tip="Add tunnel (.conf) — or drop a file / Ctrl+V">
-            <TextBlock Classes="glyph" Text="&#xE710;" Foreground="#3378DD" FontSize="15" />
-          </Button>
           <Button Classes="icon" Name="ThemeButton" Click="OnThemeClick" ToolTip.Tip="Theme: auto">
             <TextBlock Classes="glyph" Text="&#xE793;" Opacity="0.6" />
           </Button>
