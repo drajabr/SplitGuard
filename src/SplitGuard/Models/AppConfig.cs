@@ -11,9 +11,7 @@ public class AppConfig
 
 public class UiPrefs
 {
-    public string Theme { get; set; } = "auto";
-    public string Accent { get; set; } = "blue";
-    public string Font { get; set; } = "segoe";
+    public string Look { get; set; } = "auto";
     public string Zoom { get; set; } = "100%";
 }
 

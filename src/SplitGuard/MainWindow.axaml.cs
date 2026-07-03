@@ -19,47 +19,33 @@ public partial class MainWindow : Window, IDialogs
     record ThemeDef(string Name, ThemeVariant Variant, string? Page, string? Surface, string? Item,
                  double Dim, byte Hair, byte Field);
 
-    static readonly ThemeDef[] ThemeSteps =
+    // Surface palette registry (page + card + chip fill + borders + text contrast).
+    static readonly ThemeDef[] Palettes =
     {
         new("auto",     ThemeVariant.Default, null,      null,      null,      0.68, 0x33, 0x40),
         new("light",    ThemeVariant.Light,  "#F4F3F0", "#FFFFFF", "#ECEAE4", 0.62, 0x33, 0x42),
         new("pearl",    ThemeVariant.Light,  "#EAE8E2", "#F7F5F0", "#E0DDD5", 0.62, 0x36, 0x46),
-        new("ash",      ThemeVariant.Light,  "#DBD9D2", "#EAE8E2", "#D0CDC5", 0.60, 0x3C, 0x4C),
-        new("steel",    ThemeVariant.Dark,   "#464C53", "#525860", "#3C424A", 0.72, 0x44, 0x56),
         new("slate",    ThemeVariant.Dark,   "#363C43", "#414750", "#2D333A", 0.72, 0x3E, 0x50),
         new("graphite", ThemeVariant.Dark,   "#24272B", "#2E3339", "#1F2226", 0.70, 0x38, 0x48),
         new("dark",     ThemeVariant.Dark,   "#1A1C1F", "#25282C", "#17191C", 0.70, 0x34, 0x44),
     };
-    static readonly (string Name, string Hex)[] AccentSteps =
+
+    // One control cycles a small set of curated, coherent (surface + accent) looks.
+    record Look(string Name, string Palette, string Accent);
+    static readonly Look[] Looks =
     {
-        ("blue", "#3378DD"),
-        ("indigo", "#5566D8"),
-        ("purple", "#7A5BD0"),
-        ("magenta", "#A94BC0"),
-        ("rose", "#C94F6D"),
-        ("red", "#CE4038"),
-        ("orange", "#C56A1C"),
-        ("amber", "#C08A12"),
-        ("green", "#4F9A34"),
-        ("teal", "#1D9E75"),
-        ("cyan", "#1394A8"),
+        new("auto",     "auto",     "#3378DD"),
+        new("light",    "light",    "#3378DD"),
+        new("rosé",     "pearl",    "#C0506E"),
+        new("ocean",    "slate",    "#1D9E75"),
+        new("ember",    "graphite", "#C08A12"),
+        new("midnight", "dark",     "#5566D8"),
     };
-    static readonly (string Name, string Family)[] FontSteps =
-    {
-        ("segoe", "Segoe UI Variable Text, Segoe UI"),
-        ("bahnschrift", "Bahnschrift, Segoe UI"),
-        ("verdana", "Verdana, Segoe UI"),
-        ("trebuchet", "Trebuchet MS, Segoe UI"),
-        ("candara", "Candara, Segoe UI"),
-        ("georgia", "Georgia, Cambria, Times New Roman"),
-        ("mono", "Cascadia Mono, Consolas"),
-    };
+
     static readonly (string Name, double Scale)[] ZoomSteps =
     {
         ("100%", 1.0),
-        ("110%", 1.1),
         ("120%", 1.2),
-        ("130%", 1.3),
         ("140%", 1.4),
     };
     // Fonts and layout metrics scale together — no transforms, so wrapping stays correct.
@@ -70,9 +56,7 @@ public partial class MainWindow : Window, IDialogs
         ("CtrlH", 26), ("HeaderH", 30), ("CollapseH", 96),
     };
 
-    int _themeIndex;
-    int _accentIndex;
-    int _fontIndex;
+    int _lookIndex;
     int _zoomIndex;
 
     public MainWindow()
@@ -140,21 +124,10 @@ public partial class MainWindow : Window, IDialogs
 
     public void ApplyUiPrefs(SplitGuard.Models.UiPrefs prefs)
     {
-        _themeIndex = Math.Max(0, Array.FindIndex(ThemeSteps, s => s.Name == prefs.Theme));
-        _accentIndex = Math.Max(0, Array.FindIndex(AccentSteps, s => s.Name == prefs.Accent));
-        _fontIndex = Math.Max(0, Array.FindIndex(FontSteps, s => s.Name == prefs.Font));
+        _lookIndex = Math.Max(0, Array.FindIndex(Looks, s => s.Name == prefs.Look));
         _zoomIndex = Math.Max(0, Array.FindIndex(ZoomSteps, s => s.Name == prefs.Zoom));
-        ApplyTheme();
-        ApplyAccent();
-        ApplyFont();
+        ApplyLook();
         ApplyZoom();
-    }
-
-    void ApplyFont()
-    {
-        var (name, family) = FontSteps[_fontIndex];
-        FontFamily = new FontFamily(family);
-        FontLabel.Text = name;
     }
 
     void ApplyZoom()
@@ -166,28 +139,24 @@ public partial class MainWindow : Window, IDialogs
         ZoomLabel.Text = name;
     }
 
-    void ApplyTheme()
+    // A look = one curated (surface palette + accent) pair, applied together.
+    void ApplyLook()
     {
-        var t = ThemeSteps[_themeIndex];
+        var look = Looks[_lookIndex];
+        var t = Palettes.FirstOrDefault(p => p.Name == look.Palette) ?? Palettes[0];
         var resources = Avalonia.Application.Current!.Resources;
         Avalonia.Application.Current!.RequestedThemeVariant = t.Variant;
 
         if (t.Page is null) ClearValue(BackgroundProperty);
         else Background = new SolidColorBrush(Color.Parse(t.Page));
-        // Opaque surfaces when the theme defines a palette; transparent overlays under "auto".
+        // Opaque surfaces when the palette defines them; transparent overlays under "auto".
         resources["SurfaceBrush"] = new SolidColorBrush(t.Surface is null ? Color.Parse("#00FFFFFF") : Color.Parse(t.Surface));
         resources["ItemBrush"] = new SolidColorBrush(t.Item is null ? Color.FromArgb(0x14, 0x80, 0x80, 0x80) : Color.Parse(t.Item));
         resources["DimOpacity"] = t.Dim;
         resources["HairlineBrush"] = new SolidColorBrush(Color.FromArgb(t.Hair, 0x80, 0x80, 0x80));
         resources["FieldBorderBrush"] = new SolidColorBrush(Color.FromArgb(t.Field, 0x80, 0x80, 0x80));
-        ThemeLabel.Text = t.Name;
-    }
 
-    void ApplyAccent()
-    {
-        var (name, hex) = AccentSteps[_accentIndex];
-        var color = Color.Parse(hex);
-        var resources = Avalonia.Application.Current!.Resources;
+        var color = Color.Parse(look.Accent);
         resources["AccentBrush"] = new SolidColorBrush(color);
         resources["AccentDimBrush"] = new SolidColorBrush(color, 0.4);
         // Fluent's own accent: recolors toggle switches, focus rings, selection, etc.
@@ -200,14 +169,12 @@ public partial class MainWindow : Window, IDialogs
         resources["SystemAccentColorLight3"] = Tint(color, 0.45);
 
         // Icon set (window, tray, header logo) recomposed in the accent color.
-        // Syntax colors are deliberately NOT accent-derived — they stay fixed and
-        // consistent across every accent (see Syntax.* constants).
         var icons = AppIcons.Get(color);
         Icon = icons.Idle;
         LogoImage.Source = icons.Logo;
         if (Avalonia.Application.Current is App app)
             app.SetAccentIcons(icons.Idle, icons.Active);
-        AccentLabel.Text = name;
+        LookLabel.Text = look.Name;
     }
 
     static Color Shade(Color c, double factor) =>
@@ -226,25 +193,11 @@ public partial class MainWindow : Window, IDialogs
         vm.PersistPrefs();
     }
 
-    void OnThemeClick(object? sender, RoutedEventArgs e)
+    void OnLookClick(object? sender, RoutedEventArgs e)
     {
-        _themeIndex = (_themeIndex + 1) % ThemeSteps.Length;
-        ApplyTheme();
-        Persist(p => p.Theme = ThemeSteps[_themeIndex].Name);
-    }
-
-    void OnAccentClick(object? sender, RoutedEventArgs e)
-    {
-        _accentIndex = (_accentIndex + 1) % AccentSteps.Length;
-        ApplyAccent();
-        Persist(p => p.Accent = AccentSteps[_accentIndex].Name);
-    }
-
-    void OnFontClick(object? sender, RoutedEventArgs e)
-    {
-        _fontIndex = (_fontIndex + 1) % FontSteps.Length;
-        ApplyFont();
-        Persist(p => p.Font = FontSteps[_fontIndex].Name);
+        _lookIndex = (_lookIndex + 1) % Looks.Length;
+        ApplyLook();
+        Persist(p => p.Look = Looks[_lookIndex].Name);
     }
 
     void OnZoomClick(object? sender, RoutedEventArgs e)
