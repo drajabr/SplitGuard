@@ -186,15 +186,33 @@ public class NrptService
             var json = Run($"Get-DnsClientNrptRule | Where-Object Comment -eq {Quote(NrptService.Tag)} | Select-Object DisplayName,Namespace,NameServers | ConvertTo-Json -Depth 3");
             if (string.IsNullOrWhiteSpace(json)) return new List<NrptRule>();
             if (!json.TrimStart().StartsWith('[')) json = $"[{json}]";
-            var rows = JsonSerializer.Deserialize<List<PsRule>>(json) ?? new List<PsRule>();
-            return rows.Select(r => new NrptRule(r.DisplayName ?? "", r.Namespace ?? Array.Empty<string>(), r.NameServers ?? Array.Empty<string>())).ToList();
+            var result = new List<NrptRule>();
+            using var doc = JsonDocument.Parse(json);
+            foreach (var row in doc.RootElement.EnumerateArray())
+            {
+                result.Add(new NrptRule(
+                    StringOf(row, "DisplayName"),
+                    ArrayOf(row, "Namespace"),
+                    ArrayOf(row, "NameServers")));
+            }
+            return result;
         }
 
-        class PsRule
+        static string StringOf(JsonElement row, string name) =>
+            row.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString()! : "";
+
+        // ConvertTo-Json collapses single-element arrays to a bare string — accept both.
+        static string[] ArrayOf(JsonElement row, string name)
         {
-            public string? DisplayName { get; set; }
-            public string[]? Namespace { get; set; }
-            public string[]? NameServers { get; set; }
+            if (!row.TryGetProperty(name, out var v)) return Array.Empty<string>();
+            return v.ValueKind switch
+            {
+                JsonValueKind.String => new[] { v.GetString()! },
+                JsonValueKind.Array => v.EnumerateArray()
+                    .Where(e => e.ValueKind == JsonValueKind.String)
+                    .Select(e => e.GetString()!).ToArray(),
+                _ => Array.Empty<string>(),
+            };
         }
 
         static string Quote(string s) => $"'{s.Replace("'", "''")}'";

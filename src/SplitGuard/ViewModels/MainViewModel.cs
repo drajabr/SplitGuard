@@ -106,14 +106,15 @@ public class MainViewModel : ObservableObject, ITunnelHost
             foreach (var p in vm.Config!.Peers.Where(p => p.Dns is not null && p.Domains.Count > 0))
                 _nrpt.ApplyPeerRules(vm.Name, p.PublicKey, p.Domains, p.Dns!);
             RefreshCatchAll();
-            Dispatcher.UIThread.Post(() => { vm.StatusError = ""; RefreshPins(); });
+            Dispatcher.UIThread.Post(() => { StatusText = ""; RefreshPins(); });
         }
         catch (Exception ex)
         {
             Dispatcher.UIThread.Post(() =>
             {
                 vm.SetConnectedState(false);
-                vm.StatusError = ex.Message;
+                StatusText = $"{vm.Name}: {ex.Message}";
+                StatusOk = false;
             });
         }
     });
@@ -130,7 +131,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
         }
         catch (Exception ex)
         {
-            Dispatcher.UIThread.Post(() => vm.StatusError = ex.Message);
+            Dispatcher.UIThread.Post(() => { StatusText = $"{vm.Name}: {ex.Message}"; StatusOk = false; });
         }
     });
 
@@ -230,7 +231,12 @@ public class MainViewModel : ObservableObject, ITunnelHost
                 }
                 catch (Exception ex)
                 {
-                    Dispatcher.UIThread.Post(() => { vm.SetConnectedState(false); vm.StatusError = ex.Message; });
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        vm.SetConnectedState(false);
+                        StatusText = $"{vm.Name}: {ex.Message}";
+                        StatusOk = false;
+                    });
                 }
             }
             RefreshCatchAll();

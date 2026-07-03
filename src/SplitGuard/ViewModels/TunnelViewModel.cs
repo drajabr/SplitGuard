@@ -213,8 +213,6 @@ public class TunnelViewModel : ObservableObject
     public bool ShowToggle => !IsEditing && !IsExternal;
     public bool ShowInterfaceSection => !IsExternal;
 
-    string _statusError = "";
-    public string StatusError { get => _statusError; set => Set(ref _statusError, value); }
 
     string _warningText = "";
     public string WarningText { get => _warningText; set => Set(ref _warningText, value); }
