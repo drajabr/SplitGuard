@@ -15,8 +15,7 @@ public class UiPrefs
     public string Contrast { get; set; } = "normal";
     public string Accent { get; set; } = "blue";
     public string Font { get; set; } = "segoe";
-    public string FontSize { get; set; } = "100%";
-    public string Density { get; set; } = "100%";
+    public string Zoom { get; set; } = "100%";
 }
 
 public class TunnelConfig

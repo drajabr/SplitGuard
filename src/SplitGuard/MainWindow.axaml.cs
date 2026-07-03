@@ -14,8 +14,12 @@ public partial class MainWindow : Window, IDialogs
     static readonly (string Name, ThemeVariant Variant, string? Background)[] ThemeSteps =
     {
         ("auto", ThemeVariant.Default, null),
-        ("light", ThemeVariant.Light, null),
-        ("slate", ThemeVariant.Dark, "#3C4148"),
+        ("light", ThemeVariant.Light, "#FFFFFF"),
+        ("pearl", ThemeVariant.Light, "#F1EFEA"),
+        ("ash", ThemeVariant.Light, "#DEDCD7"),
+        ("steel", ThemeVariant.Dark, "#4A5158"),
+        ("slate", ThemeVariant.Dark, "#383E45"),
+        ("graphite", ThemeVariant.Dark, "#26292D"),
         ("dark", ThemeVariant.Dark, null),
     };
     static readonly (string Name, double Opacity)[] ContrastSteps =
@@ -42,32 +46,27 @@ public partial class MainWindow : Window, IDialogs
         ("georgia", "Georgia, Cambria, Times New Roman"),
         ("mono", "Cascadia Mono, Consolas"),
     };
-    static readonly (string Name, double Scale)[] SizeSteps =
+    static readonly (string Name, double Scale)[] ZoomSteps =
     {
         ("100%", 1.0),
         ("110%", 1.1),
         ("120%", 1.2),
         ("130%", 1.3),
+        ("140%", 1.4),
     };
-    static readonly (string Name, double Scale)[] DensitySteps =
-    {
-        ("100%", 1.0),
-        ("110%", 1.1),
-        ("120%", 1.2),
-        ("130%", 1.3),
-    };
-    static readonly (string Key, double Base)[] FontResources =
+    // Fonts and layout metrics scale together — no transforms, so wrapping stays correct.
+    static readonly (string Key, double Base)[] ZoomResources =
     {
         ("Fs9", 9), ("Fs11", 11), ("Fs115", 11.5), ("Fs12", 12), ("Fs125", 12.5),
         ("Fs13", 13), ("Fs135", 13.5), ("Fs14", 14), ("Fs17", 17),
+        ("CtrlH", 26), ("HeaderH", 30), ("CollapseH", 28),
     };
 
     int _themeIndex;
     int _contrastIndex = 1;
     int _accentIndex;
     int _fontIndex;
-    int _sizeIndex;
-    int _densityIndex;
+    int _zoomIndex;
 
     public MainWindow()
     {
@@ -141,14 +140,12 @@ public partial class MainWindow : Window, IDialogs
         _contrastIndex = Math.Max(0, Array.FindIndex(ContrastSteps, s => s.Name == prefs.Contrast));
         _accentIndex = Math.Max(0, Array.FindIndex(AccentSteps, s => s.Name == prefs.Accent));
         _fontIndex = Math.Max(0, Array.FindIndex(FontSteps, s => s.Name == prefs.Font));
-        _sizeIndex = Math.Max(0, Array.FindIndex(SizeSteps, s => s.Name == prefs.FontSize));
-        _densityIndex = Math.Max(0, Array.FindIndex(DensitySteps, s => s.Name == prefs.Density));
+        _zoomIndex = Math.Max(0, Array.FindIndex(ZoomSteps, s => s.Name == prefs.Zoom));
         ApplyTheme();
         ApplyContrast();
         ApplyAccent();
         ApplyFont();
-        ApplyFontSize();
-        ApplyDensity();
+        ApplyZoom();
     }
 
     void ApplyFont()
@@ -158,20 +155,13 @@ public partial class MainWindow : Window, IDialogs
         FontLabel.Text = name;
     }
 
-    void ApplyFontSize()
+    void ApplyZoom()
     {
-        var (name, scale) = SizeSteps[_sizeIndex];
+        var (name, scale) = ZoomSteps[_zoomIndex];
         var resources = Avalonia.Application.Current!.Resources;
-        foreach (var (key, baseSize) in FontResources)
-            resources[key] = baseSize * scale;
-        SizeLabel.Text = name;
-    }
-
-    void ApplyDensity()
-    {
-        var (name, scale) = DensitySteps[_densityIndex];
-        DensityHost.LayoutTransform = new ScaleTransform(scale, scale);
-        DensityLabel.Text = name;
+        foreach (var (key, baseValue) in ZoomResources)
+            resources[key] = baseValue * scale;
+        ZoomLabel.Text = name;
     }
 
     void ApplyTheme()
@@ -287,18 +277,11 @@ public partial class MainWindow : Window, IDialogs
         Persist(p => p.Font = FontSteps[_fontIndex].Name);
     }
 
-    void OnSizeClick(object? sender, RoutedEventArgs e)
+    void OnZoomClick(object? sender, RoutedEventArgs e)
     {
-        _sizeIndex = (_sizeIndex + 1) % SizeSteps.Length;
-        ApplyFontSize();
-        Persist(p => p.FontSize = SizeSteps[_sizeIndex].Name);
-    }
-
-    void OnDensityClick(object? sender, RoutedEventArgs e)
-    {
-        _densityIndex = (_densityIndex + 1) % DensitySteps.Length;
-        ApplyDensity();
-        Persist(p => p.Density = DensitySteps[_densityIndex].Name);
+        _zoomIndex = (_zoomIndex + 1) % ZoomSteps.Length;
+        ApplyZoom();
+        Persist(p => p.Zoom = ZoomSteps[_zoomIndex].Name);
     }
 
     public async Task CopyToClipboardAsync(string text)
