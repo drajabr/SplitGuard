@@ -203,17 +203,10 @@
   <Style Selector="TextBlock.synnum">
     <Setter Property="Foreground" Value="{DynamicResource SynNumBrush}" />
   </Style>
-  <Style Selector="TextBox.synip">
-    <Setter Property="Foreground" Value="{DynamicResource SynIpBrush}" />
-  </Style>
-  <Style Selector="TextBox.syndomain">
-    <Setter Property="Foreground" Value="{DynamicResource SynDomainBrush}" />
-  </Style>
-  <Style Selector="TextBox.synkey">
-    <Setter Property="Foreground" Value="{DynamicResource SynKeyBrush}" />
-  </Style>
-  <Style Selector="TextBox.synnum">
-    <Setter Property="Foreground" Value="{DynamicResource SynNumBrush}" />
+  <!-- Editable inputs are not syntax-highlighted; only read-only value chips are. -->
+  <Style Selector="TextBox.plainname">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
   </Style>
 
   <Style Selector="ToggleSwitch">
