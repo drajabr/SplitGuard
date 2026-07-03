@@ -88,6 +88,21 @@ public partial class TunnelCard : UserControl
         if (e.PropertyName is nameof(TunnelViewModel.ConfigText) or nameof(TunnelViewModel.IsTextMode))
         {
             if (_vm is null) return;
+            // Entering text mode: lock the editor to the exact height the fields area
+            // currently occupies, so toggling modes causes no vertical jump. Read the
+            // bounds synchronously (before the visibility relayout) then apply.
+            if (e.PropertyName == nameof(TunnelViewModel.IsTextMode))
+            {
+                if (_vm.IsTextMode)
+                {
+                    var h = FieldsGrid.Bounds.Height;
+                    if (h > 40) EditorHost.Height = h;
+                }
+                else
+                {
+                    EditorHost.ClearValue(HeightProperty);
+                }
+            }
             // Always push on mode entry; otherwise only when the texts diverge.
             if (e.PropertyName == nameof(TunnelViewModel.ConfigText) && ConfEditor.Text == _vm.ConfigText) return;
             _syncingEditor = true;
