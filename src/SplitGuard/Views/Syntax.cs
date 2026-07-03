@@ -18,18 +18,4 @@ public static class Syntax
         var i = s.IndexOf('/');
         return i < 0 ? "" : s[i..];
     });
-
-    public static readonly IValueConverter HostPart = new FuncValueConverter<string?, string>(s =>
-    {
-        if (string.IsNullOrEmpty(s)) return "";
-        var i = s.LastIndexOf(':');
-        return i <= 0 ? s : s[..i];
-    });
-
-    public static readonly IValueConverter PortPart = new FuncValueConverter<string?, string>(s =>
-    {
-        if (string.IsNullOrEmpty(s)) return "";
-        var i = s.LastIndexOf(':');
-        return i <= 0 ? "" : s[i..];
-    });
 }
