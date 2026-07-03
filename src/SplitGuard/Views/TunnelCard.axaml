@@ -24,8 +24,7 @@
         <Grid VerticalAlignment="Center" ColumnDefinitions="Auto,Auto,Auto,*">
           <Ellipse Grid.Column="0" Classes="dot" Classes.up="{Binding IsConnected}" />
           <Grid Grid.Column="1" VerticalAlignment="Center" Margin="10,0,0,0">
-            <TextBlock FontSize="{DynamicResource Fs135}" FontWeight="Medium" VerticalAlignment="Center"
-                       Classes.accentfg="{Binding IsConnected}"
+            <TextBlock Classes="accentfg" FontSize="{DynamicResource Fs135}" FontWeight="Medium" VerticalAlignment="Center"
                        Text="{Binding Name}" IsVisible="{Binding !IsEditing}" />
             <TextBox Width="150" FontSize="{DynamicResource Fs135}" FontWeight="Medium" Text="{Binding Name}" IsVisible="{Binding IsEditing}" />
           </Grid>
@@ -42,7 +41,7 @@
         <DockPanel Margin="30,0,12,8">
           <TextBlock DockPanel.Dock="Right" Classes="mono synip" Margin="12,0,0,0" Opacity="0.8"
                      VerticalAlignment="Top" Text="{Binding CollapsedAllowedIps}" />
-          <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding CollapsedDetail}" />
+          <TextBlock Name="DetailText" Classes="mono" FontSize="{DynamicResource Fs12}" TextWrapping="Wrap" />
         </DockPanel>
       </Border>
 

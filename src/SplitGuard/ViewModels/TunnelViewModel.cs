@@ -172,26 +172,16 @@ public class TunnelViewModel : ObservableObject
     public string CollapsedSummary =>
         Peers.Select(p => p.Endpoint).FirstOrDefault(e => !string.IsNullOrWhiteSpace(e)) ?? "";
 
-    // Second collapsed line: addresses plus what this tunnel's split DNS does.
-    public string CollapsedDetail
+    // Second collapsed line, syntax-colored in the view: addresses (IP color) and
+    // the resolved domains (domain color). Nothing else.
+    public string CollapsedAddresses => string.Join(", ", AddressValues);
+
+    public string CollapsedDomains
     {
         get
         {
-            var parts = new List<string>();
-            if (AddressValues.Any()) parts.Add(string.Join(", ", AddressValues));
-            foreach (var p in Peers)
-            {
-                var domains = p.DomainValues.ToList();
-                if (!p.HasDns && domains.Count == 0) continue;
-                var list = domains.Count == 0
-                    ? "no domains"
-                    : string.Join(", ", domains.Take(4)) + (domains.Count > 4 ? $" +{domains.Count - 4}" : "");
-                parts.Add(p.HasDns ? $"{p.Dns} → {list}" : list);
-            }
-            if (Peers.Any(p => p.IsPinned)) parts.Add("device DNS");
-            var keepalive = Peers.FirstOrDefault(p => p.HasKeepalive);
-            if (keepalive is not null) parts.Add(keepalive.KeepaliveDisplay);
-            return parts.Count == 0 ? "no split DNS configured" : string.Join("  ·  ", parts);
+            var domains = Peers.SelectMany(p => p.DomainValues).Distinct().ToList();
+            return string.Join(", ", domains);
         }
     }
 
@@ -207,7 +197,8 @@ public class TunnelViewModel : ObservableObject
     public void NotifyPresentation()
     {
         Raise(nameof(CollapsedSummary));
-        Raise(nameof(CollapsedDetail));
+        Raise(nameof(CollapsedAddresses));
+        Raise(nameof(CollapsedDomains));
         Raise(nameof(CollapsedAllowedIps));
     }
 

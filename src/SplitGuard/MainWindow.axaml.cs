@@ -33,10 +33,16 @@ public partial class MainWindow : Window, IDialogs
     static readonly (string Name, string Hex)[] AccentSteps =
     {
         ("blue", "#3378DD"),
-        ("teal", "#1D9E75"),
+        ("indigo", "#5566D8"),
         ("purple", "#7A5BD0"),
-        ("amber", "#C77E16"),
+        ("magenta", "#A94BC0"),
         ("rose", "#C94F6D"),
+        ("red", "#CE4038"),
+        ("orange", "#C56A1C"),
+        ("amber", "#C08A12"),
+        ("green", "#4F9A34"),
+        ("teal", "#1D9E75"),
+        ("cyan", "#1394A8"),
     };
     static readonly (string Name, string Family)[] FontSteps =
     {
@@ -72,21 +78,12 @@ public partial class MainWindow : Window, IDialogs
     public MainWindow()
     {
         InitializeComponent();
-        // The header lives inside the extended title bar area — make it draggable.
-        // Tunnel so we see the press before children; walk up from the hit element and
-        // only skip the drag when the press lands on an actual interactive control.
-        HeaderBar.AddHandler(PointerPressedEvent, OnHeaderPressed, RoutingStrategies.Tunnel);
+        // The header sits inside the extended-client title-bar region (TitleBarHeightHint).
+        // It has no background, so empty areas fall through to the OS caption and drag the
+        // window natively; only the hit-testable header controls capture the pointer.
         AddHandler(DragDrop.DragOverEvent, (_, e) =>
             e.DragEffects = e.Data.Contains(DataFormats.Files) ? DragDropEffects.Copy : DragDropEffects.None);
         AddHandler(DragDrop.DropEvent, OnDrop);
-    }
-
-    void OnHeaderPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
-        for (var el = e.Source as Avalonia.Visual; el is not null && el != HeaderBar; el = el.GetVisualParent())
-            if (el is Button or ToggleButton or ComboBox) return;
-        BeginMoveDrag(e);
     }
 
     async void OnDrop(object? sender, DragEventArgs e)

@@ -1,8 +1,10 @@
 using System.ComponentModel;
 using System.Xml;
 using Avalonia.Controls;
+using Avalonia.Controls.Documents;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
+using Avalonia.Media;
 using Avalonia.VisualTree;
 using AvaloniaEdit.Highlighting;
 using AvaloniaEdit.Highlighting.Xshd;
@@ -85,6 +87,7 @@ public partial class TunnelCard : UserControl
             if (_vm is not null) _vm.PropertyChanged -= OnVmPropertyChanged;
             _vm = DataContext as TunnelViewModel;
             if (_vm is not null) _vm.PropertyChanged += OnVmPropertyChanged;
+            BuildDetail();
 
             // External cards have no interface column: let the peers section span the full width.
             if (_vm is { IsExternal: true })
@@ -117,6 +120,28 @@ public partial class TunnelCard : UserControl
             ConfEditor.Text = _vm.ConfigText;
             _syncingEditor = false;
         }
+        if (e.PropertyName is nameof(TunnelViewModel.CollapsedAddresses) or nameof(TunnelViewModel.CollapsedDomains))
+            BuildDetail();
+    }
+
+    // Syntax-colored collapsed detail: addresses in IP color, domains in domain color.
+    void BuildDetail()
+    {
+        DetailText.Inlines?.Clear();
+        if (_vm is null || DetailText.Inlines is null) return;
+        var res = Avalonia.Application.Current!.Resources;
+        IBrush Brush(string key) => res[key] as IBrush ?? Brushes.Gray;
+
+        if (_vm.CollapsedAddresses.Length > 0)
+            DetailText.Inlines.Add(new Run(_vm.CollapsedAddresses) { Foreground = Brush("SynIpBrush") });
+        if (_vm.CollapsedDomains.Length > 0)
+        {
+            if (_vm.CollapsedAddresses.Length > 0)
+                DetailText.Inlines.Add(new Run("   ") );
+            DetailText.Inlines.Add(new Run(_vm.CollapsedDomains) { Foreground = Brush("SynDomainBrush") });
+        }
+        if (DetailText.Inlines.Count == 0)
+            DetailText.Inlines.Add(new Run("no split DNS configured") { Foreground = Brush("SynIpBrush"), FontStyle = FontStyle.Italic });
     }
 
     // Clicking blank card space toggles: collapsed → edit, editing → cancel/collapse.
