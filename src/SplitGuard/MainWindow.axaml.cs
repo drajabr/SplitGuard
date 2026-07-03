@@ -61,7 +61,7 @@ public partial class MainWindow : Window, IDialogs
     {
         ("Fs9", 9), ("Fs11", 11), ("Fs115", 11.5), ("Fs12", 12), ("Fs125", 12.5),
         ("Fs13", 13), ("Fs135", 13.5), ("Fs14", 14), ("Fs17", 17),
-        ("CtrlH", 26), ("HeaderH", 30), ("CollapseH", 28),
+        ("CtrlH", 26), ("HeaderH", 30), ("CollapseH", 96),
     };
 
     int _themeIndex;

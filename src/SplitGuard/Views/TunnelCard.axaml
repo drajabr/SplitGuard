@@ -21,26 +21,28 @@
           <TextBlock Classes="muted" Text="Disconnected" IsVisible="{Binding !IsConnected}" />
           <ToggleSwitch IsChecked="{Binding IsConnected}" IsVisible="{Binding !IsExternal}" IsEnabled="{Binding !IsEditing}" />
         </StackPanel>
-        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-          <Ellipse Classes="dot" Classes.up="{Binding IsConnected}" />
-          <Grid VerticalAlignment="Center">
-            <TextBlock FontSize="{DynamicResource Fs135}" FontWeight="Medium" VerticalAlignment="Center" Margin="9,0,0,0"
+        <Grid VerticalAlignment="Center" ColumnDefinitions="Auto,Auto,Auto,*">
+          <Ellipse Grid.Column="0" Classes="dot" Classes.up="{Binding IsConnected}" />
+          <Grid Grid.Column="1" VerticalAlignment="Center" Margin="10,0,0,0">
+            <TextBlock FontSize="{DynamicResource Fs135}" FontWeight="Medium" VerticalAlignment="Center"
                        Classes.accentfg="{Binding IsConnected}"
                        Text="{Binding Name}" IsVisible="{Binding !IsEditing}" />
             <TextBox Width="150" FontSize="{DynamicResource Fs135}" FontWeight="Medium" Text="{Binding Name}" IsVisible="{Binding IsEditing}" />
           </Grid>
-          <TextBlock Classes="muted" Text="{Binding CollapsedSummary}" IsVisible="{Binding !IsEditing}" />
-          <Border Background="{DynamicResource ItemBrush}" CornerRadius="4" Padding="6,2" IsVisible="{Binding IsExternal}" VerticalAlignment="Center">
+          <Border Grid.Column="2" Background="{DynamicResource ItemBrush}" CornerRadius="4" Padding="6,2" Margin="10,0,0,0"
+                  IsVisible="{Binding IsExternal}" VerticalAlignment="Center">
             <TextBlock FontSize="{DynamicResource Fs11}" Opacity="0.7" Text="External" />
           </Border>
-        </StackPanel>
+          <TextBlock Grid.Column="3" Classes="muted" Margin="10,0,0,0" VerticalAlignment="Center"
+                     TextTrimming="CharacterEllipsis" Text="{Binding CollapsedSummary}" IsVisible="{Binding !IsEditing}" />
+        </Grid>
       </DockPanel>
 
       <Border Classes="collapsehost" Classes.hidden="{Binding IsEditing}" IsHitTestVisible="{Binding !IsEditing}">
         <DockPanel Margin="30,0,12,8">
           <TextBlock DockPanel.Dock="Right" Classes="mono synip" Margin="12,0,0,0" Opacity="0.8"
-                     Text="{Binding CollapsedAllowedIps}" />
-          <TextBlock Classes="muted" TextTrimming="CharacterEllipsis" Text="{Binding CollapsedDetail}" />
+                     VerticalAlignment="Top" Text="{Binding CollapsedAllowedIps}" />
+          <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding CollapsedDetail}" />
         </DockPanel>
       </Border>
 
