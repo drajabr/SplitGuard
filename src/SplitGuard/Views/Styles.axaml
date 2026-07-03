@@ -30,6 +30,8 @@
     <Setter Property="CornerRadius" Value="4" />
     <Setter Property="FontSize" Value="{DynamicResource Fs12}" />
     <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
   </Style>
   <Style Selector="Button.icon">
     <Setter Property="Background" Value="Transparent" />
