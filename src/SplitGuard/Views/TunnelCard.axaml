@@ -4,9 +4,9 @@
              xmlns:vm="clr-namespace:SplitGuard.ViewModels"
              xmlns:views="clr-namespace:SplitGuard.Views"
              x:Class="SplitGuard.Views.TunnelCard">
-  <Border Classes="card" Classes.editing="{Binding IsEditing}">
+  <Border Classes="card" Classes.editing="{Binding IsEditing}" Background="Transparent">
     <StackPanel>
-      <DockPanel Margin="12,8">
+      <DockPanel Margin="12,8" Height="30">
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
           <TextBlock Classes="muted" Text="{Binding HeaderHandshake}" IsVisible="{Binding StatsVisible}" />
           <StackPanel Orientation="Horizontal" Spacing="3" IsVisible="{Binding StatsVisible}">
@@ -36,8 +36,13 @@
         </StackPanel>
       </DockPanel>
 
-      <TextBlock Classes="muted" Margin="30,0,12,8" TextTrimming="CharacterEllipsis"
-                 Text="{Binding CollapsedDetail}" IsVisible="{Binding !IsEditing}" />
+      <Border Classes="collapsehost" Classes.hidden="{Binding IsEditing}" IsHitTestVisible="{Binding !IsEditing}">
+        <DockPanel Margin="30,0,12,8">
+          <TextBlock DockPanel.Dock="Right" Classes="mono muted" Margin="12,0,0,0"
+                     Text="{Binding CollapsedAllowedIps}" />
+          <TextBlock Classes="muted" TextTrimming="CharacterEllipsis" Text="{Binding CollapsedDetail}" />
+        </DockPanel>
+      </Border>
 
       <Border Classes="expandhost" Classes.expanded="{Binding IsEditing}" IsHitTestVisible="{Binding IsEditing}">
       <StackPanel>

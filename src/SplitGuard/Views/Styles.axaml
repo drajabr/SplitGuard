@@ -83,6 +83,29 @@
   <Style Selector="Border.item > TextBlock">
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
+  <Style Selector="Border.card">
+    <Setter Property="Cursor" Value="Hand" />
+  </Style>
+  <Style Selector="Border.card.editing">
+    <Setter Property="Cursor" Value="Arrow" />
+  </Style>
+
+  <Style Selector="Border.collapsehost">
+    <Setter Property="ClipToBounds" Value="True" />
+    <Setter Property="MaxHeight" Value="28" />
+    <Setter Property="Opacity" Value="1" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <DoubleTransition Property="MaxHeight" Duration="0:0:0.22" Easing="CubicEaseOut" />
+        <DoubleTransition Property="Opacity" Duration="0:0:0.18" />
+      </Transitions>
+    </Setter>
+  </Style>
+  <Style Selector="Border.collapsehost.hidden">
+    <Setter Property="MaxHeight" Value="0" />
+    <Setter Property="Opacity" Value="0" />
+  </Style>
+
   <Style Selector="Border.expandhost">
     <Setter Property="ClipToBounds" Value="True" />
     <Setter Property="MaxHeight" Value="0" />

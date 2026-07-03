@@ -190,10 +190,20 @@ public class TunnelViewModel : ObservableObject
         }
     }
 
+    public string CollapsedAllowedIps
+    {
+        get
+        {
+            var ips = Peers.SelectMany(p => p.AllowedIpValues).Distinct().ToList();
+            return ips.Count == 0 ? "" : string.Join(", ", ips.Take(3)) + (ips.Count > 3 ? $" +{ips.Count - 3}" : "");
+        }
+    }
+
     public void NotifyPresentation()
     {
         Raise(nameof(CollapsedSummary));
         Raise(nameof(CollapsedDetail));
+        Raise(nameof(CollapsedAllowedIps));
     }
 
     public bool ShowToggle => !IsEditing && !IsExternal;
