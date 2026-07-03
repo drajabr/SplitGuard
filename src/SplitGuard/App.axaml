@@ -22,10 +22,17 @@
     <SolidColorBrush x:Key="FieldBorderBrush">#40808080</SolidColorBrush>
     <SolidColorBrush x:Key="SurfaceBrush">#00FFFFFF</SolidColorBrush>
     <SolidColorBrush x:Key="ItemBrush">#14808080</SolidColorBrush>
+    <!-- Syntax palette: must match SplitGuard.Views.Syntax.* constants. -->
     <SolidColorBrush x:Key="SynIpBrush">#4098D7</SolidColorBrush>
     <SolidColorBrush x:Key="SynDomainBrush">#58A65C</SolidColorBrush>
     <SolidColorBrush x:Key="SynKeyBrush">#9A6FD0</SolidColorBrush>
     <SolidColorBrush x:Key="SynNumBrush">#C77E16</SolidColorBrush>
+    <!-- Semantic/status roles: one source of truth. -->
+    <SolidColorBrush x:Key="DangerBrush">#D14B41</SolidColorBrush>
+    <SolidColorBrush x:Key="WarningBrush">#C77E16</SolidColorBrush>
+    <SolidColorBrush x:Key="SuccessBrush">#4F9A34</SolidColorBrush>
+    <SolidColorBrush x:Key="DotBrush">#8A8A8A</SolidColorBrush>
+    <SolidColorBrush x:Key="WarningBgBrush">#22C77E16</SolidColorBrush>
   </Application.Resources>
   <Application.Styles>
     <FluentTheme />

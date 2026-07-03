@@ -15,7 +15,7 @@
     <Setter Property="FontSize" Value="{DynamicResource Fs12}" />
   </Style>
   <Style Selector="TextBox.error">
-    <Setter Property="BorderBrush" Value="#C42B1C" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DangerBrush}" />
   </Style>
   <Style Selector="TextBox.addbox">
     <Setter Property="MinWidth" Value="72" />
@@ -54,7 +54,7 @@
     <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
   </Style>
   <Style Selector="Button.danger">
-    <Setter Property="Foreground" Value="#C42B1C" />
+    <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
   </Style>
   <Style Selector="Button.danger.armed">
     <Setter Property="FontWeight" Value="Bold" />
@@ -163,24 +163,24 @@
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
   <Style Selector="TextBlock.errtext">
-    <Setter Property="Foreground" Value="#C42B1C" />
+    <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
     <Setter Property="FontSize" Value="{DynamicResource Fs12}" />
     <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
   <Style Selector="TextBlock.warntext">
-    <Setter Property="Foreground" Value="#B25E09" />
+    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
     <Setter Property="FontSize" Value="{DynamicResource Fs12}" />
     <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
   <Style Selector="TextBlock.oktext">
-    <Setter Property="Foreground" Value="#2E7D32" />
+    <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" />
     <Setter Property="FontSize" Value="{DynamicResource Fs12}" />
   </Style>
 
   <Style Selector="Ellipse.dot">
     <Setter Property="Width" Value="8" />
     <Setter Property="Height" Value="8" />
-    <Setter Property="Fill" Value="#888888" />
+    <Setter Property="Fill" Value="{DynamicResource DotBrush}" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
   <Style Selector="Ellipse.dot.up">
