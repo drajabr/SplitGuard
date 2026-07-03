@@ -7,7 +7,7 @@
     <Setter Property="CornerRadius" Value="4" />
     <Setter Property="FontSize" Value="{DynamicResource Fs13}" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
-    <Setter Property="Background" Value="{DynamicResource ItemBrush}" />
+    <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderBrush" Value="{DynamicResource FieldBorderBrush}" />
   </Style>
   <Style Selector="TextBox.mono">

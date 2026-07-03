@@ -49,15 +49,15 @@
       <StackPanel>
         <Separator />
 
-        <Border Margin="12,8" CornerRadius="4" Background="{DynamicResource ItemBrush}" BorderBrush="{DynamicResource FieldBorderBrush}" BorderThickness="1"
+        <Border Margin="12,8" CornerRadius="4" BorderBrush="{DynamicResource FieldBorderBrush}" BorderThickness="1"
                 IsVisible="{Binding IsTextMode}">
-          <ae:TextEditor Name="ConfEditor" MinHeight="220" Padding="8,6"
+          <ae:TextEditor Name="ConfEditor" MinHeight="90" Padding="8,6"
                          FontFamily="Consolas,Courier New,monospace" FontSize="{DynamicResource Fs12}"
                          Background="Transparent"
                          Foreground="{DynamicResource TextControlForeground}"
                          ShowLineNumbers="False"
                          HorizontalScrollBarVisibility="Auto"
-                         VerticalScrollBarVisibility="Auto" />
+                         VerticalScrollBarVisibility="Disabled" />
         </Border>
 
         <Grid ColumnDefinitions="3*,7*" IsVisible="{Binding !IsTextMode}">
