@@ -59,8 +59,10 @@ public class App : Application
             window.Activate();
         }
         ShowMainWindow = ShowWindow;
-        _iconIdle = new WindowIcon(AssetLoader.Open(new Uri("avares://SplitGuard/Assets/app.ico")));
-        _iconActive = new WindowIcon(AssetLoader.Open(new Uri("avares://SplitGuard/Assets/tray-on.ico")));
+        // Accent-composed icons are pushed via SetAccentIcons (ApplyUiPrefs runs first);
+        // the static asset is only a fallback.
+        _iconIdle ??= new WindowIcon(AssetLoader.Open(new Uri("avares://SplitGuard/Assets/app.ico")));
+        _iconActive ??= _iconIdle;
         _tray = new TrayIcon
         {
             Icon = _iconIdle,
@@ -78,6 +80,13 @@ public class App : Application
     }
 
     Action? _exitAction;
+
+    public void SetAccentIcons(WindowIcon idle, WindowIcon active)
+    {
+        _iconIdle = idle;
+        _iconActive = active;
+        if (_tray is not null) RebuildTrayMenu();
+    }
 
     void OnTunnelsChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {

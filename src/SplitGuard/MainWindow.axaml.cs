@@ -20,9 +20,9 @@ public partial class MainWindow : Window, IDialogs
     };
     static readonly (string Name, double Opacity)[] ContrastSteps =
     {
-        ("soft", 0.45),
-        ("normal", 0.6),
-        ("high", 0.85),
+        ("soft", 0.5),
+        ("normal", 0.68),
+        ("high", 0.9),
     };
     static readonly (string Name, string Hex)[] AccentSteps =
     {
@@ -155,6 +155,13 @@ public partial class MainWindow : Window, IDialogs
         resources["SystemAccentColorLight3"] = Tint(color, 0.45);
 
         // Syntax palette leans slightly toward the accent, in fields and the raw editor alike.
+        // Icon set (window, tray, header logo) recomposed in the accent color.
+        var icons = AppIcons.Get(color);
+        Icon = icons.Idle;
+        LogoImage.Source = icons.Logo;
+        if (Avalonia.Application.Current is App app)
+            app.SetAccentIcons(icons.Idle, icons.Active);
+
         var ip = Mix(Color.Parse("#4098D7"), color, 0.22);
         var domain = Mix(Color.Parse("#58A65C"), color, 0.22);
         var key = Mix(Color.Parse("#9A6FD0"), color, 0.22);

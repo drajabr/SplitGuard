@@ -9,6 +9,8 @@
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaChromeHints="PreferSystemChrome"
         ExtendClientAreaTitleBarHeightHint="-1"
+        FontFamily="Segoe UI Variable Text, Segoe UI"
+        RenderOptions.TextRenderingMode="SubpixelAntialias"
         DragDrop.AllowDrop="True">
   <DockPanel>
     <Border DockPanel.Dock="Top" Padding="14,8,146,8" Name="HeaderBar" Background="Transparent">
@@ -34,7 +36,7 @@
           </Button>
         </StackPanel>
         <StackPanel Orientation="Horizontal" Spacing="10">
-          <Image Source="avares://SplitGuard/Assets/app.ico" Width="17" Height="17" VerticalAlignment="Center" />
+          <Image Name="LogoImage" Source="avares://SplitGuard/Assets/app.ico" Width="17" Height="17" VerticalAlignment="Center" />
           <TextBlock FontSize="13.5" FontWeight="Medium" VerticalAlignment="Center" Text="SplitGuard" />
         </StackPanel>
       </DockPanel>
