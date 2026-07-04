@@ -15,17 +15,29 @@
   <DockPanel>
     <Border DockPanel.Dock="Top" Padding="12,6,146,6" Name="HeaderBar">
       <DockPanel>
-        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-          <Button Classes="hdr" Name="AddButton">
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+          <Button Classes="hdr" Name="ThemeButton" Click="OnThemeClick" ToolTip.Tip="Theme">
             <StackPanel Orientation="Horizontal" Spacing="6">
-              <TextBlock Classes="glyph" Text="&#xE710;" FontSize="{DynamicResource Fs12}" Foreground="{DynamicResource AccentBrush}" />
-              <TextBlock Text="Add" VerticalAlignment="Center" FontSize="{DynamicResource Fs12}" />
+              <TextBlock Classes="glyph" Text="&#xE771;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
+              <TextBlock Name="ThemeLabel" FontSize="{DynamicResource Fs115}" Opacity="0.75" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
-          <Button Classes="hdr" Name="ViewButton">
+          <Button Classes="hdr" Name="AccentButton" Click="OnAccentClick" ToolTip.Tip="Accent color">
             <StackPanel Orientation="Horizontal" Spacing="6">
-              <TextBlock Classes="glyph" Text="&#xE790;" FontSize="{DynamicResource Fs12}" Opacity="0.7" />
-              <TextBlock Text="View" VerticalAlignment="Center" FontSize="{DynamicResource Fs12}" Opacity="0.85" />
+              <Ellipse Width="11" Height="11" Fill="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+              <TextBlock Name="AccentLabel" FontSize="{DynamicResource Fs115}" Opacity="0.75" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button Classes="hdr" Name="FontButton" Click="OnFontClick" ToolTip.Tip="UI font">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Classes="glyph" Text="&#xE8D2;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
+              <TextBlock Name="FontLabel" FontSize="{DynamicResource Fs115}" Opacity="0.75" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button Classes="hdr" Name="ZoomButton" Click="OnZoomClick" ToolTip.Tip="Zoom">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Classes="glyph" Text="&#xE71E;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
+              <TextBlock Name="ZoomLabel" FontSize="{DynamicResource Fs115}" Opacity="0.75" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
         </StackPanel>
@@ -53,19 +65,27 @@
       <TextBlock Text="{Binding StatusText}" Classes="oktext" Classes.errtext="{Binding !StatusOk}" />
     </Border>
 
-    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-      <StackPanel Margin="14,8,14,12">
-        <ItemsControl ItemsSource="{Binding Tunnels}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate>
-              <views:TunnelCard Margin="0,0,0,10" />
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-        <TextBlock Classes="muted" Margin="2,6" TextWrapping="Wrap"
-                   IsVisible="{Binding !Tunnels.Count}"
-                   Text="No tunnels yet. Drop a WireGuard .conf file anywhere in this window, or copy a config and press Ctrl+V. Domains you attach to a peer resolve through that peer's DNS while connected; everything else keeps using your normal system DNS." />
-      </StackPanel>
-    </ScrollViewer>
+    <Panel>
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="14,8,14,64">
+          <ItemsControl ItemsSource="{Binding Tunnels}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <views:TunnelCard Margin="0,0,0,10" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Classes="muted" Margin="2,6" TextWrapping="Wrap"
+                     IsVisible="{Binding !Tunnels.Count}"
+                     Text="No tunnels yet. Drop a WireGuard .conf file anywhere in this window, or copy a config and press Ctrl+V. Domains you attach to a peer resolve through that peer's DNS while connected; everything else keeps using your normal system DNS." />
+        </StackPanel>
+      </ScrollViewer>
+
+      <!-- Floating Add button (opens the add options popover). -->
+      <Button Name="AddButton" Classes="fab" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+              Margin="0,0,20,20" ToolTip.Tip="Add tunnel">
+        <TextBlock Classes="glyph" Text="&#xE710;" FontSize="{DynamicResource Fs17}" Foreground="White" />
+      </Button>
+    </Panel>
   </DockPanel>
 </Window>

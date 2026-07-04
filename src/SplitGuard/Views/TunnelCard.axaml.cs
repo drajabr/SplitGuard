@@ -77,7 +77,6 @@ public partial class TunnelCard : UserControl
             {
                 Grid.SetColumn(PeersHost, 1);
                 Grid.SetColumnSpan(PeersHost, 1);
-                PeersHost.BorderThickness = new Avalonia.Thickness(1, 0, 0, 0);
             }
 
             ApplyCardAccent();

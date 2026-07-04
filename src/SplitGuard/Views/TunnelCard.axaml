@@ -20,9 +20,7 @@
             <TextBlock Classes="glyph accentfg" Text="&#xE74B;" FontSize="{DynamicResource Fs11}" />
             <TextBlock Classes="mono" Text="{Binding DownRate}" Opacity="0.75" />
           </StackPanel>
-          <StackPanel Name="ConnectBox" Orientation="Horizontal" Spacing="7" VerticalAlignment="Center" IsVisible="{Binding ShowConnect}">
-            <TextBlock Name="ConnLabel" Classes="muted" VerticalAlignment="Center" Cursor="Hand"
-                       Text="{Binding ConnLabel}" PointerPressed="OnConnectLabelPressed" />
+          <StackPanel Name="ConnectBox" Orientation="Horizontal" VerticalAlignment="Center" IsVisible="{Binding ShowConnect}">
             <ToggleSwitch IsChecked="{Binding IsConnected}" IsEnabled="{Binding !IsEditing}" MinWidth="0" />
           </StackPanel>
         </StackPanel>
@@ -63,8 +61,9 @@
         </Border>
 
         <Grid Name="FieldsGrid" ColumnDefinitions="3*,7*" IsVisible="{Binding !IsTextMode}">
-          <StackPanel Grid.Column="0" IsVisible="{Binding ShowInterfaceSection}">
-          <DockPanel Margin="12,4,12,4">
+          <Border Grid.Column="0" Classes="peerblock" Margin="10,0,8,6" IsVisible="{Binding ShowInterfaceSection}">
+          <StackPanel>
+          <DockPanel Margin="10,4">
             <Button Classes="link" DockPanel.Dock="Right" Command="{Binding GenerateKeyCommand}"
                     ToolTip.Tip="Generate a new keypair (click twice to confirm)" FontSize="{DynamicResource Fs115}">
               <StackPanel Orientation="Horizontal" Spacing="5">
@@ -131,8 +130,9 @@
             </ItemsControl>
           </Grid>
           </StackPanel>
+          </Border>
 
-          <Border Grid.Column="1" Name="PeersHost" BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="1,0,0,0">
+          <Border Grid.Column="1" Name="PeersHost">
             <StackPanel Margin="0,8,0,2">
               <ItemsControl ItemsSource="{Binding Peers}">
                 <ItemsControl.ItemTemplate>

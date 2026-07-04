@@ -144,6 +144,7 @@ public partial class MainWindow : Window, IDialogs
     {
         var (name, family) = FontSteps[_fontIndex];
         FontFamily = new FontFamily(family);
+        FontLabel.Text = name;
     }
 
     void ApplyZoom()
@@ -152,6 +153,7 @@ public partial class MainWindow : Window, IDialogs
         var resources = Avalonia.Application.Current!.Resources;
         foreach (var (key, baseValue) in ZoomResources)
             resources[key] = baseValue * scale;
+        ZoomLabel.Text = name;
     }
 
     // Surface theme: page + card/chip fills + borders + text contrast.
@@ -169,6 +171,7 @@ public partial class MainWindow : Window, IDialogs
         resources["DimOpacity"] = t.Dim;
         resources["HairlineBrush"] = new SolidColorBrush(Color.FromArgb(t.Hair, 0x80, 0x80, 0x80));
         resources["FieldBorderBrush"] = new SolidColorBrush(Color.FromArgb(t.Field, 0x80, 0x80, 0x80));
+        ThemeLabel.Text = t.Name;
         ApplyAccent(); // re-resolve so a "mono" accent flips with the theme
     }
 
@@ -208,6 +211,7 @@ public partial class MainWindow : Window, IDialogs
         LogoImage.Source = icons.Logo;
         if (Avalonia.Application.Current is App app)
             app.SetAccentIcons(icons.Idle, icons.Active);
+        AccentLabel.Text = name;
     }
 
     static Color Shade(Color c, double factor) =>
@@ -226,25 +230,44 @@ public partial class MainWindow : Window, IDialogs
         vm.PersistPrefs();
     }
 
-    // ---- header popovers: Add + Settings (plain buttons, no menus) --------------
+    // ---- header controls: cycling view buttons + floating Add popover -----------
 
     Flyout? _addFlyout;
-    Flyout? _settingsFlyout;
 
     void InitChrome()
     {
-        _addFlyout ??= new Flyout { Placement = PlacementMode.BottomEdgeAlignedRight };
+        // The floating Add button opens the add-options popover above itself.
+        _addFlyout ??= new Flyout { Placement = PlacementMode.Top };
         _addFlyout.Content = BuildAddPanel();
         AddButton.Flyout = _addFlyout;
-
-        _settingsFlyout ??= new Flyout { Placement = PlacementMode.BottomEdgeAlignedRight };
-        _settingsFlyout.Content = BuildAppearancePanel();
-        ViewButton.Flyout = _settingsFlyout;
     }
 
-    void RefreshSettings()
+    void OnThemeClick(object? sender, RoutedEventArgs e)
     {
-        if (_settingsFlyout is not null) _settingsFlyout.Content = BuildAppearancePanel();
+        _themeIndex = (_themeIndex + 1) % Palettes.Length;
+        ApplyTheme();
+        Persist(p => p.Theme = Palettes[_themeIndex].Name);
+    }
+
+    void OnAccentClick(object? sender, RoutedEventArgs e)
+    {
+        _accentIndex = (_accentIndex + 1) % AccentSteps.Length;
+        ApplyAccent();
+        Persist(p => p.Accent = AccentSteps[_accentIndex].Name);
+    }
+
+    void OnFontClick(object? sender, RoutedEventArgs e)
+    {
+        _fontIndex = (_fontIndex + 1) % FontSteps.Length;
+        ApplyFont();
+        Persist(p => p.Font = FontSteps[_fontIndex].Name);
+    }
+
+    void OnZoomClick(object? sender, RoutedEventArgs e)
+    {
+        _zoomIndex = (_zoomIndex + 1) % ZoomSteps.Length;
+        ApplyZoom();
+        Persist(p => p.Zoom = ZoomSteps[_zoomIndex].Name);
     }
 
     Control BuildAddPanel()
@@ -272,75 +295,6 @@ public partial class MainWindow : Window, IDialogs
         return b;
     }
 
-    // Appearance only; behavior settings live in the tray menu.
-    Control BuildAppearancePanel()
-    {
-        var sp = new StackPanel { Spacing = 7, MinWidth = 300, Margin = new Thickness(4) };
-        sp.Children.Add(Row("Theme", Segmented(Palettes.Select(p => p.Name), _themeIndex, i =>
-        { _themeIndex = i; ApplyTheme(); Persist(p => p.Theme = Palettes[i].Name); RefreshSettings(); })));
-        sp.Children.Add(Row("Accent", Swatches(_accentIndex, i =>
-        { _accentIndex = i; ApplyAccent(); Persist(p => p.Accent = AccentSteps[i].Name); RefreshSettings(); })));
-        sp.Children.Add(Row("Font", Segmented(FontSteps.Select(f => f.Name), _fontIndex, i =>
-        { _fontIndex = i; ApplyFont(); Persist(p => p.Font = FontSteps[i].Name); RefreshSettings(); })));
-        sp.Children.Add(Row("Zoom", Segmented(ZoomSteps.Select(z => z.Name), _zoomIndex, i =>
-        { _zoomIndex = i; ApplyZoom(); Persist(p => p.Zoom = ZoomSteps[i].Name); RefreshSettings(); })));
-        return sp;
-    }
-
-    Control Row(string label, Control content)
-    {
-        var g = new Grid { ColumnDefinitions = new ColumnDefinitions("64,*") };
-        var l = new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center };
-        l.Classes.Add("lbl");
-        Grid.SetColumn(content, 1);
-        g.Children.Add(l);
-        g.Children.Add(content);
-        return g;
-    }
-
-    Control Segmented(IEnumerable<string> options, int current, Action<int> select)
-    {
-        var wp = new WrapPanel();
-        var i = 0;
-        foreach (var name in options)
-        {
-            var idx = i++;
-            var b = new Button { Content = name, Margin = new Thickness(0, 0, 4, 4) };
-            b.Classes.Add("seg");
-            if (idx == current) b.Classes.Add("sel");
-            b.Click += (_, _) => select(idx);
-            wp.Children.Add(b);
-        }
-        return wp;
-    }
-
-    Control Swatches(int current, Action<int> select)
-    {
-        var wp = new WrapPanel();
-        var isDark = EffectiveVariant() == ThemeVariant.Dark;
-        var i = 0;
-        foreach (var (name, _) in AccentSteps)
-        {
-            var idx = i++;
-            var color = Accents.Resolve(name, isDark);
-            var dot = new Avalonia.Controls.Shapes.Ellipse { Width = 16, Height = 16, Fill = new SolidColorBrush(color) };
-            var b = new Button
-            {
-                Content = dot,
-                Padding = new Thickness(2),
-                Margin = new Thickness(0, 0, 4, 4),
-                Background = Brushes.Transparent,
-                MinHeight = 0,
-                CornerRadius = new CornerRadius(11),
-                BorderThickness = new Thickness(idx == current ? 2 : 0),
-                BorderBrush = new SolidColorBrush(color),
-            };
-            b.Click += (_, _) => select(idx);
-            wp.Children.Add(b);
-        }
-        return wp;
-    }
-
     async Task ImportConfAsync()
     {
         if (DataContext is not MainViewModel vm) return;
@@ -364,18 +318,6 @@ public partial class MainWindow : Window, IDialogs
             await Clipboard.SetTextAsync(text);
     }
 
-    Avalonia.Controls.Notifications.WindowNotificationManager? _notifier;
-
-    public void Notify(string title, string message, bool isError)
-    {
-        _notifier ??= new Avalonia.Controls.Notifications.WindowNotificationManager(this)
-        {
-            Position = Avalonia.Controls.Notifications.NotificationPosition.BottomRight,
-            MaxItems = 3,
-        };
-        _notifier.Show(new Avalonia.Controls.Notifications.Notification(
-            title, message,
-            isError ? Avalonia.Controls.Notifications.NotificationType.Error
-                    : Avalonia.Controls.Notifications.NotificationType.Information));
-    }
+    public void Notify(string title, string message, bool isError) =>
+        NotificationService.Show(title, message, isError);
 }
