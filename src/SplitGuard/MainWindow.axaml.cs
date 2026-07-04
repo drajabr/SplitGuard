@@ -42,6 +42,15 @@ public partial class MainWindow : Window, IDialogs
         new("midnight", "dark",     "#5566D8"),
     };
 
+    // Proportional UI fonts (values/keys always use the mono stack regardless).
+    static readonly (string Name, string Family)[] FontSteps =
+    {
+        ("segoe",   "Segoe UI Variable Text, Segoe UI"),
+        ("calibri", "Calibri, Segoe UI"),
+        ("candara", "Candara, Segoe UI"),
+        ("tahoma",  "Tahoma, Segoe UI"),
+        ("verdana", "Verdana, Segoe UI"),
+    };
     static readonly (string Name, double Scale)[] ZoomSteps =
     {
         ("100%", 1.0),
@@ -57,6 +66,7 @@ public partial class MainWindow : Window, IDialogs
     };
 
     int _lookIndex;
+    int _fontIndex;
     int _zoomIndex;
 
     public MainWindow()
@@ -125,9 +135,18 @@ public partial class MainWindow : Window, IDialogs
     public void ApplyUiPrefs(SplitGuard.Models.UiPrefs prefs)
     {
         _lookIndex = Math.Max(0, Array.FindIndex(Looks, s => s.Name == prefs.Look));
+        _fontIndex = Math.Max(0, Array.FindIndex(FontSteps, s => s.Name == prefs.Font));
         _zoomIndex = Math.Max(0, Array.FindIndex(ZoomSteps, s => s.Name == prefs.Zoom));
         ApplyLook();
+        ApplyFont();
         ApplyZoom();
+    }
+
+    void ApplyFont()
+    {
+        var (name, family) = FontSteps[_fontIndex];
+        FontFamily = new FontFamily(family);
+        FontLabel.Text = name;
     }
 
     void ApplyZoom()
@@ -198,6 +217,13 @@ public partial class MainWindow : Window, IDialogs
         _lookIndex = (_lookIndex + 1) % Looks.Length;
         ApplyLook();
         Persist(p => p.Look = Looks[_lookIndex].Name);
+    }
+
+    void OnFontClick(object? sender, RoutedEventArgs e)
+    {
+        _fontIndex = (_fontIndex + 1) % FontSteps.Length;
+        ApplyFont();
+        Persist(p => p.Font = FontSteps[_fontIndex].Name);
     }
 
     void OnZoomClick(object? sender, RoutedEventArgs e)

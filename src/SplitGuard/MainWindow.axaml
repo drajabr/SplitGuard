@@ -22,6 +22,12 @@
               <TextBlock Name="LookLabel" FontSize="{DynamicResource Fs115}" Opacity="0.7" VerticalAlignment="Center" Text="auto" />
             </StackPanel>
           </Button>
+          <Button Classes="icon" Name="FontButton" Click="OnFontClick" ToolTip.Tip="UI font">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Classes="glyph" Text="&#xE8D2;" Opacity="0.6" />
+              <TextBlock Name="FontLabel" FontSize="{DynamicResource Fs115}" Opacity="0.7" VerticalAlignment="Center" Text="segoe" />
+            </StackPanel>
+          </Button>
           <Button Classes="icon" Name="ZoomButton" Click="OnZoomClick" ToolTip.Tip="Zoom (fonts and controls)">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <TextBlock Classes="glyph" Text="&#xE71E;" Opacity="0.6" />

@@ -12,6 +12,7 @@ public class AppConfig
 public class UiPrefs
 {
     public string Look { get; set; } = "auto";
+    public string Font { get; set; } = "segoe";
     public string Zoom { get; set; } = "100%";
 }
 
