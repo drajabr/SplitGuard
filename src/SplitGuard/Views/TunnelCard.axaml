@@ -6,7 +6,9 @@
              xmlns:ae="using:AvaloniaEdit"
              x:Class="SplitGuard.Views.TunnelCard">
   <Border Classes="card" Classes.editing="{Binding IsEditing}" Background="{DynamicResource SurfaceBrush}">
-    <StackPanel>
+    <Grid ColumnDefinitions="Auto,*">
+      <Border Grid.Column="0" Width="4" Background="{DynamicResource AccentBrush}" />
+      <StackPanel Grid.Column="1">
       <DockPanel Name="HeaderRow" Background="Transparent" Margin="12,8" Height="{DynamicResource HeaderH}">
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
           <TextBlock Classes="muted" Text="{Binding HeaderHandshake}" IsVisible="{Binding StatsVisible}" />
@@ -41,11 +43,7 @@
       </DockPanel>
 
       <Border Classes="collapsehost" Classes.hidden="{Binding IsEditing}" IsHitTestVisible="{Binding !IsEditing}">
-        <DockPanel Margin="30,0,12,8">
-          <TextBlock DockPanel.Dock="Right" Classes="mono synip" Margin="12,0,0,0" Opacity="0.8"
-                     VerticalAlignment="Top" Text="{Binding CollapsedAllowedIps}" />
-          <WrapPanel Name="DetailPanel" VerticalAlignment="Top" />
-        </DockPanel>
+        <StackPanel Name="DetailPanel" Margin="30,0,12,8" />
       </Border>
 
       <Border Name="ExpandHost" Classes="expandhost" Classes.expanded="{Binding IsEditing}" IsHitTestVisible="{Binding IsEditing}">
@@ -67,14 +65,13 @@
           <StackPanel Grid.Column="0" Margin="12,8" Spacing="8" IsVisible="{Binding ShowInterfaceSection}">
             <StackPanel Spacing="3">
               <TextBlock Classes="lbl" Text="Public key" />
-              <DockPanel>
-                <Button DockPanel.Dock="Right" Classes="icon" Margin="6,0,0,0" Command="{Binding CopyPublicKeyCommand}" ToolTip.Tip="Copy full public key">
-                  <TextBlock Classes="glyph" Text="&#xE8C8;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
-                </Button>
-                <Border Classes="item">
-                  <TextBlock Classes="mono synkey" Text="{Binding PublicKeyFull}" TextTrimming="CharacterEllipsis" />
-                </Border>
-              </DockPanel>
+              <TextBox Classes="mono synkey" Text="{Binding PublicKeyFull}" IsReadOnly="True">
+                <TextBox.InnerRightContent>
+                  <Button Classes="icon" Command="{Binding CopyPublicKeyCommand}" ToolTip.Tip="Copy full public key">
+                    <TextBlock Classes="glyph" Text="&#xE8C8;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
+                  </Button>
+                </TextBox.InnerRightContent>
+              </TextBox>
             </StackPanel>
 
             <StackPanel Spacing="3">
@@ -88,9 +85,9 @@
               </TextBox>
             </StackPanel>
 
-            <StackPanel Spacing="3">
-              <TextBlock Classes="lbl" Text="Listen port" />
-              <TextBox Classes="mono" Width="90" HorizontalAlignment="Left" Text="{Binding ListenPortText}" Watermark="automatic" />
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <TextBlock Classes="lbl" Text="Listen port" VerticalAlignment="Center" />
+              <TextBox Classes="mono" Width="90" Text="{Binding ListenPortText}" Watermark="automatic" />
             </StackPanel>
 
             <StackPanel Spacing="3">
@@ -165,6 +162,7 @@
         </DockPanel>
       </StackPanel>
       </Border>
-    </StackPanel>
+      </StackPanel>
+    </Grid>
   </Border>
 </UserControl>

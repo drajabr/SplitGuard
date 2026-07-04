@@ -15,7 +15,7 @@
     <x:Double x:Key="Fs17">17</x:Double>
     <x:Double x:Key="CtrlH">26</x:Double>
     <x:Double x:Key="HeaderH">30</x:Double>
-    <x:Double x:Key="CollapseH">96</x:Double>
+    <x:Double x:Key="CollapseH">170</x:Double>
     <SolidColorBrush x:Key="AccentBrush">#3378DD</SolidColorBrush>
     <SolidColorBrush x:Key="AccentDimBrush">#663378DD</SolidColorBrush>
     <SolidColorBrush x:Key="HairlineBrush">#33808080</SolidColorBrush>

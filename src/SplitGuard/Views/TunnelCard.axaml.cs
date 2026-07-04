@@ -121,18 +121,46 @@ public partial class TunnelCard : UserControl
         DetailPanel.Children.Clear();
         if (_vm is null) return;
 
-        void AddToken(string text, IBrush brush)
+        TextBlock Mono(string text, IBrush brush)
         {
-            // Use the "mono" style class so FontSize follows the zoom-scaled Fs12 resource.
-            var tb = new TextBlock { Text = text, Foreground = brush, Margin = new Avalonia.Thickness(0, 0, 10, 2) };
+            // "mono" class → FontSize follows the zoom-scaled Fs12 resource.
+            var tb = new TextBlock { Text = text, Foreground = brush, TextTrimming = TextTrimming.CharacterEllipsis };
             tb.Classes.Add("mono");
-            DetailPanel.Children.Add(tb);
+            return tb;
         }
 
-        foreach (var addr in _vm.AddressValues) AddToken(addr, Syntax.IpBrush);
-        foreach (var domain in _vm.AllDomains) AddToken(domain, Syntax.DomainBrush);
+        // One row: left text and a right-aligned text (either may be blank).
+        void AddRow(string left, IBrush leftBrush, string right, IBrush rightBrush)
+        {
+            var row = new DockPanel { Margin = new Avalonia.Thickness(0, 0, 0, 2) };
+            if (right.Length > 0)
+            {
+                var r = Mono(right, rightBrush);
+                r.Margin = new Avalonia.Thickness(12, 0, 0, 0);
+                r.TextAlignment = Avalonia.Media.TextAlignment.Right;
+                DockPanel.SetDock(r, Dock.Right);
+                row.Children.Add(r);
+            }
+            if (left.Length > 0) row.Children.Add(Mono(left, leftBrush));
+            DetailPanel.Children.Add(row);
+        }
+
+        // Line 1: our address(es) on the left, all peers' allowed IPs on the right.
+        var ourIps = string.Join(", ", _vm.AddressValues);
+        var allowed = string.Join(", ", _vm.Peers.SelectMany(p => p.AllowedIpValues).Distinct());
+        if (ourIps.Length > 0 || allowed.Length > 0) AddRow(ourIps, Syntax.IpBrush, allowed, Syntax.IpBrush);
+
+        // Then one line per peer that defines a DNS server and/or domains:
+        //   DNS server on the left, the domains it resolves right-aligned.
+        foreach (var p in _vm.Peers)
+        {
+            var domains = string.Join(", ", p.DomainValues);
+            if (!p.HasDns && domains.Length == 0) continue;
+            AddRow(p.HasDns ? p.Dns.Trim() : "", Syntax.IpBrush, domains, Syntax.DomainBrush);
+        }
+
         if (DetailPanel.Children.Count == 0)
-            AddToken("no split DNS configured", Syntax.IpBrush);
+            AddRow("no split DNS configured", Syntax.IpBrush, "", Syntax.IpBrush);
     }
 
     // Collapsed: a click anywhere on the card expands it. Expanded: only a click on
