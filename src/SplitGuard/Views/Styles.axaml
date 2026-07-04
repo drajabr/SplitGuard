@@ -152,7 +152,7 @@
     <Setter Property="MaxHeight" Value="0" />
     <Setter Property="Transitions">
       <Transitions>
-        <DoubleTransition Property="MaxHeight" Duration="0:0:0.17" Easing="CubicEaseOut" />
+        <DoubleTransition Property="MaxHeight" Duration="0:0:0.18" Easing="CubicEaseOut" />
       </Transitions>
     </Setter>
   </Style>
@@ -162,7 +162,7 @@
     <Setter Property="MaxHeight" Value="0" />
     <Setter Property="Transitions">
       <Transitions>
-        <DoubleTransition Property="MaxHeight" Duration="0:0:0.17" Easing="CubicEaseOut" />
+        <DoubleTransition Property="MaxHeight" Duration="0:0:0.18" Easing="CubicEaseOut" />
       </Transitions>
     </Setter>
   </Style>

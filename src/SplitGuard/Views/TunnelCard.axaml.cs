@@ -90,18 +90,6 @@ public partial class TunnelCard : UserControl
         // PointerPressed instead of Tapped: Tapped suppresses the second of two fast
         // clicks (double-tap detection), which made rapid expand/collapse feel dead.
         AddHandler(PointerPressedEvent, OnCardPressed, handledEventsToo: false);
-
-        // While a section is open and settled, keep its MaxHeight glued to the content's
-        // real height so growth (adding a domain, switching mode) is reflected with no
-        // jump. Reads Bounds only — never measures here, so no layout re-entrancy.
-        ExpandContent.LayoutUpdated += (_, _) =>
-        {
-            if (_vm?.IsEditing == true && !_expandAnimating) PinGrow(ExpandHost, ExpandContent);
-        };
-        DetailPanel.LayoutUpdated += (_, _) =>
-        {
-            if (_vm?.IsEditing == false && !_collapseAnimating) PinGrow(CollapseHost, DetailPanel);
-        };
     }
 
     void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -137,16 +125,8 @@ public partial class TunnelCard : UserControl
             ApplyCardAccent();
         if (e.PropertyName == nameof(TunnelViewModel.IsEditing) && _vm is not null)
         {
-            if (_vm.IsEditing)
-            {
-                OpenHost(ExpandHost, ExpandContent, v => _expandAnimating = v);
-                CloseHost(CollapseHost, DetailPanel, v => _collapseAnimating = v);
-            }
-            else
-            {
-                CloseHost(ExpandHost, ExpandContent, v => _expandAnimating = v);
-                OpenHost(CollapseHost, DetailPanel, v => _collapseAnimating = v);
-            }
+            SetOpen(ExpandHost, ExpandContent, _vm.IsEditing, _expandAnim);
+            SetOpen(CollapseHost, DetailPanel, !_vm.IsEditing, _collapseAnim);
         }
     }
 
@@ -176,11 +156,14 @@ public partial class TunnelCard : UserControl
         }
     }
 
-    // ---- expand/collapse: animate MaxHeight between 0 and the content height ----
+    // ---- expand/collapse: one MaxHeight tween per toggle, no per-frame work ------
 
-    const int AnimMs = 170; // must match the MaxHeight transition in Styles.axaml
-    bool _expandAnimating;
-    bool _collapseAnimating;
+    const int AnimMs = 180; // must match the MaxHeight transition duration in Styles.axaml
+
+    // Per-host generation counter so a rapid re-toggle cancels a stale "uncap" callback.
+    sealed class AnimState { public int Gen; }
+    readonly AnimState _expandAnim = new();
+    readonly AnimState _collapseAnim = new();
 
     static void WithoutTransitions(Border b, Action apply)
     {
@@ -190,7 +173,8 @@ public partial class TunnelCard : UserControl
         b.Transitions = t;
     }
 
-    static double MeasureHeight(Control content, Border host)
+    // Measure the content's natural (uncapped) height at the host's real width.
+    static double NaturalHeight(Control content, Border host)
     {
         var w = host.Bounds.Width;
         if (w < 1) w = 400;
@@ -198,38 +182,29 @@ public partial class TunnelCard : UserControl
         return content.DesiredSize.Height;
     }
 
-    // Keep an open section's cap at least as tall as its natural (uncapped) content, so
-    // the content is never clipped. Grow-only: it can never zero out the detail or shrink
-    // a few px, and it converges (once MaxHeight >= natural it stops), so no layout loop.
-    // A finite cap that's too tall is corrected on the next open/close, not here.
-    void PinGrow(Border host, Control content)
+    // Open: tween 0 → measured height, then lift the cap so later edits grow freely.
+    // Close: pin the current height, then tween → 0. Exactly one animation per toggle;
+    // nothing runs on LayoutUpdated, so there's no thrash or settle-jump.
+    void SetOpen(Border host, Control content, bool open, AnimState a)
     {
-        if (!double.IsFinite(host.MaxHeight)) return; // already unbounded (fully shown)
-        var natural = MeasureHeight(content, host);
-        if (natural > host.MaxHeight + 0.5)
-            WithoutTransitions(host, () => host.MaxHeight = natural);
-    }
-
-    // Grow 0 → content height, then let the LayoutUpdated pin track any later changes.
-    async void OpenHost(Border host, Control content, Action<bool> setAnimating)
-    {
-        setAnimating(true);
-        var h = MeasureHeight(content, host);
-        if (host.MaxHeight > h + 0.5) WithoutTransitions(host, () => host.MaxHeight = 0);
-        host.MaxHeight = h;
-        await Task.Delay(AnimMs + 40);
-        setAnimating(false);
-    }
-
-    // Pin to the current height, then animate down to 0 on the next render tick.
-    async void CloseHost(Border host, Control content, Action<bool> setAnimating)
-    {
-        setAnimating(true);
-        var cur = host.Bounds.Height;
-        if (double.IsFinite(cur) && cur > 0) WithoutTransitions(host, () => host.MaxHeight = cur);
-        Dispatcher.UIThread.Post(() => host.MaxHeight = 0, DispatcherPriority.Render);
-        await Task.Delay(AnimMs + 40);
-        setAnimating(false);
+        var gen = ++a.Gen;
+        if (open)
+        {
+            var h = NaturalHeight(content, host);
+            // Start the tween from a clean 0 if we're currently collapsed or uncapped.
+            if (!double.IsFinite(host.MaxHeight) || host.MaxHeight > h)
+                WithoutTransitions(host, () => host.MaxHeight = 0);
+            host.MaxHeight = h; // animates 0 → h
+            DispatcherTimer.RunOnce(
+                () => { if (a.Gen == gen) WithoutTransitions(host, () => host.MaxHeight = double.PositiveInfinity); },
+                TimeSpan.FromMilliseconds(AnimMs + 50));
+        }
+        else
+        {
+            var cur = host.Bounds.Height;
+            if (double.IsFinite(cur) && cur > 0) WithoutTransitions(host, () => host.MaxHeight = cur);
+            Dispatcher.UIThread.Post(() => { if (a.Gen == gen) host.MaxHeight = 0; }, DispatcherPriority.Render);
+        }
     }
 
     // Syntax-colored collapsed detail as atomic tokens in a WrapPanel: addresses in
