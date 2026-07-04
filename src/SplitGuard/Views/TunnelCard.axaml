@@ -63,8 +63,20 @@
         </Border>
 
         <Grid Name="FieldsGrid" ColumnDefinitions="3*,7*" IsVisible="{Binding !IsTextMode}">
-          <Grid Grid.Column="0" Margin="12,8" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto"
-                IsVisible="{Binding ShowInterfaceSection}">
+          <StackPanel Grid.Column="0" IsVisible="{Binding ShowInterfaceSection}">
+          <DockPanel Margin="12,4,12,4">
+            <Button Classes="link" DockPanel.Dock="Right" Command="{Binding GenerateKeyCommand}"
+                    ToolTip.Tip="Generate a new keypair (click twice to confirm)" FontSize="{DynamicResource Fs115}">
+              <StackPanel Orientation="Horizontal" Spacing="5">
+                <TextBlock Classes="glyph" Text="&#xE72C;" FontSize="{DynamicResource Fs12}" />
+                <TextBlock Text="{Binding GenerateLabel}" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+            <TextBlock Classes="accentfg" FontSize="{DynamicResource Fs115}" FontWeight="Medium"
+                       VerticalAlignment="Center" Text="Interface" />
+          </DockPanel>
+          <Separator />
+          <Grid Margin="12,8" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto">
             <TextBlock Grid.Row="0" Grid.Column="0" Classes="lbl" Text="Public key" Margin="0,0,10,8" />
             <TextBox Grid.Row="0" Grid.Column="1" Classes="mono synkey" Text="{Binding PublicKeyFull}" IsReadOnly="True" Margin="0,0,0,8">
               <TextBox.InnerRightContent>
@@ -75,16 +87,7 @@
             </TextBox>
 
             <TextBlock Grid.Row="1" Grid.Column="0" Classes="lbl" Text="Private key" Margin="0,0,10,8" />
-            <TextBox Grid.Row="1" Grid.Column="1" Classes="mono" Text="{Binding PrivateKeyEdit}" Margin="0,0,0,8">
-              <TextBox.InnerRightContent>
-                <Button Classes="icon" Command="{Binding GenerateKeyCommand}" ToolTip.Tip="Generate new keypair (click twice to confirm)">
-                  <StackPanel Orientation="Horizontal" Spacing="4">
-                    <TextBlock Classes="glyph" Text="&#xE72C;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
-                    <TextBlock Text="{Binding GenerateLabel}" FontSize="{DynamicResource Fs11}" Opacity="0.7" VerticalAlignment="Center" />
-                  </StackPanel>
-                </Button>
-              </TextBox.InnerRightContent>
-            </TextBox>
+            <TextBox Grid.Row="1" Grid.Column="1" Classes="mono" Text="{Binding PrivateKeyEdit}" Margin="0,0,0,8" />
 
             <TextBlock Grid.Row="2" Grid.Column="0" Classes="lbl" Text="Listen port" Margin="0,0,10,8" />
             <TextBox Grid.Row="2" Grid.Column="1" Classes="mono" Text="{Binding ListenPortText}" Watermark="automatic" Margin="0,0,0,8">
@@ -127,6 +130,7 @@
               </ItemsControl.DataTemplates>
             </ItemsControl>
           </Grid>
+          </StackPanel>
 
           <Border Grid.Column="1" Name="PeersHost" BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="1,0,0,0">
             <StackPanel Margin="0,8,0,2">

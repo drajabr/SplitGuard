@@ -136,6 +136,45 @@ public class App : Application
         }
         if (menu.Items.Count > 0)
             menu.Items.Add(new NativeMenuItemSeparator());
+
+        // App settings live here in the tray.
+        var settings = new NativeMenuItem("Settings") { Menu = new NativeMenu() };
+        var custom = new NativeMenuItem("Custom DNS forwarding")
+        {
+            ToggleType = NativeMenuItemToggleType.CheckBox,
+            IsChecked = _vm.HasCustomDns,
+        };
+        custom.Click += (_, _) => { _vm.ToggleCustomDns(!_vm.HasCustomDns); RebuildTrayMenu(); };
+        settings.Menu!.Items.Add(custom);
+        var boot = new NativeMenuItem("Start on Windows startup")
+        {
+            ToggleType = NativeMenuItemToggleType.CheckBox,
+            IsChecked = _vm.Prefs.StartOnBoot,
+        };
+        boot.Click += (_, _) =>
+        {
+            var on = !_vm.Prefs.StartOnBoot;
+            SplitGuard.Services.StartupService.Set(on);
+            _vm.Prefs.StartOnBoot = on;
+            _vm.PersistPrefs();
+            RebuildTrayMenu();
+        };
+        settings.Menu.Items.Add(boot);
+        var notif = new NativeMenuItem("Notifications")
+        {
+            ToggleType = NativeMenuItemToggleType.CheckBox,
+            IsChecked = _vm.Prefs.Notifications,
+        };
+        notif.Click += (_, _) =>
+        {
+            _vm.Prefs.Notifications = !_vm.Prefs.Notifications;
+            _vm.PersistPrefs();
+            RebuildTrayMenu();
+        };
+        settings.Menu.Items.Add(notif);
+        menu.Items.Add(settings);
+        menu.Items.Add(new NativeMenuItemSeparator());
+
         var show = new NativeMenuItem("Show");
         show.Click += (_, _) => ShowMainWindow?.Invoke();
         var exit = new NativeMenuItem("Exit");

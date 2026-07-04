@@ -37,6 +37,7 @@ public class UiPrefs
     public string Zoom { get; set; } = "100%";
     public bool StartOnBoot { get; set; }
     public bool Notifications { get; set; } = true;
+    public bool CustomDnsEnabled { get; set; } = true;
 }
 
 public class TunnelConfig

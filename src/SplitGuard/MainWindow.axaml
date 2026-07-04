@@ -22,10 +22,10 @@
               <TextBlock Text="Add" VerticalAlignment="Center" FontSize="{DynamicResource Fs12}" />
             </StackPanel>
           </Button>
-          <Button Classes="hdr" Name="SettingsButton">
+          <Button Classes="hdr" Name="ViewButton">
             <StackPanel Orientation="Horizontal" Spacing="6">
-              <TextBlock Classes="glyph" Text="&#xE713;" FontSize="{DynamicResource Fs12}" Opacity="0.7" />
-              <TextBlock Text="Settings" VerticalAlignment="Center" FontSize="{DynamicResource Fs12}" Opacity="0.85" />
+              <TextBlock Classes="glyph" Text="&#xE790;" FontSize="{DynamicResource Fs12}" Opacity="0.7" />
+              <TextBlock Text="View" VerticalAlignment="Center" FontSize="{DynamicResource Fs12}" Opacity="0.85" />
             </StackPanel>
           </Button>
         </StackPanel>

@@ -238,13 +238,13 @@ public partial class MainWindow : Window, IDialogs
         AddButton.Flyout = _addFlyout;
 
         _settingsFlyout ??= new Flyout { Placement = PlacementMode.BottomEdgeAlignedRight };
-        _settingsFlyout.Content = BuildSettingsPanel();
-        SettingsButton.Flyout = _settingsFlyout;
+        _settingsFlyout.Content = BuildAppearancePanel();
+        ViewButton.Flyout = _settingsFlyout;
     }
 
     void RefreshSettings()
     {
-        if (_settingsFlyout is not null) _settingsFlyout.Content = BuildSettingsPanel();
+        if (_settingsFlyout is not null) _settingsFlyout.Content = BuildAppearancePanel();
     }
 
     Control BuildAddPanel()
@@ -272,13 +272,10 @@ public partial class MainWindow : Window, IDialogs
         return b;
     }
 
-    Control BuildSettingsPanel()
+    // Appearance only; behavior settings live in the tray menu.
+    Control BuildAppearancePanel()
     {
-        var mvm = DataContext as MainViewModel;
-        var prefs = mvm?.Prefs;
         var sp = new StackPanel { Spacing = 7, MinWidth = 300, Margin = new Thickness(4) };
-
-        sp.Children.Add(Section("APPEARANCE"));
         sp.Children.Add(Row("Theme", Segmented(Palettes.Select(p => p.Name), _themeIndex, i =>
         { _themeIndex = i; ApplyTheme(); Persist(p => p.Theme = Palettes[i].Name); RefreshSettings(); })));
         sp.Children.Add(Row("Accent", Swatches(_accentIndex, i =>
@@ -287,22 +284,8 @@ public partial class MainWindow : Window, IDialogs
         { _fontIndex = i; ApplyFont(); Persist(p => p.Font = FontSteps[i].Name); RefreshSettings(); })));
         sp.Children.Add(Row("Zoom", Segmented(ZoomSteps.Select(z => z.Name), _zoomIndex, i =>
         { _zoomIndex = i; ApplyZoom(); Persist(p => p.Zoom = ZoomSteps[i].Name); RefreshSettings(); })));
-
-        sp.Children.Add(new Separator { Margin = new Thickness(0, 4) });
-        sp.Children.Add(Section("BEHAVIOR"));
-        sp.Children.Add(Check("Custom DNS forwarding", mvm?.HasCustomDns == true, on =>
-        { mvm?.ToggleCustomDns(on); RefreshSettings(); }));
-        sp.Children.Add(Check("Start on Windows startup", prefs?.StartOnBoot == true, on =>
-        { StartupService.Set(on); Persist(p => p.StartOnBoot = on); }));
-        sp.Children.Add(Check("Notifications", prefs?.Notifications == true, on =>
-        { Persist(p => p.Notifications = on); }));
         return sp;
     }
-
-    static Control Section(string text) => new TextBlock
-    {
-        Text = text, FontSize = 10, Opacity = 0.5, FontWeight = FontWeight.SemiBold, Margin = new Thickness(0, 2, 0, 0),
-    };
 
     Control Row(string label, Control content)
     {
@@ -356,13 +339,6 @@ public partial class MainWindow : Window, IDialogs
             wp.Children.Add(b);
         }
         return wp;
-    }
-
-    Control Check(string text, bool value, Action<bool> set)
-    {
-        var cb = new CheckBox { Content = text, IsChecked = value };
-        cb.IsCheckedChanged += (_, _) => set(cb.IsChecked == true);
-        return cb;
     }
 
     async Task ImportConfAsync()

@@ -75,6 +75,12 @@ public class MainViewModel : ObservableObject, ITunnelHost
         GpoWarning = NrptService.IsGpoNrptActive();
         foreach (var t in _config.Tunnels)
             Tunnels.Add(new TunnelViewModel(this, t));
+        // Custom DNS forwarding is on by default; materialize its card if enabled.
+        if (_config.Ui.CustomDnsEnabled && _config.Custom is null)
+        {
+            _config.Custom = new CustomDnsConfig();
+            _store.Save(_config);
+        }
         if (_config.Custom is not null)
             Tunnels.Add(new TunnelViewModel(this, _config.Custom));
         await RefreshExternalsAsync();
@@ -369,9 +375,10 @@ public class MainViewModel : ObservableObject, ITunnelHost
 
     public void ToggleCustomDns(bool on)
     {
+        _config.Ui.CustomDnsEnabled = on;
         if (on)
         {
-            if (_config.Custom is not null) return;
+            if (_config.Custom is not null) { _store.Save(_config); return; }
             _config.Custom = new CustomDnsConfig();
             _store.Save(_config);
             Tunnels.Add(new TunnelViewModel(this, _config.Custom));
@@ -382,6 +389,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
         {
             var vm = Tunnels.FirstOrDefault(t => t.IsCustom);
             if (vm is not null) RequestDelete(vm);
+            _store.Save(_config);
         }
     }
 
