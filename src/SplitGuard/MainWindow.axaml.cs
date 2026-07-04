@@ -209,7 +209,11 @@ public partial class MainWindow : Window, IDialogs
         resources["SystemAccentColorLight2"] = Tint(color, 0.30);
         resources["SystemAccentColorLight3"] = Tint(color, 0.45);
 
-        var icons = AppIcons.Get(color);
+        // The icon sits on unknown backgrounds (taskbar/tray, light or dark), so a pure
+        // white/black "mono" dragon would vanish. Use a neutral mid-gray for mono; the
+        // colored accents are mid-tone and read fine on both.
+        var iconColor = hex.Length > 0 ? color : Color.Parse("#8A93A0");
+        var icons = AppIcons.Get(iconColor);
         Icon = icons.Idle;
         LogoImage.Source = icons.Logo;
         if (Avalonia.Application.Current is App app)
