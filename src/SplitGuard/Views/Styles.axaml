@@ -59,22 +59,6 @@
     <Setter Property="MinHeight" Value="0" />
     <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
   </Style>
-  <!-- Header dropdown buttons: uniform width so each menu below hugs its button. -->
-  <Style Selector="Button.drop">
-    <Setter Property="MinWidth" Value="104" />
-    <Setter Property="HorizontalContentAlignment" Value="Left" />
-  </Style>
-  <!-- Make the dropdown look like it grows out of the button: no gap, square top,
-       matched width, tight chrome (not a floating separate menu). -->
-  <Style Selector="MenuFlyoutPresenter">
-    <Setter Property="Margin" Value="0" />
-    <Setter Property="Padding" Value="2" />
-    <Setter Property="MinWidth" Value="104" />
-    <Setter Property="CornerRadius" Value="0,0,6,6" />
-  </Style>
-  <Style Selector="MenuFlyoutPresenter > MenuItem">
-    <Setter Property="Padding" Value="8,4" />
-  </Style>
   <Style Selector="Button.danger">
     <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
   </Style>

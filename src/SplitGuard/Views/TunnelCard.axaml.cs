@@ -97,11 +97,11 @@ public partial class TunnelCard : UserControl
         // jump. Reads Bounds only — never measures here, so no layout re-entrancy.
         ExpandContent.LayoutUpdated += (_, _) =>
         {
-            if (_vm?.IsEditing == true && !_expandAnimating) PinTo(ExpandHost, ExpandContent);
+            if (_vm?.IsEditing == true && !_expandAnimating) PinGrow(ExpandHost, ExpandContent);
         };
         DetailPanel.LayoutUpdated += (_, _) =>
         {
-            if (_vm?.IsEditing == false && !_collapseAnimating) PinTo(CollapseHost, DetailPanel);
+            if (_vm?.IsEditing == false && !_collapseAnimating) PinGrow(CollapseHost, DetailPanel);
         };
     }
 
@@ -199,12 +199,16 @@ public partial class TunnelCard : UserControl
         return content.DesiredSize.Height;
     }
 
-    // Keep an open section's cap equal to its real content height (no-op if already equal).
-    void PinTo(Border host, Control content)
+    // Keep an open section's cap at least as tall as its natural (uncapped) content, so
+    // the content is never clipped. Grow-only: it can never zero out the detail or shrink
+    // a few px, and it converges (once MaxHeight >= natural it stops), so no layout loop.
+    // A finite cap that's too tall is corrected on the next open/close, not here.
+    void PinGrow(Border host, Control content)
     {
-        var h = content.Bounds.Height;
-        if (h > 0 && Math.Abs(host.MaxHeight - h) > 0.5)
-            WithoutTransitions(host, () => host.MaxHeight = h);
+        if (!double.IsFinite(host.MaxHeight)) return; // already unbounded (fully shown)
+        var natural = MeasureHeight(content, host);
+        if (natural > host.MaxHeight + 0.5)
+            WithoutTransitions(host, () => host.MaxHeight = natural);
     }
 
     // Grow 0 → content height, then let the LayoutUpdated pin track any later changes.

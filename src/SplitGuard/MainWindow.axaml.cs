@@ -143,7 +143,7 @@ public partial class MainWindow : Window, IDialogs
     {
         var (name, family) = FontSteps[_fontIndex];
         FontFamily = new FontFamily(family);
-        FontLabel.Text = name;
+        FontMenu.Header = $"Font: {name}";
     }
 
     void ApplyZoom()
@@ -152,7 +152,7 @@ public partial class MainWindow : Window, IDialogs
         var resources = Avalonia.Application.Current!.Resources;
         foreach (var (key, baseValue) in ZoomResources)
             resources[key] = baseValue * scale;
-        ZoomLabel.Text = name;
+        ZoomMenu.Header = $"Zoom: {name}";
     }
 
     // Surface theme: page + card/chip fills + borders + text contrast.
@@ -170,7 +170,7 @@ public partial class MainWindow : Window, IDialogs
         resources["DimOpacity"] = t.Dim;
         resources["HairlineBrush"] = new SolidColorBrush(Color.FromArgb(t.Hair, 0x80, 0x80, 0x80));
         resources["FieldBorderBrush"] = new SolidColorBrush(Color.FromArgb(t.Field, 0x80, 0x80, 0x80));
-        ThemeLabel.Text = t.Name;
+        ThemeMenu.Header = $"Theme: {t.Name}";
         ApplyAccent(); // re-resolve so a "mono" accent flips with the theme
     }
 
@@ -210,7 +210,7 @@ public partial class MainWindow : Window, IDialogs
         LogoImage.Source = icons.Logo;
         if (Avalonia.Application.Current is App app)
             app.SetAccentIcons(icons.Idle, icons.Active);
-        AccentLabel.Text = name;
+        AccentMenu.Header = $"Accent: {name}";
     }
 
     static Color Shade(Color c, double factor) =>
@@ -236,10 +236,10 @@ public partial class MainWindow : Window, IDialogs
         Text = "", FontFamily = new FontFamily("Segoe MDL2 Assets"), FontSize = 12,
     };
 
-    // Build a single-choice picker: one radio item per option, current one checked.
-    static void BuildPicker(MenuFlyout flyout, IEnumerable<string> options, int current, Action<int> select)
+    // Build a single-choice picker: one item per option, current one checked.
+    void BuildPicker(MenuItem menu, IEnumerable<string> options, int current, Action<int> select)
     {
-        flyout.Items.Clear();
+        menu.Items.Clear();
         var i = 0;
         foreach (var name in options)
         {
@@ -247,41 +247,36 @@ public partial class MainWindow : Window, IDialogs
             var item = new MenuItem { Header = name };
             if (idx == current) item.Icon = CheckIcon();
             item.Click += (_, _) => select(idx);
-            flyout.Items.Add(item);
+            menu.Items.Add(item);
         }
     }
 
-    // Flyouts live in their own namescope, so they aren't generated as fields; reach
-    // them through the (named) buttons that own them.
-    static MenuFlyout Flyout(Button b) => (MenuFlyout)b.Flyout!;
-
     void BuildMenus()
     {
-        BuildPicker(Flyout(ThemeButton), Palettes.Select(p => p.Name), _themeIndex, i =>
+        BuildPicker(ThemeMenu, Palettes.Select(p => p.Name), _themeIndex, i =>
         { _themeIndex = i; ApplyTheme(); Persist(p => p.Theme = Palettes[i].Name); BuildMenus(); });
-        BuildPicker(Flyout(AccentButton), AccentSteps.Select(a => a.Name), _accentIndex, i =>
+        BuildPicker(AccentMenu, AccentSteps.Select(a => a.Name), _accentIndex, i =>
         { _accentIndex = i; ApplyAccent(); Persist(p => p.Accent = AccentSteps[i].Name); BuildMenus(); });
-        BuildPicker(Flyout(FontButton), FontSteps.Select(f => f.Name), _fontIndex, i =>
+        BuildPicker(FontMenu, FontSteps.Select(f => f.Name), _fontIndex, i =>
         { _fontIndex = i; ApplyFont(); Persist(p => p.Font = FontSteps[i].Name); BuildMenus(); });
-        BuildPicker(Flyout(ZoomButton), ZoomSteps.Select(z => z.Name), _zoomIndex, i =>
+        BuildPicker(ZoomMenu, ZoomSteps.Select(z => z.Name), _zoomIndex, i =>
         { _zoomIndex = i; ApplyZoom(); Persist(p => p.Zoom = ZoomSteps[i].Name); BuildMenus(); });
 
-        var addFlyout = Flyout(AddButton);
-        addFlyout.Items.Clear();
-        addFlyout.Items.Add(ActionItem("Import .conf…", "", () => _ = ImportConfAsync()));
-        addFlyout.Items.Add(ActionItem("New empty tunnel", "", () => (DataContext as MainViewModel)?.CreateEmptyTunnel()));
-        addFlyout.Items.Add(new Separator());
-        addFlyout.Items.Add(ActionItem("Rescan external tunnels", "", () => (DataContext as MainViewModel)?.RescanExternals()));
+        AddMenu.Items.Clear();
+        AddMenu.Items.Add(ActionItem("Import .conf…", "", () => _ = ImportConfAsync()));
+        AddMenu.Items.Add(ActionItem("New empty tunnel", "", () => (DataContext as MainViewModel)?.CreateEmptyTunnel()));
+        AddMenu.Items.Add(new Separator());
+        AddMenu.Items.Add(ActionItem("Rescan external tunnels", "", () => (DataContext as MainViewModel)?.RescanExternals()));
 
         var mvm = DataContext as MainViewModel;
         var prefs = mvm?.Prefs;
-        var settingsFlyout = Flyout(SettingsButton);
-        settingsFlyout.Items.Clear();
+        
+        SettingsMenu.Items.Clear();
         var custom = new MenuItem { Header = "Custom DNS forwarding" };
         if (mvm?.HasCustomDns == true) custom.Icon = CheckIcon();
         custom.Click += (_, _) => { mvm?.ToggleCustomDns(!(mvm?.HasCustomDns ?? false)); BuildMenus(); };
-        settingsFlyout.Items.Add(custom);
-        settingsFlyout.Items.Add(new Separator());
+        SettingsMenu.Items.Add(custom);
+        SettingsMenu.Items.Add(new Separator());
         var boot = new MenuItem { Header = "Start on Windows startup" };
         if (prefs?.StartOnBoot == true) boot.Icon = CheckIcon();
         boot.Click += (_, _) =>
@@ -291,7 +286,7 @@ public partial class MainWindow : Window, IDialogs
             Persist(p => p.StartOnBoot = on);
             BuildMenus();
         };
-        settingsFlyout.Items.Add(boot);
+        SettingsMenu.Items.Add(boot);
         var notif = new MenuItem { Header = "Notifications" };
         if (prefs?.Notifications == true) notif.Icon = CheckIcon();
         notif.Click += (_, _) =>
@@ -300,7 +295,7 @@ public partial class MainWindow : Window, IDialogs
             Persist(p => p.Notifications = on);
             BuildMenus();
         };
-        settingsFlyout.Items.Add(notif);
+        SettingsMenu.Items.Add(notif);
     }
 
     static MenuItem ActionItem(string header, string glyph, Action onClick)

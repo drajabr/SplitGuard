@@ -13,66 +13,23 @@
         RenderOptions.TextRenderingMode="SubpixelAntialias"
         DragDrop.AllowDrop="True">
   <DockPanel>
-    <Border DockPanel.Dock="Top" Padding="14,8,146,8" Name="HeaderBar">
+    <Border DockPanel.Dock="Top" Padding="10,4,146,4" Name="HeaderBar">
       <DockPanel>
-        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
-          <Button Classes="icon drop" Name="AddButton" ToolTip.Tip="Add tunnel">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <TextBlock Classes="glyph" Text="&#xE710;" Foreground="{DynamicResource AccentBrush}" />
-              <TextBlock FontSize="{DynamicResource Fs115}" Opacity="0.8" VerticalAlignment="Center" Text="Add" />
-            </StackPanel>
-            <Button.Flyout>
-              <MenuFlyout Placement="BottomEdgeAlignedLeft" />
-            </Button.Flyout>
-          </Button>
-          <Border Width="1" Background="{DynamicResource HairlineBrush}" Margin="4,4" />
-          <Button Classes="icon drop" Name="ThemeButton" ToolTip.Tip="Theme">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <TextBlock Classes="glyph" Text="&#xE771;" Opacity="0.6" />
-              <TextBlock Name="ThemeLabel" Width="52" FontSize="{DynamicResource Fs115}" Opacity="0.7" VerticalAlignment="Center" Text="auto" />
-            </StackPanel>
-            <Button.Flyout>
-              <MenuFlyout Placement="BottomEdgeAlignedLeft" />
-            </Button.Flyout>
-          </Button>
-          <Button Classes="icon drop" Name="AccentButton" ToolTip.Tip="Accent color">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <Ellipse Width="11" Height="11" Fill="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
-              <TextBlock Name="AccentLabel" Width="52" FontSize="{DynamicResource Fs115}" Opacity="0.7" VerticalAlignment="Center" Text="blue" />
-            </StackPanel>
-            <Button.Flyout>
-              <MenuFlyout Placement="BottomEdgeAlignedLeft" />
-            </Button.Flyout>
-          </Button>
-          <Button Classes="icon drop" Name="FontButton" ToolTip.Tip="UI font">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <TextBlock Classes="glyph" Text="&#xE8D2;" Opacity="0.6" />
-              <TextBlock Name="FontLabel" Width="64" FontSize="{DynamicResource Fs115}" Opacity="0.7" VerticalAlignment="Center" Text="segoe" />
-            </StackPanel>
-            <Button.Flyout>
-              <MenuFlyout Placement="BottomEdgeAlignedLeft" />
-            </Button.Flyout>
-          </Button>
-          <Button Classes="icon drop" Name="ZoomButton" ToolTip.Tip="Zoom (fonts and controls)">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <TextBlock Classes="glyph" Text="&#xE71E;" Opacity="0.6" />
-              <TextBlock Name="ZoomLabel" Width="36" FontSize="{DynamicResource Fs115}" Opacity="0.7" VerticalAlignment="Center" Text="100%" />
-            </StackPanel>
-            <Button.Flyout>
-              <MenuFlyout Placement="BottomEdgeAlignedLeft" />
-            </Button.Flyout>
-          </Button>
-          <Button Classes="icon" Name="SettingsButton" ToolTip.Tip="Settings">
-            <TextBlock Classes="glyph" Text="&#xE713;" Opacity="0.6" />
-            <Button.Flyout>
-              <MenuFlyout Placement="BottomEdgeAlignedRight" />
-            </Button.Flyout>
-          </Button>
-        </StackPanel>
-        <StackPanel Orientation="Horizontal" Spacing="8" IsHitTestVisible="False">
-          <Image Name="LogoImage" Source="avares://SplitGuard/Assets/app.ico" Width="17" Height="17" VerticalAlignment="Center" />
-          <TextBlock FontSize="{DynamicResource Fs135}" FontWeight="Medium" VerticalAlignment="Center" Text="SplitGuard" />
-          <TextBlock Name="VersionLabel" FontSize="{DynamicResource Fs11}" Opacity="0.5" VerticalAlignment="Bottom" Margin="0,0,0,2" />
+        <TextBlock DockPanel.Dock="Right" Name="VersionLabel" FontSize="{DynamicResource Fs11}" Opacity="0.5"
+                   VerticalAlignment="Center" Margin="0,0,6,0" />
+        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <Image Name="LogoImage" Source="avares://SplitGuard/Assets/app.ico" Width="17" Height="17"
+                 VerticalAlignment="Center" IsHitTestVisible="False" />
+          <TextBlock FontSize="{DynamicResource Fs135}" FontWeight="Medium" VerticalAlignment="Center"
+                     Text="SplitGuard" IsHitTestVisible="False" Margin="0,0,4,0" />
+          <Menu Name="HeaderMenu" Background="Transparent" VerticalAlignment="Center">
+            <MenuItem Name="AddMenu" Header="Add" />
+            <MenuItem Name="ThemeMenu" Header="Theme" />
+            <MenuItem Name="AccentMenu" Header="Accent" />
+            <MenuItem Name="FontMenu" Header="Font" />
+            <MenuItem Name="ZoomMenu" Header="Zoom" />
+            <MenuItem Name="SettingsMenu" Header="Settings" />
+          </Menu>
         </StackPanel>
       </DockPanel>
     </Border>
