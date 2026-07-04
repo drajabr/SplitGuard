@@ -16,6 +16,21 @@
     <Border DockPanel.Dock="Top" Padding="14,8,146,8" Name="HeaderBar">
       <DockPanel>
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
+          <Button Classes="icon" Name="HelpButton">
+            <Button.Content>
+              <TextBlock Classes="glyph" Text="&#xE897;" Opacity="0.6" />
+            </Button.Content>
+            <ToolTip.Tip>
+              <StackPanel MaxWidth="360">
+                <TextBlock FontWeight="Medium" Text="Shortcuts" Margin="0,0,0,4" />
+                <TextBlock TextWrapping="Wrap" Text="Add tunnel: drop a .conf onto the window, or Ctrl+V a config." />
+                <TextBlock TextWrapping="Wrap" Text="New empty tunnel: Ctrl+N." />
+                <TextBlock TextWrapping="Wrap" Text="Raw config editor: Ctrl+E while editing." />
+                <TextBlock TextWrapping="Wrap" Text="Delete: Ctrl+D twice while editing." />
+                <TextBlock TextWrapping="Wrap" Margin="0,4,0,0" Text="Verify with ping or Resolve-DnsName — nslookup bypasses split DNS." />
+              </StackPanel>
+            </ToolTip.Tip>
+          </Button>
           <Button Classes="icon" Name="ThemeButton" Click="OnThemeClick" ToolTip.Tip="Theme">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <TextBlock Classes="glyph" Text="&#xE771;" Opacity="0.6" />
@@ -41,9 +56,10 @@
             </StackPanel>
           </Button>
         </StackPanel>
-        <StackPanel Orientation="Horizontal" Spacing="10" IsHitTestVisible="False">
+        <StackPanel Orientation="Horizontal" Spacing="8" IsHitTestVisible="False">
           <Image Name="LogoImage" Source="avares://SplitGuard/Assets/app.ico" Width="17" Height="17" VerticalAlignment="Center" />
           <TextBlock FontSize="{DynamicResource Fs135}" FontWeight="Medium" VerticalAlignment="Center" Text="SplitGuard" />
+          <TextBlock Name="VersionLabel" FontSize="{DynamicResource Fs11}" Opacity="0.5" VerticalAlignment="Bottom" Margin="0,0,0,2" />
         </StackPanel>
       </DockPanel>
     </Border>
@@ -56,23 +72,6 @@
       </StackPanel>
     </Border>
 
-    <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="0,1,0,0" Padding="14,5">
-      <TextBlock FontSize="{DynamicResource Fs11}" Opacity="0.72" TextWrapping="Wrap">
-        <Run Text="Add: drop a .conf or " />
-        <Run Text="Ctrl+V" Foreground="{DynamicResource AccentBrush}" FontWeight="Medium" />
-        <Run Text="    New: " />
-        <Run Text="Ctrl+N" Foreground="{DynamicResource AccentBrush}" FontWeight="Medium" />
-        <Run Text="    Raw config: " />
-        <Run Text="Ctrl+E" Foreground="{DynamicResource AccentBrush}" FontWeight="Medium" />
-        <Run Text="    Delete: " />
-        <Run Text="Ctrl+D" Foreground="{DynamicResource AccentBrush}" FontWeight="Medium" />
-        <Run Text=" twice    Verify with " />
-        <Run Text="ping" Foreground="{DynamicResource AccentBrush}" FontWeight="Medium" />
-        <Run Text=" or " />
-        <Run Text="Resolve-DnsName" Foreground="{DynamicResource AccentBrush}" FontWeight="Medium" />
-        <Run Text=" (nslookup bypasses split DNS)" />
-      </TextBlock>
-    </Border>
     <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="0,1,0,0" Padding="14,6"
             IsVisible="{Binding HasStatus}">
       <TextBlock Text="{Binding StatusText}" Classes="oktext" Classes.errtext="{Binding !StatusOk}" />

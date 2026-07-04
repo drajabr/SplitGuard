@@ -10,7 +10,8 @@
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <AssemblyName>SplitGuard</AssemblyName>
-    <Version>0.1.0</Version>
+    <!-- Single source of truth: the repo-root VERSION file (also read by CI to tag releases). -->
+    <Version>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)/../../VERSION').Trim())</Version>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>

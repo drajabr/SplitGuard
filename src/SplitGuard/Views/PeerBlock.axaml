@@ -17,32 +17,31 @@
       </DockPanel>
       <Separator />
 
-      <Grid Margin="10,6" ColumnDefinitions="80,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
+      <Grid Margin="10,6" ColumnDefinitions="80,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
 
         <TextBlock Grid.Row="0" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Endpoint" IsVisible="{Binding !IsExternal}" Margin="0,5,0,4" />
-        <Grid Grid.Row="0" Grid.Column="1" ColumnDefinitions="*,Auto" IsVisible="{Binding !IsExternal}" Margin="0,0,0,4">
-          <TextBox Grid.Column="0" Classes="mono" Text="{Binding Endpoint}" Watermark="host:port" />
-          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="5" Margin="8,0,0,0">
-            <TextBox Classes="mono" Width="60" Text="{Binding KeepaliveText}" Watermark="off" ToolTip.Tip="Persistent keepalive, seconds" />
-            <TextBlock Classes="muted" Text="s keepalive" />
-          </StackPanel>
+        <Grid Grid.Row="0" Grid.Column="1" ColumnDefinitions="*,Auto,86" IsVisible="{Binding !IsExternal}" Margin="0,0,0,4">
+          <TextBox Grid.Column="0" Classes="mono" Text="{Binding EndpointHost}" Watermark="host or ip" />
+          <TextBlock Grid.Column="1" Classes="muted" Text=":" VerticalAlignment="Center" Margin="4,0,4,0" />
+          <TextBox Grid.Column="2" Classes="mono" Text="{Binding EndpointPort}" Watermark="port" />
         </Grid>
 
-        <TextBlock Grid.Row="1" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Public key" IsVisible="{Binding ShowKeysRow}" Margin="0,5,0,4" />
-        <TextBox Grid.Row="1" Grid.Column="1" Classes="mono" Text="{Binding PublicKey}" Watermark="peer public key"
+        <TextBlock Grid.Row="1" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Keepalive" IsVisible="{Binding !IsExternal}" Margin="0,5,0,4" />
+        <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding !IsExternal}" Margin="0,0,0,4">
+          <TextBox Classes="mono" Width="70" Text="{Binding KeepaliveText}" Watermark="off" />
+          <TextBlock Classes="muted" Text="seconds" VerticalAlignment="Center" />
+        </StackPanel>
+
+        <TextBlock Grid.Row="2" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Public key" IsVisible="{Binding ShowKeysRow}" Margin="0,5,0,4" />
+        <TextBox Grid.Row="2" Grid.Column="1" Classes="mono" Text="{Binding PublicKey}" Watermark="peer public key"
                  HorizontalAlignment="Stretch" IsVisible="{Binding ShowKeysRow}" Margin="0,0,0,4" />
 
-        <TextBlock Grid.Row="2" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Preshared key" IsVisible="{Binding ShowKeysRow}" Margin="0,5,0,4" />
-        <Grid Grid.Row="2" Grid.Column="1" ColumnDefinitions="*,Auto" IsVisible="{Binding ShowKeysRow}" Margin="0,0,0,4">
-          <TextBox Grid.Column="0" Classes="mono" PasswordChar="●" RevealPassword="{Binding #PskEye.IsChecked}"
-                   Text="{Binding PresharedKey}" Watermark="optional" />
-          <ToggleButton Grid.Column="1" Name="PskEye" Background="Transparent" BorderThickness="0" Padding="4" Margin="4,0,0,0" ToolTip.Tip="Reveal">
-            <TextBlock Classes="glyph" Text="&#xE7B3;" FontSize="{DynamicResource Fs13}" />
-          </ToggleButton>
-        </Grid>
+        <TextBlock Grid.Row="3" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Preshared key" IsVisible="{Binding ShowKeysRow}" Margin="0,5,0,4" />
+        <TextBox Grid.Row="3" Grid.Column="1" Classes="mono" Text="{Binding PresharedKey}" Watermark="optional"
+                 HorizontalAlignment="Stretch" IsVisible="{Binding ShowKeysRow}" Margin="0,0,0,4" />
 
-        <TextBlock Grid.Row="3" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Allowed IPs" IsVisible="{Binding !IsExternal}" Margin="0,5,0,4" />
-        <ItemsControl Grid.Row="3" Grid.Column="1" ItemsSource="{Binding AllowedIps}" IsVisible="{Binding !IsExternal}" Margin="0,0,0,4">
+        <TextBlock Grid.Row="4" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Allowed IPs" IsVisible="{Binding !IsExternal}" Margin="0,5,0,4" />
+        <ItemsControl Grid.Row="4" Grid.Column="1" ItemsSource="{Binding AllowedIps}" IsVisible="{Binding !IsExternal}" Margin="0,0,0,4">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>
@@ -73,18 +72,21 @@
           </ItemsControl.DataTemplates>
         </ItemsControl>
 
-        <TextBlock Grid.Row="4" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="DNS" Margin="0,5,0,4" />
-        <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
-          <TextBox Classes="mono" Width="160" Text="{Binding Dns}" Watermark="optional" />
-          <Button Classes="icon" Command="{Binding TogglePinCommand}" IsEnabled="{Binding PinEnabled}"
-                  ToolTip.Tip="Pin as device-wide DNS (applies immediately)">
-            <TextBlock Classes="glyph pinicon" Classes.pinned="{Binding IsPinned}" Text="&#xE718;" />
-          </Button>
-          <TextBlock Classes="accent" Text="{Binding PinCaption}" />
-        </StackPanel>
+        <TextBlock Grid.Row="5" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="DNS" Margin="0,5,0,4" />
+        <Grid Grid.Row="5" Grid.Column="1" ColumnDefinitions="*,Auto" Margin="0,0,0,4">
+          <TextBox Grid.Column="0" Classes="mono" Text="{Binding Dns}" Watermark="optional">
+            <TextBox.InnerRightContent>
+              <Button Classes="icon" Command="{Binding TogglePinCommand}" IsEnabled="{Binding PinEnabled}"
+                      ToolTip.Tip="Pin as device-wide DNS (applies immediately)">
+                <TextBlock Classes="glyph pinicon" Classes.pinned="{Binding IsPinned}" Text="&#xE718;" />
+              </Button>
+            </TextBox.InnerRightContent>
+          </TextBox>
+          <TextBlock Grid.Column="1" Classes="accent" VerticalAlignment="Center" Margin="8,0,0,0" Text="{Binding PinCaption}" />
+        </Grid>
 
-        <TextBlock Grid.Row="5" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Domains" Margin="0,5,0,0" />
-        <ItemsControl Grid.Row="5" Grid.Column="1" ItemsSource="{Binding Domains}">
+        <TextBlock Grid.Row="6" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Domains" Margin="0,5,0,0" />
+        <ItemsControl Grid.Row="6" Grid.Column="1" ItemsSource="{Binding Domains}">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>

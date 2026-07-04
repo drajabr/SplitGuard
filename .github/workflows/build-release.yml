@@ -25,18 +25,40 @@ jobs:
           name: SplitGuard-win-${{ matrix.arch }}
           path: dist/*.zip
 
+  # Releases are driven by the repo-root VERSION file: bump it and push to main and
+  # a tagged release is cut automatically (if that tag doesn't already exist).
   release:
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+      - name: Resolve version tag
+        id: ver
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          else
+            TAG="v$(tr -d '[:space:]' < VERSION)"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/download-artifact@v4
+        if: steps.ver.outputs.exists == 'false'
         with:
           path: artifacts
           merge-multiple: true
-      - uses: softprops/action-gh-release@v2
+      - name: Publish release
+        if: steps.ver.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: SplitGuard ${{ steps.ver.outputs.tag }}
           files: artifacts/*.zip
           generate_release_notes: true

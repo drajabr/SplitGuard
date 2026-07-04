@@ -157,8 +157,9 @@ public class TunnelViewModel : ObservableObject
         }
     }
 
+    // Collapsed: show our own listen port (peer endpoints are ambiguous with many peers).
     public string CollapsedSummary =>
-        Peers.Select(p => p.Endpoint).FirstOrDefault(e => !string.IsNullOrWhiteSpace(e)) ?? "";
+        ListenPortText.Trim().Length > 0 ? $"listen :{ListenPortText.Trim()}" : "";
 
     // Collapsed detail tokens (built + syntax-colored in the view).
     public IEnumerable<string> AllDomains => Peers.SelectMany(p => p.DomainValues).Distinct();

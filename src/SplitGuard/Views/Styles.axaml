@@ -10,8 +10,8 @@
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderBrush" Value="{DynamicResource FieldBorderBrush}" />
   </Style>
+  <!-- "mono" is now just the compact value size; the family follows the chosen UI font. -->
   <Style Selector="TextBox.mono">
-    <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, Courier New, monospace" />
     <Setter Property="FontSize" Value="{DynamicResource Fs12}" />
   </Style>
   <Style Selector="TextBox.error">
@@ -136,7 +136,6 @@
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
   <Style Selector="TextBlock.mono">
-    <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, Courier New, monospace" />
     <Setter Property="FontSize" Value="{DynamicResource Fs12}" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>

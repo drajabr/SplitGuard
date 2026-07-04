@@ -27,8 +27,23 @@ public partial class PeerViewModel : ObservableObject
     string _presharedKey = "";
     public string PresharedKey { get => _presharedKey; set => Set(ref _presharedKey, value); }
 
-    string _endpoint = "";
-    public string Endpoint { get => _endpoint; set => Set(ref _endpoint, value); }
+    // Endpoint is edited as two fields (host + port) but stored/validated as "host:port".
+    string _endpointHost = "";
+    public string EndpointHost { get => _endpointHost; set => Set(ref _endpointHost, value); }
+
+    string _endpointPort = "";
+    public string EndpointPort { get => _endpointPort; set => Set(ref _endpointPort, value); }
+
+    public string Endpoint
+    {
+        get => string.IsNullOrWhiteSpace(EndpointHost) ? "" : $"{EndpointHost.Trim()}:{EndpointPort.Trim()}";
+        set
+        {
+            var i = value.LastIndexOf(':');
+            if (i > 0) { EndpointHost = value[..i]; EndpointPort = value[(i + 1)..]; }
+            else { EndpointHost = value; EndpointPort = ""; }
+        }
+    }
 
     string _dns = "";
     public string Dns

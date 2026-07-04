@@ -34,25 +34,23 @@ public partial class MainWindow : Window, IDialogs
     // spread around the wheel, plus "mono" (neutral: white on dark, black on light).
     static readonly (string Name, string Hex)[] AccentSteps =
     {
+        ("red",    "#E03B3B"),
+        ("orange", "#EE7719"),
+        ("yellow", "#E3A70A"),
+        ("green",  "#2FA84F"),
         ("blue",   "#2F7FE4"),
-        ("cyan",   "#159BB3"),
-        ("green",  "#3E9E4E"),
-        ("amber",  "#D79A12"),
-        ("orange", "#E0692A"),
-        ("red",    "#D53E3E"),
-        ("pink",   "#D14BA0"),
-        ("purple", "#8A5CE0"),
+        ("violet", "#9B55E4"),
+        ("pink",   "#DE47A6"),
         ("mono",   ""),
     };
 
-    // A few visually distinct UI fonts, one per style family (values/keys stay mono).
+    // Distinct UI fonts, applied to the whole window (including values/fields).
     static readonly (string Name, string Family)[] FontSteps =
     {
-        ("segoe",       "Segoe UI Variable Text, Segoe UI"),   // modern sans (default)
-        ("verdana",     "Verdana, Segoe UI"),                  // wide humanist sans
-        ("bahnschrift", "Bahnschrift, Segoe UI"),              // condensed industrial
-        ("georgia",     "Georgia, Cambria, serif"),            // serif
-        ("consolas",    "Consolas, monospace"),                // monospace
+        ("segoe",       "Segoe UI Variable Text, Segoe UI"),           // modern sans (default)
+        ("bahnschrift", "Bahnschrift, Segoe UI"),                      // condensed industrial
+        ("georgia",     "Georgia, Cambria, serif"),                    // serif
+        ("mono",        "Cascadia Mono, Consolas, Courier New, monospace"), // monospace
     };
     static readonly (string Name, double Scale)[] ZoomSteps =
     {
@@ -82,6 +80,9 @@ public partial class MainWindow : Window, IDialogs
         AddHandler(DragDrop.DragOverEvent, (_, e) =>
             e.DragEffects = e.Data.Contains(DataFormats.Files) ? DragDropEffects.Copy : DragDropEffects.None);
         AddHandler(DragDrop.DropEvent, OnDrop);
+
+        var v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+        if (v is not null) VersionLabel.Text = $"v{v.Major}.{v.Minor}.{v.Build}";
     }
 
     async void OnDrop(object? sender, DragEventArgs e)
