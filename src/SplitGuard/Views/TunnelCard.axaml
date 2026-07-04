@@ -64,14 +64,14 @@
           <StackPanel Grid.Column="0" Margin="12,8" Spacing="8" IsVisible="{Binding ShowInterfaceSection}">
             <StackPanel Spacing="3">
               <TextBlock Classes="lbl" Text="Public key" />
-              <StackPanel Orientation="Horizontal" Spacing="6">
-                <Border Classes="item">
-                  <TextBlock Classes="mono synkey" Text="{Binding PublicKeyShort}" />
-                </Border>
-                <Button Classes="icon" Command="{Binding CopyPublicKeyCommand}" ToolTip.Tip="Copy full public key">
+              <DockPanel>
+                <Button DockPanel.Dock="Right" Classes="icon" Margin="6,0,0,0" Command="{Binding CopyPublicKeyCommand}" ToolTip.Tip="Copy full public key">
                   <TextBlock Classes="glyph" Text="&#xE8C8;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
                 </Button>
-              </StackPanel>
+                <Border Classes="item">
+                  <TextBlock Classes="mono synkey" Text="{Binding PublicKeyFull}" TextTrimming="CharacterEllipsis" />
+                </Border>
+              </DockPanel>
             </StackPanel>
 
             <StackPanel Spacing="3">

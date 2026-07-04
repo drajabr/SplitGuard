@@ -86,14 +86,7 @@ public class TunnelViewModel : ObservableObject
     public string Name { get => _name; set => Set(ref _name, value); }
 
     string _publicKeyFull = "";
-    public string PublicKeyFull
-    {
-        get => _publicKeyFull;
-        set { if (Set(ref _publicKeyFull, value)) Raise(nameof(PublicKeyShort)); }
-    }
-
-    public string PublicKeyShort =>
-        PublicKeyFull.Length > 12 ? $"{PublicKeyFull[..5]}…{PublicKeyFull[^5..]}" : PublicKeyFull;
+    public string PublicKeyFull { get => _publicKeyFull; set => Set(ref _publicKeyFull, value); }
 
     public ObservableCollection<object> Addresses { get; } = new() { new AddSlot() };
     public IEnumerable<string> AddressValues => Addresses.OfType<string>();
