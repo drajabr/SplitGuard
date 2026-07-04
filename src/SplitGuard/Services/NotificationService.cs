@@ -15,11 +15,15 @@ public static class NotificationService
             var sysIcon = isError ? "Error" : "Information";
             var t = Escape(title);
             var m = Escape(message);
+            var exe = Escape(Environment.ProcessPath ?? "");
+            // Use our own app icon (extracted from the exe) so the toast shows the SplitGuard
+            // brand; fall back to the system status icon if extraction fails.
             var script =
                 "Add-Type -AssemblyName System.Windows.Forms;" +
                 "Add-Type -AssemblyName System.Drawing;" +
                 "$n = New-Object System.Windows.Forms.NotifyIcon;" +
-                $"$n.Icon = [System.Drawing.SystemIcons]::{sysIcon};" +
+                $"try {{ $n.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon('{exe}') }} catch {{ $n.Icon = [System.Drawing.SystemIcons]::{sysIcon} }};" +
+                "$n.Text = 'SplitGuard';" +
                 "$n.Visible = $true;" +
                 $"$n.ShowBalloonTip(6000, '{t}', '{m}', [System.Windows.Forms.ToolTipIcon]::{kind});" +
                 "Start-Sleep -Milliseconds 6500;" +

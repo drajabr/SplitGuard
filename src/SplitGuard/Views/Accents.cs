@@ -8,13 +8,12 @@ public static class Accents
 {
     public static readonly (string Name, string Hex)[] Steps =
     {
-        ("red",     "#E03B3B"),
-        ("amber",   "#E0920C"),
-        ("green",   "#2FA84F"),
-        ("cyan",    "#12A6C4"),
-        ("blue",    "#2F7FE4"),
-        ("magenta", "#C24BC2"),
-        ("mono",    ""),
+        ("red",    "#E03B3B"),
+        ("amber",  "#E0920C"),
+        ("green",  "#2FA84F"),
+        ("blue",   "#2F7FE4"),
+        ("violet", "#8A5CF0"),
+        ("mono",   ""),
     };
 
     // Resolve a hue name to a color; unknown names fall back to blue.

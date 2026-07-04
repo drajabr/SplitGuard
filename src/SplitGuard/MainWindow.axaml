@@ -61,7 +61,7 @@
     </Border>
 
     <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="0,1,0,0" Padding="14,6"
-            IsVisible="{Binding HasStatus}">
+            Classes="statusbar" Classes.shown="{Binding HasStatus}">
       <TextBlock Text="{Binding StatusText}" Classes="oktext" Classes.errtext="{Binding !StatusOk}" />
     </Border>
 

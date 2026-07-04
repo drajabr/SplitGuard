@@ -21,7 +21,10 @@
             <TextBlock Classes="mono" Text="{Binding DownRate}" Opacity="0.75" />
           </StackPanel>
           <StackPanel Name="ConnectBox" Orientation="Horizontal" VerticalAlignment="Center" IsVisible="{Binding ShowConnect}">
-            <ToggleSwitch IsChecked="{Binding IsConnected}" IsEnabled="{Binding !IsEditing}" MinWidth="0" />
+            <ToggleButton Classes="conn" IsChecked="{Binding IsConnected}" IsEnabled="{Binding !IsEditing}"
+                          ToolTip.Tip="Connect / disconnect">
+              <TextBlock Classes="glyph" Text="&#xE7E8;" FontSize="{DynamicResource Fs14}" />
+            </ToggleButton>
           </StackPanel>
         </StackPanel>
         <Grid VerticalAlignment="Center" ColumnDefinitions="Auto,Auto,Auto,*">
@@ -58,7 +61,7 @@
                          VerticalScrollBarVisibility="Disabled" />
         </Border>
 
-        <Grid Name="FieldsGrid" ColumnDefinitions="3*,7*" IsVisible="{Binding !IsTextMode}">
+        <Grid Name="FieldsGrid" ColumnDefinitions="35*,65*" IsVisible="{Binding !IsTextMode}">
           <Border Grid.Column="0" Classes="peerblock" Margin="10,8,8,6" VerticalAlignment="Top" IsVisible="{Binding ShowInterfaceSection}">
           <StackPanel>
           <DockPanel Margin="10,4">
