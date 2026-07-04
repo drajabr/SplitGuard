@@ -62,7 +62,6 @@ public partial class TunnelCard : UserControl
             _vm = DataContext as TunnelViewModel;
             if (_vm is not null) _vm.PropertyChanged += OnVmPropertyChanged;
             BuildDetail();
-            OnEditingChanged();
 
             // External cards have no interface column: let the peers section span the full width.
             if (_vm is { IsExternal: true })
@@ -81,34 +80,6 @@ public partial class TunnelCard : UserControl
         // PointerPressed instead of Tapped: Tapped suppresses the second of two fast
         // clicks (double-tap detection), which made rapid expand/collapse feel dead.
         AddHandler(PointerPressedEvent, OnCardPressed, handledEventsToo: false);
-        // Keep the active section's MaxHeight tracking its real content height so the
-        // expand/collapse transition animates over the exact range (natural motion).
-        LayoutUpdated += (_, _) => SyncActiveHeight();
-    }
-
-    void OnEditingChanged()
-    {
-        if (_vm is null) return;
-        var editing = _vm.IsEditing;
-        ExpandHost.Opacity = editing ? 1 : 0;
-        CollapseHost.Opacity = editing ? 0 : 1;
-        if (editing) CollapseHost.MaxHeight = 0; else ExpandHost.MaxHeight = 0;
-        SyncActiveHeight();
-    }
-
-    void SyncActiveHeight()
-    {
-        if (_vm is null) return;
-        if (_vm.IsEditing) SetMax(ExpandHost, ExpandContent);
-        else SetMax(CollapseHost, DetailPanel);
-    }
-
-    static void SetMax(Border host, Control content)
-    {
-        var width = host.Bounds.Width > 0 ? host.Bounds.Width : 700;
-        content.Measure(new Avalonia.Size(width, double.PositiveInfinity));
-        var h = content.DesiredSize.Height;
-        if (h > 0 && Math.Abs(host.MaxHeight - h) > 0.5) host.MaxHeight = h;
     }
 
     void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -140,8 +111,6 @@ public partial class TunnelCard : UserControl
         }
         if (e.PropertyName == nameof(TunnelViewModel.CollapsedSummary))
             BuildDetail();
-        if (e.PropertyName == nameof(TunnelViewModel.IsEditing))
-            OnEditingChanged();
     }
 
     // Syntax-colored collapsed detail as atomic tokens in a WrapPanel: addresses in
