@@ -7,6 +7,7 @@ using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Styling;
 using Avalonia.VisualTree;
+using SplitGuard.Services;
 using SplitGuard.ViewModels;
 
 namespace SplitGuard.Views;
@@ -30,19 +31,8 @@ public partial class MainWindow : Window, IDialogs
         new("dark",     ThemeVariant.Dark,   "#1A1C1F", "#25282C", "#17191C", 0.70, 0x34, 0x44),
     };
 
-    // Accent hue is its own control, independent of the surface theme. Distinct hues
-    // spread around the wheel, plus "mono" (neutral: white on dark, black on light).
-    static readonly (string Name, string Hex)[] AccentSteps =
-    {
-        ("red",    "#E03B3B"),
-        ("orange", "#EE7719"),
-        ("yellow", "#E3A70A"),
-        ("green",  "#2FA84F"),
-        ("blue",   "#2F7FE4"),
-        ("violet", "#9B55E4"),
-        ("pink",   "#DE47A6"),
-        ("mono",   ""),
-    };
+    // Accent hue is its own control, independent of the surface theme (see Views.Accents).
+    static (string Name, string Hex)[] AccentSteps => Accents.Steps;
 
     // Distinct UI fonts, applied to the whole window (including values/fields).
     static readonly (string Name, string Family)[] FontSteps =
@@ -55,8 +45,8 @@ public partial class MainWindow : Window, IDialogs
     static readonly (string Name, double Scale)[] ZoomSteps =
     {
         ("100%", 1.0),
-        ("120%", 1.2),
-        ("140%", 1.4),
+        ("125%", 1.25),
+        ("150%", 1.5),
     };
     // Fonts and layout metrics scale together — no transforms, so wrapping stays correct.
     static readonly (string Key, double Base)[] ZoomResources =
@@ -146,6 +136,7 @@ public partial class MainWindow : Window, IDialogs
         ApplyTheme();   // also applies the accent (keeps "mono" in sync with the theme)
         ApplyFont();
         ApplyZoom();
+        BuildMenus();
     }
 
     void ApplyFont()
@@ -238,37 +229,118 @@ public partial class MainWindow : Window, IDialogs
         vm.PersistPrefs();
     }
 
-    void OnThemeClick(object? sender, RoutedEventArgs e)
+    // ---- header dropdown menus -------------------------------------------------
+
+    static TextBlock CheckIcon() => new()
     {
-        _themeIndex = (_themeIndex + 1) % Palettes.Length;
-        ApplyTheme();
-        Persist(p => p.Theme = Palettes[_themeIndex].Name);
+        Text = "", FontFamily = new FontFamily("Segoe MDL2 Assets"), FontSize = 12,
+    };
+
+    // Build a single-choice picker: one radio item per option, current one checked.
+    static void BuildPicker(MenuFlyout flyout, IEnumerable<string> options, int current, Action<int> select)
+    {
+        flyout.Items.Clear();
+        var i = 0;
+        foreach (var name in options)
+        {
+            var idx = i++;
+            var item = new MenuItem { Header = name };
+            if (idx == current) item.Icon = CheckIcon();
+            item.Click += (_, _) => select(idx);
+            flyout.Items.Add(item);
+        }
     }
 
-    void OnAccentClick(object? sender, RoutedEventArgs e)
+    // Flyouts live in their own namescope, so they aren't generated as fields; reach
+    // them through the (named) buttons that own them.
+    static MenuFlyout Flyout(Button b) => (MenuFlyout)b.Flyout!;
+
+    void BuildMenus()
     {
-        _accentIndex = (_accentIndex + 1) % AccentSteps.Length;
-        ApplyAccent();
-        Persist(p => p.Accent = AccentSteps[_accentIndex].Name);
+        BuildPicker(Flyout(ThemeButton), Palettes.Select(p => p.Name), _themeIndex, i =>
+        { _themeIndex = i; ApplyTheme(); Persist(p => p.Theme = Palettes[i].Name); BuildMenus(); });
+        BuildPicker(Flyout(AccentButton), AccentSteps.Select(a => a.Name), _accentIndex, i =>
+        { _accentIndex = i; ApplyAccent(); Persist(p => p.Accent = AccentSteps[i].Name); BuildMenus(); });
+        BuildPicker(Flyout(FontButton), FontSteps.Select(f => f.Name), _fontIndex, i =>
+        { _fontIndex = i; ApplyFont(); Persist(p => p.Font = FontSteps[i].Name); BuildMenus(); });
+        BuildPicker(Flyout(ZoomButton), ZoomSteps.Select(z => z.Name), _zoomIndex, i =>
+        { _zoomIndex = i; ApplyZoom(); Persist(p => p.Zoom = ZoomSteps[i].Name); BuildMenus(); });
+
+        var addFlyout = Flyout(AddButton);
+        addFlyout.Items.Clear();
+        addFlyout.Items.Add(ActionItem("Import .conf…", "", () => _ = ImportConfAsync()));
+        addFlyout.Items.Add(ActionItem("New empty tunnel", "", () => (DataContext as MainViewModel)?.CreateEmptyTunnel()));
+
+        var prefs = (DataContext as MainViewModel)?.Prefs;
+        var settingsFlyout = Flyout(SettingsButton);
+        settingsFlyout.Items.Clear();
+        var boot = new MenuItem { Header = "Start on Windows startup" };
+        if (prefs?.StartOnBoot == true) boot.Icon = CheckIcon();
+        boot.Click += (_, _) =>
+        {
+            var on = !(prefs?.StartOnBoot ?? false);
+            StartupService.Set(on);
+            Persist(p => p.StartOnBoot = on);
+            BuildMenus();
+        };
+        settingsFlyout.Items.Add(boot);
+        var notif = new MenuItem { Header = "Notifications" };
+        if (prefs?.Notifications == true) notif.Icon = CheckIcon();
+        notif.Click += (_, _) =>
+        {
+            var on = !(prefs?.Notifications ?? true);
+            Persist(p => p.Notifications = on);
+            BuildMenus();
+        };
+        settingsFlyout.Items.Add(notif);
     }
 
-    void OnFontClick(object? sender, RoutedEventArgs e)
+    static MenuItem ActionItem(string header, string glyph, Action onClick)
     {
-        _fontIndex = (_fontIndex + 1) % FontSteps.Length;
-        ApplyFont();
-        Persist(p => p.Font = FontSteps[_fontIndex].Name);
+        var item = new MenuItem
+        {
+            Header = header,
+            Icon = new TextBlock { Text = glyph, FontFamily = new FontFamily("Segoe MDL2 Assets"), FontSize = 13, Opacity = 0.7 },
+        };
+        item.Click += (_, _) => onClick();
+        return item;
     }
 
-    void OnZoomClick(object? sender, RoutedEventArgs e)
+    async Task ImportConfAsync()
     {
-        _zoomIndex = (_zoomIndex + 1) % ZoomSteps.Length;
-        ApplyZoom();
-        Persist(p => p.Zoom = ZoomSteps[_zoomIndex].Name);
+        if (DataContext is not MainViewModel vm) return;
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Import WireGuard configuration",
+            AllowMultiple = true,
+            FileTypeFilter = new[] { new FilePickerFileType("WireGuard config") { Patterns = new[] { "*.conf" } } },
+        });
+        foreach (var file in files)
+        {
+            await using var stream = await file.OpenReadAsync();
+            using var reader = new StreamReader(stream);
+            vm.AddTunnelFromText(await reader.ReadToEndAsync(), Path.GetFileNameWithoutExtension(file.Name));
+        }
     }
 
     public async Task CopyToClipboardAsync(string text)
     {
         if (Clipboard is not null)
             await Clipboard.SetTextAsync(text);
+    }
+
+    Avalonia.Controls.Notifications.WindowNotificationManager? _notifier;
+
+    public void Notify(string title, string message, bool isError)
+    {
+        _notifier ??= new Avalonia.Controls.Notifications.WindowNotificationManager(this)
+        {
+            Position = Avalonia.Controls.Notifications.NotificationPosition.BottomRight,
+            MaxItems = 3,
+        };
+        _notifier.Show(new Avalonia.Controls.Notifications.Notification(
+            title, message,
+            isError ? Avalonia.Controls.Notifications.NotificationType.Error
+                    : Avalonia.Controls.Notifications.NotificationType.Information));
     }
 }

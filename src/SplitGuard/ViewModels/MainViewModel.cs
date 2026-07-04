@@ -8,6 +8,7 @@ namespace SplitGuard.ViewModels;
 public interface IDialogs
 {
     Task CopyToClipboardAsync(string text);
+    void Notify(string title, string message, bool isError);
 }
 
 public class MainViewModel : ObservableObject, ITunnelHost
@@ -37,11 +38,37 @@ public class MainViewModel : ObservableObject, ITunnelHost
     public bool GpoWarning { get => _gpoWarning; set => Set(ref _gpoWarning, value); }
 
     string _statusText = "";
-    public string StatusText { get => _statusText; set { if (Set(ref _statusText, value)) Raise(nameof(HasStatus)); } }
+    int _statusVersion;
+    public string StatusText
+    {
+        get => _statusText;
+        set
+        {
+            if (!Set(ref _statusText, value)) return;
+            Raise(nameof(HasStatus));
+            // Auto-hide transient messages after a few seconds so the bar doesn't linger.
+            var v = ++_statusVersion;
+            if (value.Length > 0) _ = ClearStatusLater(v);
+        }
+    }
     public bool HasStatus => StatusText.Length > 0;
+
+    async Task ClearStatusLater(int version)
+    {
+        await Task.Delay(7000);
+        if (version == _statusVersion) StatusText = "";
+    }
 
     bool _statusOk;
     public bool StatusOk { get => _statusOk; set => Set(ref _statusOk, value); }
+
+    // Fire an OS/in-app notification when the user has them enabled.
+    void Notify(string title, string message, bool isError)
+    {
+        if (_config.Ui.Notifications) _dialogs.Notify(title, message, isError);
+    }
+
+    public void AccentChanged(TunnelViewModel tunnel) => _store.Save(_config);
 
     public async Task InitializeAsync()
     {
@@ -106,7 +133,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
             foreach (var p in vm.Config!.Peers.Where(p => p.Dns is not null && p.Domains.Count > 0))
                 _nrpt.ApplyPeerRules(vm.Name, p.PublicKey, p.Domains, p.Dns!);
             RefreshCatchAll();
-            Dispatcher.UIThread.Post(() => { StatusText = ""; RefreshPins(); });
+            Dispatcher.UIThread.Post(() => { StatusText = ""; RefreshPins(); Notify(vm.Name, "Connected", false); });
         }
         catch (Exception ex)
         {
@@ -115,6 +142,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
                 vm.SetConnectedState(false);
                 StatusText = $"{vm.Name}: {ex.Message}";
                 StatusOk = false;
+                Notify(vm.Name, $"Connection failed: {ex.Message}", true);
             });
         }
     });
@@ -127,11 +155,16 @@ public class MainViewModel : ObservableObject, ITunnelHost
                 _nrpt.RemovePeerRules(vm.Name, p.PublicKey);
             _tunnels.Disconnect(vm.Name);
             RefreshCatchAll();
-            Dispatcher.UIThread.Post(RefreshPins);
+            Dispatcher.UIThread.Post(() => { RefreshPins(); Notify(vm.Name, "Disconnected", false); });
         }
         catch (Exception ex)
         {
-            Dispatcher.UIThread.Post(() => { StatusText = $"{vm.Name}: {ex.Message}"; StatusOk = false; });
+            Dispatcher.UIThread.Post(() =>
+            {
+                StatusText = $"{vm.Name}: {ex.Message}";
+                StatusOk = false;
+                Notify(vm.Name, $"Disconnect failed: {ex.Message}", true);
+            });
         }
     });
 

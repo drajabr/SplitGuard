@@ -27,7 +27,8 @@
           </StackPanel>
         </StackPanel>
         <Grid VerticalAlignment="Center" ColumnDefinitions="Auto,Auto,Auto,*">
-          <Ellipse Grid.Column="0" Classes="dot" Classes.up="{Binding IsConnected}" />
+          <Ellipse Grid.Column="0" Name="StatusDot" Classes="dot" Classes.up="{Binding IsConnected}"
+                   PointerPressed="OnDotPressed" ToolTip.Tip="Click while editing to change this card's accent" />
           <TextBox Grid.Column="1" MinWidth="60" HorizontalAlignment="Left" Margin="10,0,0,0" VerticalAlignment="Center"
                    FontSize="{DynamicResource Fs135}" FontWeight="Medium"
                    Foreground="{DynamicResource AccentBrush}" Text="{Binding Name}"
@@ -42,11 +43,11 @@
         </Grid>
       </DockPanel>
 
-      <Border Name="CollapseHost" Classes="collapsehost" Classes.hidden="{Binding IsEditing}" IsHitTestVisible="{Binding !IsEditing}">
+      <Border Name="CollapseHost" Classes="collapsehost" IsHitTestVisible="{Binding !IsEditing}">
         <StackPanel Name="DetailPanel" Margin="30,0,12,8" />
       </Border>
 
-      <Border Name="ExpandHost" Classes="expandhost" Classes.expanded="{Binding IsEditing}" IsHitTestVisible="{Binding IsEditing}">
+      <Border Name="ExpandHost" Classes="expandhost" IsHitTestVisible="{Binding IsEditing}">
       <StackPanel Name="ExpandContent">
         <Separator />
 

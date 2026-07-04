@@ -14,6 +14,7 @@ public interface ITunnelHost
     void TunnelSaved(TunnelViewModel tunnel, bool connectionChanged);
     void RequestDelete(TunnelViewModel tunnel);
     void CopyText(string text);
+    void AccentChanged(TunnelViewModel tunnel);
 }
 
 public class TunnelViewModel : ObservableObject
@@ -181,6 +182,25 @@ public class TunnelViewModel : ObservableObject
     }
 
     public bool ShowInterfaceSection => !IsExternal;
+
+    // Optional per-card accent hue (null = follow the global accent). Cycled by clicking
+    // the header dot while editing; the view resolves the name to a color and overrides
+    // AccentBrush inside this card only.
+    public string? Accent
+    {
+        get => IsExternal ? External!.Accent : Config!.Accent;
+        set
+        {
+            if (IsExternal) External!.Accent = value; else Config!.Accent = value;
+            Raise();
+        }
+    }
+
+    public void CycleAccent()
+    {
+        Accent = Accents.Next(Accent);
+        Host.AccentChanged(this);
+    }
 
 
     string _warningText = "";

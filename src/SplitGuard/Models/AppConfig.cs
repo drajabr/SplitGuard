@@ -15,6 +15,8 @@ public class UiPrefs
     public string Accent { get; set; } = "blue";
     public string Font { get; set; } = "segoe";
     public string Zoom { get; set; } = "100%";
+    public bool StartOnBoot { get; set; }
+    public bool Notifications { get; set; } = true;
 }
 
 public class TunnelConfig
@@ -24,6 +26,8 @@ public class TunnelConfig
     public ushort ListenPort { get; set; }
     public List<string> Addresses { get; set; } = new();
     public List<PeerConfig> Peers { get; set; } = new();
+    // Optional per-card accent hue name (null = use the global accent).
+    public string? Accent { get; set; }
 }
 
 public class PeerConfig
@@ -43,6 +47,7 @@ public class ExternalRuleConfig
     public string AdapterName { get; set; } = "";
     public string? Dns { get; set; }
     public List<string> Domains { get; set; } = new();
+    public string? Accent { get; set; }
 }
 
 public class PinnedDnsRef

@@ -99,36 +99,26 @@
     <Setter Property="Cursor" Value="Arrow" />
   </Style>
 
+  <!-- Both hosts animate their MaxHeight to the exact content height (driven from
+       code-behind), so the card grows/shrinks smoothly with no fade and no overshoot. -->
   <Style Selector="Border.collapsehost">
     <Setter Property="ClipToBounds" Value="True" />
-    <Setter Property="MaxHeight" Value="{DynamicResource CollapseH}" />
-    <Setter Property="Opacity" Value="1" />
+    <Setter Property="MaxHeight" Value="0" />
     <Setter Property="Transitions">
       <Transitions>
-        <DoubleTransition Property="MaxHeight" Duration="0:0:0.14" Easing="CubicEaseOut" />
-        <DoubleTransition Property="Opacity" Duration="0:0:0.10" />
+        <DoubleTransition Property="MaxHeight" Duration="0:0:0.16" Easing="CubicEaseOut" />
       </Transitions>
     </Setter>
-  </Style>
-  <Style Selector="Border.collapsehost.hidden">
-    <Setter Property="MaxHeight" Value="0" />
-    <Setter Property="Opacity" Value="0" />
   </Style>
 
   <Style Selector="Border.expandhost">
     <Setter Property="ClipToBounds" Value="True" />
     <Setter Property="MaxHeight" Value="0" />
-    <Setter Property="Opacity" Value="0" />
     <Setter Property="Transitions">
       <Transitions>
-        <DoubleTransition Property="MaxHeight" Duration="0:0:0.14" Easing="CubicEaseOut" />
-        <DoubleTransition Property="Opacity" Duration="0:0:0.10" />
+        <DoubleTransition Property="MaxHeight" Duration="0:0:0.16" Easing="CubicEaseOut" />
       </Transitions>
     </Setter>
-  </Style>
-  <Style Selector="Border.expandhost.expanded">
-    <Setter Property="MaxHeight" Value="1400" />
-    <Setter Property="Opacity" Value="1" />
   </Style>
 
   <Style Selector="Border.peerblock">

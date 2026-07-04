@@ -1,10 +1,13 @@
 using System.ComponentModel;
 using System.Xml;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Styling;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using AvaloniaEdit.Highlighting;
 using AvaloniaEdit.Highlighting.Xshd;
@@ -76,7 +79,15 @@ public partial class TunnelCard : UserControl
                 Grid.SetColumnSpan(PeersHost, 1);
                 PeersHost.BorderThickness = new Avalonia.Thickness(1, 0, 0, 0);
             }
+
+            ApplyCardAccent();
+            // Set the initial reveal state without animating (collapsed detail shown).
+            var editing = _vm?.IsEditing ?? false;
+            WithoutTransitions(ExpandHost, () => ExpandHost.MaxHeight = editing ? double.PositiveInfinity : 0);
+            WithoutTransitions(CollapseHost, () => CollapseHost.MaxHeight = editing ? 0 : double.PositiveInfinity);
         };
+        // Re-resolve a per-card "mono" accent when the app theme flips.
+        ActualThemeVariantChanged += (_, _) => ApplyCardAccent();
         // PointerPressed instead of Tapped: Tapped suppresses the second of two fast
         // clicks (double-tap detection), which made rapid expand/collapse feel dead.
         AddHandler(PointerPressedEvent, OnCardPressed, handledEventsToo: false);
@@ -111,6 +122,79 @@ public partial class TunnelCard : UserControl
         }
         if (e.PropertyName == nameof(TunnelViewModel.CollapsedSummary))
             BuildDetail();
+        if (e.PropertyName == nameof(TunnelViewModel.Accent))
+            ApplyCardAccent();
+        if (e.PropertyName == nameof(TunnelViewModel.IsEditing) && _vm is not null)
+        {
+            var editing = _vm.IsEditing;
+            Animate(ExpandHost, ExpandContent, editing, _expandTok);
+            Animate(CollapseHost, DetailPanel, !editing, _collapseTok);
+        }
+    }
+
+    // ---- per-card accent -------------------------------------------------------
+
+    void ApplyCardAccent()
+    {
+        var name = _vm?.Accent;
+        if (string.IsNullOrEmpty(name))
+        {
+            // Follow the global accent: drop any local override.
+            Resources.Remove("AccentBrush");
+            Resources.Remove("AccentDimBrush");
+            return;
+        }
+        var color = Accents.Resolve(name, ActualThemeVariant == ThemeVariant.Dark);
+        Resources["AccentBrush"] = new SolidColorBrush(color);
+        Resources["AccentDimBrush"] = new SolidColorBrush(color, 0.4);
+    }
+
+    void OnDotPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (_vm is { IsEditing: true })
+        {
+            _vm.CycleAccent();
+            e.Handled = true;
+        }
+    }
+
+    // ---- expand/collapse: animate MaxHeight to the exact content height ---------
+
+    // Independent generation counters so a rapid re-toggle cancels a pending finalize.
+    sealed class Tok { public int V; }
+    readonly Tok _expandTok = new();
+    readonly Tok _collapseTok = new();
+
+    static void WithoutTransitions(Border b, Action apply)
+    {
+        var t = b.Transitions;
+        b.Transitions = null;
+        apply();
+        b.Transitions = t;
+    }
+
+    // Open: animate 0 → measured content height, then lift the cap so the content can
+    // grow freely while it stays open. Close: pin to the current height, then animate → 0.
+    async void Animate(Border host, Control content, bool open, Tok tok)
+    {
+        var id = ++tok.V;
+        if (open)
+        {
+            var w = host.Bounds.Width;
+            if (w < 1) w = Bounds.Width;
+            if (w < 1) w = 400;
+            content.Measure(new Size(w, double.PositiveInfinity));
+            var h = content.DesiredSize.Height;
+            host.MaxHeight = h; // animates from the current (0) value
+            await Task.Delay(220);
+            if (tok.V == id) WithoutTransitions(host, () => host.MaxHeight = double.PositiveInfinity);
+        }
+        else
+        {
+            var cur = host.Bounds.Height;
+            if (double.IsFinite(cur) && cur > 0) WithoutTransitions(host, () => host.MaxHeight = cur);
+            Dispatcher.UIThread.Post(() => { if (tok.V == id) host.MaxHeight = 0; }, DispatcherPriority.Render);
+        }
     }
 
     // Syntax-colored collapsed detail as atomic tokens in a WrapPanel: addresses in
