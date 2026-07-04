@@ -123,6 +123,7 @@ public class App : Application
         var menu = new NativeMenu();
         foreach (var tunnel in _vm.Tunnels)
         {
+            if (tunnel.IsCustom) continue; // the custom DNS card isn't a connection
             var item = new NativeMenuItem(tunnel.Name)
             {
                 ToggleType = NativeMenuItemToggleType.CheckBox,
@@ -133,7 +134,7 @@ public class App : Application
             item.Click += (_, _) => captured.IsConnected = !captured.IsConnected;
             menu.Items.Add(item);
         }
-        if (_vm.Tunnels.Count > 0)
+        if (menu.Items.Count > 0)
             menu.Items.Add(new NativeMenuItemSeparator());
         var show = new NativeMenuItem("Show");
         show.Click += (_, _) => ShowMainWindow?.Invoke();
@@ -143,10 +144,10 @@ public class App : Application
         menu.Items.Add(exit);
         _tray.Menu = menu;
 
-        var anyConnected = _vm.Tunnels.Any(t => t.IsConnected);
-        _tray.Icon = anyConnected ? _iconActive : _iconIdle;
-        _tray.ToolTipText = anyConnected
-            ? $"SplitGuard — {string.Join(", ", _vm.Tunnels.Where(t => t.IsConnected).Select(t => t.Name))}"
+        var connected = _vm.Tunnels.Where(t => t.IsConnected && !t.IsCustom).ToList();
+        _tray.Icon = connected.Count > 0 ? _iconActive : _iconIdle;
+        _tray.ToolTipText = connected.Count > 0
+            ? $"SplitGuard — {string.Join(", ", connected.Select(t => t.Name))}"
             : "SplitGuard";
     }
 }

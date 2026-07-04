@@ -66,8 +66,8 @@ public partial class TunnelCard : UserControl
             if (_vm is not null) _vm.PropertyChanged += OnVmPropertyChanged;
             BuildDetail();
 
-            // External cards have no interface column: let the peers section span the full width.
-            if (_vm is { IsExternal: true })
+            // External and custom cards have no interface column: peers span full width.
+            if (_vm is { ShowInterfaceSection: false })
             {
                 Grid.SetColumn(PeersHost, 0);
                 Grid.SetColumnSpan(PeersHost, 2);

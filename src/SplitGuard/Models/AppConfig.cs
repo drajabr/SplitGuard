@@ -7,6 +7,26 @@ public class AppConfig
     public UiPrefs Ui { get; set; } = new();
     public List<TunnelConfig> Tunnels { get; set; } = new();
     public List<ExternalRuleConfig> Externals { get; set; } = new();
+    // Externals the user deleted: skipped on rescan until they explicitly rescan.
+    public List<string> DismissedExternals { get; set; } = new();
+    // Optional standalone split-DNS card (NRPT rules unrelated to any WireGuard tunnel).
+    public CustomDnsConfig? Custom { get; set; }
+}
+
+// A single "Custom DNS" card: NRPT domain→server rules applied while the app runs,
+// independent of any tunnel connection. At most one exists.
+public class CustomDnsConfig
+{
+    public List<CustomDnsRole> Roles { get; set; } = new();
+    public string? Accent { get; set; }
+}
+
+public class CustomDnsRole
+{
+    // Stable id used to key this role's NRPT rules (acts as the "peer key").
+    public string Id { get; set; } = "";
+    public string? Dns { get; set; }
+    public List<string> Domains { get; set; } = new();
 }
 
 public class UiPrefs

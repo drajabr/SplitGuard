@@ -22,8 +22,10 @@ public class TunnelViewModel : ObservableObject
     public ITunnelHost Host { get; }
     public TunnelConfig? Config { get; }
     public ExternalRuleConfig? External { get; }
+    public CustomDnsConfig? Custom { get; }
 
     public bool IsExternal => External is not null;
+    public bool IsCustom => Custom is not null;
 
     public TunnelViewModel(ITunnelHost host, TunnelConfig config)
     {
@@ -42,6 +44,22 @@ public class TunnelViewModel : ObservableObject
         var peer = new PeerViewModel(this) { Dns = external.Dns ?? "" };
         PeerViewModel.Fill(peer.Domains, external.Domains);
         Peers.Add(peer);
+    }
+
+    public TunnelViewModel(ITunnelHost host, CustomDnsConfig custom)
+    {
+        Host = host;
+        Custom = custom;
+        InitCommands();
+        Name = "Custom DNS";
+        _isConnected = true; // always "on" so its NRPT rules apply and can be pinned
+        if (custom.Roles.Count == 0) custom.Roles.Add(new CustomDnsRole());
+        foreach (var role in custom.Roles)
+        {
+            var peer = new PeerViewModel(this) { PublicKey = role.Id, Dns = role.Dns ?? "" };
+            PeerViewModel.Fill(peer.Domains, role.Domains);
+            Peers.Add(peer);
+        }
     }
 
     void InitCommands()
@@ -122,7 +140,7 @@ public class TunnelViewModel : ObservableObject
         set
         {
             if (_isConnected == value) return;
-            if (IsExternal) return; // external adapters are read-only
+            if (IsExternal || IsCustom) return; // external adapters & the custom card aren't toggleable
             // Optimistic UI: the host reverts via SetConnectedState on failure.
             _isConnected = value;
             Raise();
@@ -142,7 +160,9 @@ public class TunnelViewModel : ObservableObject
         Raise(nameof(ConnLabel));
     }
 
-    public bool StatsVisible => IsConnected;
+    public bool StatsVisible => IsConnected && !IsExternal && !IsCustom;
+    public bool ShowConnect => !IsExternal && !IsCustom;
+    public bool NameEditable => IsEditing && !IsExternal && !IsCustom;
     public string ConnLabel => IsConnected ? "Connected" : "Disconnected";
 
     // Expanded IS edit mode: clicking the card opens editing; clicking blank card
@@ -154,6 +174,7 @@ public class TunnelViewModel : ObservableObject
         set
         {
             if (!Set(ref _isEditing, value)) return;
+            Raise(nameof(NameEditable));
             foreach (var p in Peers) p.IsEditing = value;
         }
     }
@@ -181,17 +202,20 @@ public class TunnelViewModel : ObservableObject
         Raise(nameof(CollapsedAllowedIps));
     }
 
-    public bool ShowInterfaceSection => !IsExternal;
+    public bool ShowInterfaceSection => !IsExternal && !IsCustom;
+    public string AddPeerLabel => IsCustom ? "+ Add DNS rule" : "+ Add peer";
 
     // Optional per-card accent hue (null = follow the global accent). Cycled by clicking
     // the header dot while editing; the view resolves the name to a color and overrides
     // AccentBrush inside this card only.
     public string? Accent
     {
-        get => IsExternal ? External!.Accent : Config!.Accent;
+        get => IsCustom ? Custom!.Accent : IsExternal ? External!.Accent : Config!.Accent;
         set
         {
-            if (IsExternal) External!.Accent = value; else Config!.Accent = value;
+            if (IsCustom) Custom!.Accent = value;
+            else if (IsExternal) External!.Accent = value;
+            else Config!.Accent = value;
             Raise();
         }
     }
@@ -265,7 +289,7 @@ public class TunnelViewModel : ObservableObject
 
     void ToggleTextMode()
     {
-        if (IsExternal || !IsEditing) return;
+        if (IsExternal || IsCustom || !IsEditing) return;
         if (!IsTextMode)
         {
             ConfigText = SerializeStaged();
@@ -336,7 +360,7 @@ public class TunnelViewModel : ObservableObject
     void BeginEdit()
     {
         ValidationError = "";
-        if (!IsExternal)
+        if (!IsExternal && !IsCustom)
         {
             try { PrivateKeyEdit = RuleStore.Unprotect(Config!.PrivateKeyProtected); }
             catch { PrivateKeyEdit = ""; }
@@ -378,9 +402,25 @@ public class TunnelViewModel : ObservableObject
             Peers[0].Dns = External!.Dns ?? "";
             PeerViewModel.Fill(Peers[0].Domains, External.Domains);
         }
+        else if (IsCustom)
+        {
+            LoadFromCustom();
+        }
         else
         {
             LoadFromConfig();
+        }
+    }
+
+    void LoadFromCustom()
+    {
+        Peers.Clear();
+        if (Custom!.Roles.Count == 0) Custom.Roles.Add(new CustomDnsRole());
+        foreach (var role in Custom.Roles)
+        {
+            var peer = new PeerViewModel(this) { PublicKey = role.Id, Dns = role.Dns ?? "" };
+            PeerViewModel.Fill(peer.Domains, role.Domains);
+            Peers.Add(peer);
         }
     }
 
@@ -399,8 +439,23 @@ public class TunnelViewModel : ObservableObject
         }
         ValidationError = "";
         WarningText = string.Join(" · ", Peers.Select(p => p.DnsRouteWarning()).Where(w => w is not null)!);
-        var connectionChanged = !IsExternal && ConnSnapshot() != _connSnapshot;
-        if (IsExternal)
+        var connectionChanged = !IsExternal && !IsCustom && ConnSnapshot() != _connSnapshot;
+        if (IsCustom)
+        {
+            // Rebuild the role list from the DNS-only peers, keeping/creating a stable id each.
+            Custom!.Roles = Peers.Select(p =>
+            {
+                var id = string.IsNullOrEmpty(p.PublicKey) ? Guid.NewGuid().ToString("N") : p.PublicKey;
+                p.PublicKey = id;
+                return new CustomDnsRole
+                {
+                    Id = id,
+                    Dns = p.HasDns ? p.Dns.Trim() : null,
+                    Domains = p.DomainValues.ToList(),
+                };
+            }).ToList();
+        }
+        else if (IsExternal)
         {
             External!.Dns = Peers[0].HasDns ? Peers[0].Dns.Trim() : null;
             External.Domains = Peers[0].DomainValues.ToList();
@@ -432,7 +487,7 @@ public class TunnelViewModel : ObservableObject
 
     string? Validate()
     {
-        if (!IsExternal)
+        if (!IsExternal && !IsCustom)
         {
             if (string.IsNullOrWhiteSpace(Name)) return "Tunnel needs a name";
             if (!PeerViewModel.IsValidKey(PrivateKeyEdit)) return "Private key must be a valid 32-byte base64 key";

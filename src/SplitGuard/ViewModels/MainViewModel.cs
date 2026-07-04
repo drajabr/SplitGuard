@@ -75,6 +75,8 @@ public class MainViewModel : ObservableObject, ITunnelHost
         GpoWarning = NrptService.IsGpoNrptActive();
         foreach (var t in _config.Tunnels)
             Tunnels.Add(new TunnelViewModel(this, t));
+        if (_config.Custom is not null)
+            Tunnels.Add(new TunnelViewModel(this, _config.Custom));
         await RefreshExternalsAsync();
         await Task.Run(Reconcile);
         RefreshPins();
@@ -101,6 +103,15 @@ public class MainViewModel : ObservableObject, ITunnelHost
                         _nrpt.ApplyDomain(ExtName(ext.AdapterName), ext.AdapterName, d, ext.Dns);
                 }
             }
+            // Re-apply any missing custom-card rules.
+            if (_config.Custom is not null)
+                foreach (var role in _config.Custom.Roles.Where(r => !string.IsNullOrEmpty(r.Dns)))
+                    foreach (var d in role.Domains)
+                    {
+                        var id = NrptService.RuleId(CustomName, role.Id, d);
+                        if (!tagged.Any(r => r.Id == id))
+                            _nrpt.ApplyDomain(CustomName, role.Id, d, role.Dns!);
+                    }
         }
         catch (Exception ex)
         {
@@ -118,10 +129,22 @@ public class MainViewModel : ObservableObject, ITunnelHost
             foreach (var d in ext.Domains)
                 set.Add(NrptService.RuleId(ExtName(ext.AdapterName), ext.AdapterName, d));
         }
+        // Custom card rules are always desired (no connection gating).
+        if (_config.Custom is not null)
+            foreach (var role in _config.Custom.Roles.Where(r => !string.IsNullOrEmpty(r.Dns)))
+                foreach (var d in role.Domains)
+                    set.Add(NrptService.RuleId(CustomName, role.Id, d));
         return set;
     }
 
     static string ExtName(string adapter) => $"ext:{adapter}";
+    const string CustomName = "custom:dns";
+
+    // NRPT/pin identity for a card: externals prefix the adapter, the custom card uses a
+    // fixed sentinel, WG tunnels use their name. Peer identity is the peer's public key
+    // (for externals there's one implicit peer keyed by the adapter name).
+    string TunnelKey(TunnelViewModel t) => t.IsExternal ? ExtName(t.Name) : t.IsCustom ? CustomName : t.Name;
+    static string PeerKey(TunnelViewModel t, PeerViewModel p) => t.IsExternal ? t.Name : p.PublicKey;
 
     // ---- tunnel lifecycle -------------------------------------------------
 
@@ -177,8 +200,8 @@ public class MainViewModel : ObservableObject, ITunnelHost
         else if (peer.HasDns)
             _config.PinnedDns = new PinnedDnsRef
             {
-                TunnelName = tunnel.IsExternal ? ExtName(tunnel.Name) : tunnel.Name,
-                PeerPublicKey = tunnel.IsExternal ? tunnel.Name : peer.PublicKey,
+                TunnelName = TunnelKey(tunnel),
+                PeerPublicKey = PeerKey(tunnel, peer),
             };
         _store.Save(_config);
         RefreshPins();
@@ -192,8 +215,8 @@ public class MainViewModel : ObservableObject, ITunnelHost
             foreach (var p in t.Peers)
             {
                 var pinned = _config.PinnedDns is not null
-                    && _config.PinnedDns.TunnelName == (t.IsExternal ? ExtName(t.Name) : t.Name)
-                    && _config.PinnedDns.PeerPublicKey == (t.IsExternal ? t.Name : p.PublicKey);
+                    && _config.PinnedDns.TunnelName == TunnelKey(t)
+                    && _config.PinnedDns.PeerPublicKey == PeerKey(t, p);
                 p.IsPinned = pinned;
                 p.PinSuspended = pinned && !t.IsConnected;
             }
@@ -231,8 +254,8 @@ public class MainViewModel : ObservableObject, ITunnelHost
         {
             foreach (var p in t.Peers.Where(p => p.HasDns))
             {
-                var isPinnedPeer = _config.PinnedDns.TunnelName == (t.IsExternal ? ExtName(t.Name) : t.Name)
-                    && _config.PinnedDns.PeerPublicKey == (t.IsExternal ? t.Name : p.PublicKey);
+                var isPinnedPeer = _config.PinnedDns.TunnelName == TunnelKey(t)
+                    && _config.PinnedDns.PeerPublicKey == PeerKey(t, p);
                 if (isPinnedPeer) servers.Insert(0, p.Dns.Trim());
                 else servers.Add(p.Dns.Trim());
             }
@@ -260,7 +283,11 @@ public class MainViewModel : ObservableObject, ITunnelHost
         RefreshPins();
         _ = Task.Run(() =>
         {
-            if (vm.IsExternal)
+            if (vm.IsCustom)
+            {
+                ApplyCustomRules(vm);
+            }
+            else if (vm.IsExternal)
             {
                 if (vm.IsConnected) ReapplyExternalRules(vm);
             }
@@ -289,6 +316,14 @@ public class MainViewModel : ObservableObject, ITunnelHost
         });
     }
 
+    // Rewrite all custom-card NRPT rules from scratch (they're always active while running).
+    void ApplyCustomRules(TunnelViewModel vm)
+    {
+        _nrpt.RemoveByTunnel(CustomName);
+        foreach (var p in vm.Peers.Where(p => p.HasDns && p.DomainValues.Any()))
+            _nrpt.ApplyPeerRules(CustomName, p.PublicKey, p.DomainValues, p.Dns.Trim());
+    }
+
     void ReapplyExternalRules(TunnelViewModel vm)
     {
         _nrpt.RemovePeerRules(ExtName(vm.Name), vm.Name);
@@ -299,14 +334,49 @@ public class MainViewModel : ObservableObject, ITunnelHost
 
     public void RequestDelete(TunnelViewModel vm)
     {
-        if (vm.IsConnected && !vm.IsExternal) RequestDisconnect(vm);
-        if (_config.PinnedDns?.TunnelName == (vm.IsExternal ? ExtName(vm.Name) : vm.Name))
+        if (vm.IsConnected && !vm.IsExternal && !vm.IsCustom) RequestDisconnect(vm);
+        if (_config.PinnedDns?.TunnelName == TunnelKey(vm))
             _config.PinnedDns = null;
-        if (vm.IsExternal) _config.Externals.Remove(vm.External!);
+        if (vm.IsCustom)
+        {
+            _config.Custom = null;
+            _ = Task.Run(() => _nrpt.RemoveByTunnel(CustomName));
+        }
+        else if (vm.IsExternal)
+        {
+            _config.Externals.Remove(vm.External!);
+            // Remember the dismissal so a rescan is required to bring it back.
+            if (!_config.DismissedExternals.Contains(vm.Name)) _config.DismissedExternals.Add(vm.Name);
+        }
         else _config.Tunnels.Remove(vm.Config!);
         _store.Save(_config);
         Tunnels.Remove(vm);
         _ = Task.Run(RefreshCatchAll);
+    }
+
+    // Ctrl+/menu: create the single standalone custom-DNS card and edit it.
+    public void CreateCustomDnsCard()
+    {
+        if (_config.Custom is not null)
+        {
+            Tunnels.FirstOrDefault(t => t.IsCustom)?.BeginEditCommand.Execute(null);
+            return;
+        }
+        _config.Custom = new CustomDnsConfig();
+        _store.Save(_config);
+        var vm = new TunnelViewModel(this, _config.Custom) { IsDraft = true };
+        Tunnels.Add(vm);
+        vm.BeginEditCommand.Execute(null);
+    }
+
+    public bool CanAddCustom => _config.Custom is null;
+
+    // Forget dismissed externals so the next scan re-adds any that are still present.
+    public void RescanExternals()
+    {
+        _config.DismissedExternals.Clear();
+        _store.Save(_config);
+        _ = RefreshExternalsAsync();
     }
 
     public void CopyText(string text) => _ = _dialogs.CopyToClipboardAsync(text);
@@ -377,6 +447,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
     {
         var adapters = (await Task.Run(_external.GetExternalAdapters))
             .Where(a => _config.Tunnels.All(t => t.Name != a.Name)) // our own adapters aren't "external"
+            .Where(a => !_config.DismissedExternals.Contains(a.Name)) // user-deleted until rescan
             .ToList();
         foreach (var adapter in adapters)
         {
@@ -429,11 +500,12 @@ public class MainViewModel : ObservableObject, ITunnelHost
     {
         try
         {
-            foreach (var vm in Tunnels.Where(t => !t.IsExternal && t.IsConnected))
+            foreach (var vm in Tunnels.Where(t => !t.IsExternal && !t.IsCustom && t.IsConnected))
             {
                 foreach (var p in vm.Config!.Peers)
                     _nrpt.RemovePeerRules(vm.Name, p.PublicKey);
             }
+            if (_config.Custom is not null) _nrpt.RemoveByTunnel(CustomName);
             _tunnels.DisconnectAll();
             // Catch-all survives only if the pinned DNS belongs to an external tunnel that stays up.
             var pinnedExternalUp = _config.PinnedDns is not null

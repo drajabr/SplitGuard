@@ -270,6 +270,12 @@ public partial class MainWindow : Window, IDialogs
         addFlyout.Items.Clear();
         addFlyout.Items.Add(ActionItem("Import .conf…", "", () => _ = ImportConfAsync()));
         addFlyout.Items.Add(ActionItem("New empty tunnel", "", () => (DataContext as MainViewModel)?.CreateEmptyTunnel()));
+        var mvm = DataContext as MainViewModel;
+        var customItem = ActionItem("Custom DNS rules", "", () => { (DataContext as MainViewModel)?.CreateCustomDnsCard(); BuildMenus(); });
+        customItem.IsEnabled = mvm?.CanAddCustom ?? true;
+        addFlyout.Items.Add(customItem);
+        addFlyout.Items.Add(new Separator());
+        addFlyout.Items.Add(ActionItem("Rescan external tunnels", "", () => (DataContext as MainViewModel)?.RescanExternals()));
 
         var prefs = (DataContext as MainViewModel)?.Prefs;
         var settingsFlyout = Flyout(SettingsButton);

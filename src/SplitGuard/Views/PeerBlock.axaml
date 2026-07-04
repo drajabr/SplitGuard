@@ -12,7 +12,7 @@
           <Button Classes="link danger" Content="Remove peer" Command="{Binding RemovePeerCommand}" IsVisible="{Binding IsEditing}" FontSize="{DynamicResource Fs115}" />
         </StackPanel>
         <StackPanel Orientation="Horizontal" Spacing="8">
-          <TextBlock Classes="accentfg" FontSize="{DynamicResource Fs115}" FontWeight="Medium" VerticalAlignment="Center" Text="Peer" />
+          <TextBlock Classes="accentfg" FontSize="{DynamicResource Fs115}" FontWeight="Medium" VerticalAlignment="Center" Text="{Binding BlockTitle}" />
         </StackPanel>
       </DockPanel>
       <Separator />
@@ -20,8 +20,8 @@
       <!-- Label column is Auto: inputs begin just past the widest label. -->
       <Grid Margin="10,6" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
 
-        <TextBlock Grid.Row="0" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Endpoint" IsVisible="{Binding !IsExternal}" Margin="0,5,12,4" />
-        <Grid Grid.Row="0" Grid.Column="1" ColumnDefinitions="*,Auto,86" IsVisible="{Binding !IsExternal}" Margin="0,0,0,4">
+        <TextBlock Grid.Row="0" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Endpoint" IsVisible="{Binding ShowWgFields}" Margin="0,5,12,4" />
+        <Grid Grid.Row="0" Grid.Column="1" ColumnDefinitions="*,Auto,86" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
           <TextBox Grid.Column="0" Classes="mono" Text="{Binding EndpointHost}" Watermark="host or ip" />
           <TextBlock Grid.Column="1" Classes="muted" Text=":" VerticalAlignment="Center" Margin="4,0,4,0" />
           <TextBox Grid.Column="2" Classes="mono" Text="{Binding EndpointPort}" Watermark="port" />
@@ -35,8 +35,8 @@
         <TextBox Grid.Row="2" Grid.Column="1" Classes="mono" Text="{Binding PresharedKey}" Watermark="optional"
                  HorizontalAlignment="Stretch" IsVisible="{Binding ShowKeysRow}" Margin="0,0,0,4" />
 
-        <TextBlock Grid.Row="3" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Allowed IPs" IsVisible="{Binding !IsExternal}" Margin="0,5,12,4" />
-        <ItemsControl Grid.Row="3" Grid.Column="1" ItemsSource="{Binding AllowedIps}" IsVisible="{Binding !IsExternal}" Margin="0,0,0,4">
+        <TextBlock Grid.Row="3" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Allowed IPs" IsVisible="{Binding ShowWgFields}" Margin="0,5,12,4" />
+        <ItemsControl Grid.Row="3" Grid.Column="1" ItemsSource="{Binding AllowedIps}" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>
@@ -67,8 +67,8 @@
           </ItemsControl.DataTemplates>
         </ItemsControl>
 
-        <TextBlock Grid.Row="4" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Keepalive" IsVisible="{Binding !IsExternal}" Margin="0,5,12,4" />
-        <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding !IsExternal}" Margin="0,0,0,4">
+        <TextBlock Grid.Row="4" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Keepalive" IsVisible="{Binding ShowWgFields}" Margin="0,5,12,4" />
+        <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
           <TextBox Classes="mono" Width="70" Text="{Binding KeepaliveText}" Watermark="off" />
           <TextBlock Classes="muted" Text="seconds" VerticalAlignment="Center" />
         </StackPanel>

@@ -87,6 +87,18 @@ public class NrptService
         }
     }
 
+    // Remove every tagged rule belonging to a card (all peers/roles under one tunnel key).
+    public void RemoveByTunnel(string tunnelName)
+    {
+        lock (_gate)
+        {
+            var prefix = $"WGSDNS|{tunnelName}|";
+            foreach (var rule in Backend.GetTagged().Where(r => r.Id.StartsWith(prefix)))
+                Backend.Remove(rule.Id);
+            Flush();
+        }
+    }
+
     public void SetCatchAll(string[] orderedServers)
     {
         lock (_gate)

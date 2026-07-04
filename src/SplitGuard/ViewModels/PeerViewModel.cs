@@ -97,9 +97,13 @@ public partial class PeerViewModel : ObservableObject
     bool _isEditing;
     public bool IsEditing { get => _isEditing; set => Set(ref _isEditing, value); }
 
-    public bool ShowKeysRow => !IsExternal;
-
     public bool IsExternal => _tunnel.IsExternal;
+    public bool IsCustom => _tunnel.IsCustom;
+    // DNS-only rows: externals and the custom card show just DNS + Domains.
+    public bool IsDnsOnly => IsExternal || IsCustom;
+    public bool ShowWgFields => !IsDnsOnly;
+    public bool ShowKeysRow => !IsDnsOnly;
+    public string BlockTitle => IsCustom ? "DNS rule" : "Peer";
 
     bool _isPinned;
     public bool IsPinned
@@ -158,8 +162,13 @@ public partial class PeerViewModel : ObservableObject
 
     public string? Validate()
     {
-        if (IsExternal)
-            return HasDns && !IPAddress.TryParse(Dns.Trim(), out _) ? $"Invalid DNS server: {Dns}" : null;
+        if (IsDnsOnly)
+        {
+            if (HasDns && !IPAddress.TryParse(Dns.Trim(), out _)) return $"Invalid DNS server: {Dns}";
+            foreach (var d in DomainValues)
+                if (!IsValidDomain(d)) return $"Invalid domain: {d}";
+            return null;
+        }
         if (!IsValidKey(PublicKey)) return "Peer public key must be a valid 32-byte base64 key";
         if (!string.IsNullOrEmpty(PresharedKey) && !IsValidKey(PresharedKey)) return "Preshared key must be a valid 32-byte base64 key";
         if (!IsValidEndpoint(Endpoint)) return $"Endpoint must be host:port — got '{Endpoint}'";
@@ -176,7 +185,7 @@ public partial class PeerViewModel : ObservableObject
 
     public string? DnsRouteWarning()
     {
-        if (!HasDns || IsExternal || !IPAddress.TryParse(Dns.Trim(), out var ip)) return null;
+        if (!HasDns || IsDnsOnly || !IPAddress.TryParse(Dns.Trim(), out var ip)) return null;
         return AllowedIpValues.Any(c => Models.WireGuardConf.CidrContains(c, ip))
             ? null
             : $"DNS {Dns} is outside this peer's allowed IPs — queries would leak outside the tunnel";
