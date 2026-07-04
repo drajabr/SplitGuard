@@ -70,6 +70,18 @@ public class MainViewModel : ObservableObject, ITunnelHost
 
     public void AccentChanged(TunnelViewModel tunnel) => _store.Save(_config);
 
+    // Custom DNS card's activate/deactivate button: apply or remove its NRPT rules.
+    public void CustomActiveChanged(TunnelViewModel tunnel)
+    {
+        _store.Save(_config);
+        _ = Task.Run(() =>
+        {
+            if (_config.Custom?.Active == true) ApplyCustomRules(tunnel);
+            else _nrpt.RemoveByTunnel(CustomName);
+            RefreshCatchAll();
+        });
+    }
+
     public async Task InitializeAsync()
     {
         GpoWarning = NrptService.IsGpoNrptActive();
@@ -110,8 +122,8 @@ public class MainViewModel : ObservableObject, ITunnelHost
                         _nrpt.ApplyDomain(ExtName(ext.AdapterName), ext.AdapterName, d, ext.Dns);
                 }
             }
-            // Re-apply any missing custom-card rules.
-            if (_config.Custom is not null)
+            // Re-apply any missing custom-card rules (only while active).
+            if (_config.Custom is { Active: true })
                 foreach (var role in _config.Custom.Roles.Where(r => !string.IsNullOrEmpty(r.Dns)))
                     foreach (var d in role.Domains)
                     {
@@ -136,8 +148,8 @@ public class MainViewModel : ObservableObject, ITunnelHost
             foreach (var d in ext.Domains)
                 set.Add(NrptService.RuleId(ExtName(ext.AdapterName), ext.AdapterName, d));
         }
-        // Custom card rules are always desired (no connection gating).
-        if (_config.Custom is not null)
+        // Custom card rules are desired while the card is active.
+        if (_config.Custom is { Active: true })
             foreach (var role in _config.Custom.Roles.Where(r => !string.IsNullOrEmpty(r.Dns)))
                 foreach (var d in role.Domains)
                     set.Add(NrptService.RuleId(CustomName, role.Id, d));
@@ -300,7 +312,8 @@ public class MainViewModel : ObservableObject, ITunnelHost
         {
             if (vm.IsCustom)
             {
-                ApplyCustomRules(vm);
+                if (vm.Custom!.Active) ApplyCustomRules(vm);
+                else _nrpt.RemoveByTunnel(CustomName);
             }
             else if (vm.IsExternal)
             {

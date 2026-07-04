@@ -99,12 +99,12 @@
     <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
   </Style>
 
-  <!-- Connect toggle: a round power button. Outlined when off, accent-filled when on. -->
+  <!-- Connect toggle: a big square power button. Outlined when off, accent-filled when on. -->
   <Style Selector="ToggleButton.conn">
-    <Setter Property="Width" Value="30" />
-    <Setter Property="Height" Value="30" />
+    <Setter Property="Width" Value="40" />
+    <Setter Property="Height" Value="40" />
     <Setter Property="Padding" Value="0" />
-    <Setter Property="CornerRadius" Value="15" />
+    <Setter Property="CornerRadius" Value="6" />
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderBrush" Value="{DynamicResource FieldBorderBrush}" />
     <Setter Property="BorderThickness" Value="1" />

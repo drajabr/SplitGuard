@@ -15,6 +15,7 @@ public interface ITunnelHost
     void RequestDelete(TunnelViewModel tunnel);
     void CopyText(string text);
     void AccentChanged(TunnelViewModel tunnel);
+    void CustomActiveChanged(TunnelViewModel tunnel);
 }
 
 public class TunnelViewModel : ObservableObject
@@ -52,7 +53,7 @@ public class TunnelViewModel : ObservableObject
         Custom = custom;
         InitCommands();
         Name = "Custom DNS";
-        _isConnected = true; // always "on" so its NRPT rules apply and can be pinned
+        _isConnected = custom.Active; // active = its NRPT rules are applied
         if (custom.Roles.Count == 0) custom.Roles.Add(new CustomDnsRole());
         foreach (var role in custom.Roles)
         {
@@ -141,12 +142,18 @@ public class TunnelViewModel : ObservableObject
         set
         {
             if (_isConnected == value) return;
-            if (IsExternal || IsCustom) return; // external adapters & the custom card aren't toggleable
+            if (IsExternal) return; // external adapters are driven by the official client
             // Optimistic UI: the host reverts via SetConnectedState on failure.
             _isConnected = value;
             Raise();
             Raise(nameof(StatsVisible));
             Raise(nameof(ConnLabel));
+            if (IsCustom)
+            {
+                Custom!.Active = value;
+                Host.CustomActiveChanged(this);
+                return;
+            }
             if (value) Host.RequestConnect(this);
             else Host.RequestDisconnect(this);
         }
@@ -162,7 +169,7 @@ public class TunnelViewModel : ObservableObject
     }
 
     public bool StatsVisible => IsConnected && !IsExternal && !IsCustom;
-    public bool ShowConnect => !IsExternal && !IsCustom;
+    public bool ShowConnect => !IsExternal; // WG tunnels connect; custom card activates
     public bool NameEditable => IsEditing && !IsExternal && !IsCustom;
     public string ConnLabel => IsConnected ? "Connected" : "Disconnected";
 

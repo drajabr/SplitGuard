@@ -19,6 +19,8 @@ public class CustomDnsConfig
 {
     public List<CustomDnsRole> Roles { get; set; } = new();
     public string? Accent { get; set; }
+    // Whether its NRPT rules are currently applied (toggled by the card's activate button).
+    public bool Active { get; set; } = true;
 }
 
 public class CustomDnsRole
