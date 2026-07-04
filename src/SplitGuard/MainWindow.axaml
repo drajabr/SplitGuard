@@ -81,10 +81,14 @@
         </StackPanel>
       </ScrollViewer>
 
-      <!-- Floating Add button (opens the add options popover). -->
-      <Button Name="AddButton" Classes="fab" HorizontalAlignment="Right" VerticalAlignment="Bottom"
-              Margin="0,0,20,20" ToolTip.Tip="Add tunnel">
-        <TextBlock Classes="glyph" Text="&#xE710;" FontSize="{DynamicResource Fs17}" Foreground="White" />
+      <!-- Floating Add button (centered at the bottom; opens the add options popover). -->
+      <Button Name="AddButton" Classes="addbtn" HorizontalAlignment="Center" VerticalAlignment="Bottom"
+              Margin="0,0,0,14" ToolTip.Tip="Add tunnel">
+        <StackPanel HorizontalAlignment="Center" Spacing="0">
+          <TextBlock Classes="glyph" Text="&#xE710;" FontSize="{DynamicResource Fs17}" HorizontalAlignment="Center"
+                     Foreground="{DynamicResource AccentBrush}" />
+          <TextBlock Text="Add" FontSize="{DynamicResource Fs11}" Opacity="0.75" HorizontalAlignment="Center" />
+        </StackPanel>
       </Button>
     </Panel>
   </DockPanel>

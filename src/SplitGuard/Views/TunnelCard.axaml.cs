@@ -80,10 +80,11 @@ public partial class TunnelCard : UserControl
             }
 
             ApplyCardAccent();
-            // Set the initial reveal state without animating (collapsed detail shown).
+            // Initial state (no animation): show the right content at its natural height.
             var editing = _vm?.IsEditing ?? false;
-            WithoutTransitions(ExpandHost, () => ExpandHost.MaxHeight = editing ? double.PositiveInfinity : 0);
-            WithoutTransitions(CollapseHost, () => CollapseHost.MaxHeight = editing ? 0 : double.PositiveInfinity);
+            ExpandContent.IsVisible = editing;
+            DetailPanel.IsVisible = !editing;
+            WithoutTransitions(Body, () => Body.MaxHeight = double.PositiveInfinity);
         };
         // Re-resolve a per-card "mono" accent when the app theme flips.
         ActualThemeVariantChanged += (_, _) => ApplyCardAccent();
@@ -124,10 +125,7 @@ public partial class TunnelCard : UserControl
         if (e.PropertyName == nameof(TunnelViewModel.Accent))
             ApplyCardAccent();
         if (e.PropertyName == nameof(TunnelViewModel.IsEditing) && _vm is not null)
-        {
-            SetOpen(ExpandHost, ExpandContent, _vm.IsEditing, _expandAnim);
-            SetOpen(CollapseHost, DetailPanel, !_vm.IsEditing, _collapseAnim);
-        }
+            Animate(_vm.IsEditing);
     }
 
     // ---- per-card accent -------------------------------------------------------
@@ -156,14 +154,10 @@ public partial class TunnelCard : UserControl
         }
     }
 
-    // ---- expand/collapse: one MaxHeight tween per toggle, no per-frame work ------
+    // ---- expand/collapse: one MaxHeight tween of a single region ----------------
 
-    const int AnimMs = 180; // must match the MaxHeight transition duration in Styles.axaml
-
-    // Per-host generation counter so a rapid re-toggle cancels a stale "uncap" callback.
-    sealed class AnimState { public int Gen; }
-    readonly AnimState _expandAnim = new();
-    readonly AnimState _collapseAnim = new();
+    const int AnimMs = 180; // must match the Border.body MaxHeight transition in Styles.axaml
+    int _animGen;           // cancels a stale "uncap" callback on rapid re-toggle
 
     static void WithoutTransitions(Border b, Action apply)
     {
@@ -173,38 +167,34 @@ public partial class TunnelCard : UserControl
         b.Transitions = t;
     }
 
-    // Measure the content's natural (uncapped) height at the host's real width.
-    static double NaturalHeight(Control content, Border host)
+    static double NaturalHeight(Control content, double width)
     {
-        var w = host.Bounds.Width;
-        if (w < 1) w = 400;
-        content.Measure(new Size(w, double.PositiveInfinity));
+        content.Measure(new Size(width, double.PositiveInfinity));
         return content.DesiredSize.Height;
     }
 
-    // Open: tween 0 → measured height, then lift the cap so later edits grow freely.
-    // Close: pin the current height, then tween → 0. Exactly one animation per toggle;
-    // nothing runs on LayoutUpdated, so there's no thrash or settle-jump.
-    void SetOpen(Border host, Control content, bool open, AnimState a)
+    // Swap the visible content, then tween the shared region's height from where it is now
+    // to the target's natural height — one smooth motion, no overlap, no jump. Afterward
+    // the cap is lifted so edits (adding a domain, raw mode) resize freely.
+    void Animate(bool editing)
     {
-        var gen = ++a.Gen;
-        if (open)
-        {
-            var h = NaturalHeight(content, host);
-            // Start the tween from a clean 0 if we're currently collapsed or uncapped.
-            if (!double.IsFinite(host.MaxHeight) || host.MaxHeight > h)
-                WithoutTransitions(host, () => host.MaxHeight = 0);
-            host.MaxHeight = h; // animates 0 → h
-            DispatcherTimer.RunOnce(
-                () => { if (a.Gen == gen) WithoutTransitions(host, () => host.MaxHeight = double.PositiveInfinity); },
-                TimeSpan.FromMilliseconds(AnimMs + 50));
-        }
-        else
-        {
-            var cur = host.Bounds.Height;
-            if (double.IsFinite(cur) && cur > 0) WithoutTransitions(host, () => host.MaxHeight = cur);
-            Dispatcher.UIThread.Post(() => { if (a.Gen == gen) host.MaxHeight = 0; }, DispatcherPriority.Render);
-        }
+        var gen = ++_animGen;
+        var curH = Body.Bounds.Height;
+        var w = Body.Bounds.Width;
+        if (w < 1) w = 400;
+
+        ExpandContent.IsVisible = editing;
+        DetailPanel.IsVisible = !editing;
+
+        var target = NaturalHeight(editing ? ExpandContent : DetailPanel, w);
+        // Pin the current height (finite) as the animation's starting point.
+        WithoutTransitions(Body, () => Body.MaxHeight = double.IsFinite(curH) && curH > 0 ? curH : target);
+        // Next render tick: animate to the target height.
+        Dispatcher.UIThread.Post(() => { if (_animGen == gen) Body.MaxHeight = target; }, DispatcherPriority.Render);
+        // After the tween: uncap so later content changes aren't clipped.
+        DispatcherTimer.RunOnce(
+            () => { if (_animGen == gen) WithoutTransitions(Body, () => Body.MaxHeight = double.PositiveInfinity); },
+            TimeSpan.FromMilliseconds(AnimMs + 60));
     }
 
     // Syntax-colored collapsed detail as atomic tokens in a WrapPanel: addresses in

@@ -71,19 +71,16 @@
     <Setter Property="Background" Value="{DynamicResource ItemBrush}" />
   </Style>
 
-  <!-- Floating action button (Add) pinned to the bottom-right of the page. -->
-  <Style Selector="Button.fab">
-    <Setter Property="Width" Value="48" />
-    <Setter Property="Height" Value="48" />
-    <Setter Property="CornerRadius" Value="24" />
-    <Setter Property="Padding" Value="0" />
-    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
-    <Setter Property="HorizontalContentAlignment" Value="Center" />
-    <Setter Property="VerticalContentAlignment" Value="Center" />
+  <!-- Floating Add control: centered at the page bottom, borderless, icon over label. -->
+  <Style Selector="Button.addbtn">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="10,4" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="CornerRadius" Value="6" />
   </Style>
-  <Style Selector="Button.fab:pointerover /template/ ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
-    <Setter Property="Opacity" Value="0.9" />
+  <Style Selector="Button.addbtn:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource ItemBrush}" />
   </Style>
 
   <!-- Segmented option buttons inside the Settings popover. -->
@@ -145,21 +142,11 @@
     <Setter Property="Cursor" Value="Arrow" />
   </Style>
 
-  <!-- Both hosts animate their MaxHeight to the exact content height (driven from
-       code-behind), so the card grows/shrinks smoothly with no fade and no overshoot. -->
-  <Style Selector="Border.collapsehost">
+  <!-- Single clipped region below the header. Its MaxHeight is tweened by the code-behind
+       between the collapsed-detail height and the expanded height, so the card grows and
+       shrinks in one smooth motion (no overlap, no fade). -->
+  <Style Selector="Border.body">
     <Setter Property="ClipToBounds" Value="True" />
-    <Setter Property="MaxHeight" Value="0" />
-    <Setter Property="Transitions">
-      <Transitions>
-        <DoubleTransition Property="MaxHeight" Duration="0:0:0.18" Easing="CubicEaseOut" />
-      </Transitions>
-    </Setter>
-  </Style>
-
-  <Style Selector="Border.expandhost">
-    <Setter Property="ClipToBounds" Value="True" />
-    <Setter Property="MaxHeight" Value="0" />
     <Setter Property="Transitions">
       <Transitions>
         <DoubleTransition Property="MaxHeight" Duration="0:0:0.18" Easing="CubicEaseOut" />

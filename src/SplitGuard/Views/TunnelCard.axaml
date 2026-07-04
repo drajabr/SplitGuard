@@ -41,12 +41,10 @@
         </Grid>
       </DockPanel>
 
-      <Border Name="CollapseHost" Classes="collapsehost" IsHitTestVisible="{Binding !IsEditing}">
-        <StackPanel Name="DetailPanel" Margin="30,0,12,8" />
-      </Border>
-
-      <Border Name="ExpandHost" Classes="expandhost" IsHitTestVisible="{Binding IsEditing}">
-      <StackPanel Name="ExpandContent">
+      <Border Name="Body" Classes="body">
+      <Panel>
+      <StackPanel Name="DetailPanel" Margin="30,0,12,8" IsHitTestVisible="{Binding !IsEditing}" />
+      <StackPanel Name="ExpandContent" IsHitTestVisible="{Binding IsEditing}">
         <Separator />
 
         <Border Name="EditorHost" Margin="12,8" CornerRadius="4" BorderBrush="{DynamicResource FieldBorderBrush}" BorderThickness="1"
@@ -61,7 +59,7 @@
         </Border>
 
         <Grid Name="FieldsGrid" ColumnDefinitions="3*,7*" IsVisible="{Binding !IsTextMode}">
-          <Border Grid.Column="0" Classes="peerblock" Margin="10,0,8,6" IsVisible="{Binding ShowInterfaceSection}">
+          <Border Grid.Column="0" Classes="peerblock" Margin="10,8,8,6" VerticalAlignment="Top" IsVisible="{Binding ShowInterfaceSection}">
           <StackPanel>
           <DockPanel Margin="10,4">
             <Button Classes="link" DockPanel.Dock="Right" Command="{Binding GenerateKeyCommand}"
@@ -168,6 +166,7 @@
                   Command="{Binding DeleteCommand}" HorizontalAlignment="Left" FontSize="{DynamicResource Fs115}" />
         </DockPanel>
       </StackPanel>
+      </Panel>
       </Border>
       </StackPanel>
     </Grid>
