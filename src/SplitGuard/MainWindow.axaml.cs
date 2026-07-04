@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
@@ -136,7 +137,7 @@ public partial class MainWindow : Window, IDialogs
         ApplyTheme();   // also applies the accent (keeps "mono" in sync with the theme)
         ApplyFont();
         ApplyZoom();
-        BuildMenus();
+        InitChrome();
     }
 
     void ApplyFont()
@@ -225,94 +226,143 @@ public partial class MainWindow : Window, IDialogs
         vm.PersistPrefs();
     }
 
-    // ---- native header menu (Add | View | Settings) ----------------------------
+    // ---- header popovers: Add + Settings (plain buttons, no menus) --------------
 
-    static NativeMenuItem Action(string header, Action onClick)
+    Flyout? _addFlyout;
+    Flyout? _settingsFlyout;
+
+    void InitChrome()
     {
-        var item = new NativeMenuItem(header);
-        item.Click += (_, _) => onClick();
-        return item;
+        _addFlyout ??= new Flyout { Placement = PlacementMode.BottomEdgeAlignedRight };
+        _addFlyout.Content = BuildAddPanel();
+        AddButton.Flyout = _addFlyout;
+
+        _settingsFlyout ??= new Flyout { Placement = PlacementMode.BottomEdgeAlignedRight };
+        _settingsFlyout.Content = BuildSettingsPanel();
+        SettingsButton.Flyout = _settingsFlyout;
     }
 
-    // A submenu of options with the current one checked.
-    NativeMenuItem Picker(string header, IEnumerable<string> options, int current, Action<int> select)
+    void RefreshSettings()
     {
-        var root = new NativeMenuItem(header) { Menu = new NativeMenu() };
+        if (_settingsFlyout is not null) _settingsFlyout.Content = BuildSettingsPanel();
+    }
+
+    Control BuildAddPanel()
+    {
+        var sp = new StackPanel { Spacing = 1, MinWidth = 190 };
+        sp.Children.Add(FlatItem("Import .conf…", () => _ = ImportConfAsync()));
+        sp.Children.Add(FlatItem("New empty tunnel", () => (DataContext as MainViewModel)?.CreateEmptyTunnel()));
+        sp.Children.Add(new Separator { Margin = new Thickness(0, 4) });
+        sp.Children.Add(FlatItem("Rescan external tunnels", () => (DataContext as MainViewModel)?.RescanExternals()));
+        return sp;
+    }
+
+    Button FlatItem(string text, Action onClick)
+    {
+        var b = new Button
+        {
+            Content = text,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Left,
+            Background = Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            Padding = new Thickness(8, 5),
+        };
+        b.Click += (_, _) => { _addFlyout?.Hide(); onClick(); };
+        return b;
+    }
+
+    Control BuildSettingsPanel()
+    {
+        var mvm = DataContext as MainViewModel;
+        var prefs = mvm?.Prefs;
+        var sp = new StackPanel { Spacing = 7, MinWidth = 300, Margin = new Thickness(4) };
+
+        sp.Children.Add(Section("APPEARANCE"));
+        sp.Children.Add(Row("Theme", Segmented(Palettes.Select(p => p.Name), _themeIndex, i =>
+        { _themeIndex = i; ApplyTheme(); Persist(p => p.Theme = Palettes[i].Name); RefreshSettings(); })));
+        sp.Children.Add(Row("Accent", Swatches(_accentIndex, i =>
+        { _accentIndex = i; ApplyAccent(); Persist(p => p.Accent = AccentSteps[i].Name); RefreshSettings(); })));
+        sp.Children.Add(Row("Font", Segmented(FontSteps.Select(f => f.Name), _fontIndex, i =>
+        { _fontIndex = i; ApplyFont(); Persist(p => p.Font = FontSteps[i].Name); RefreshSettings(); })));
+        sp.Children.Add(Row("Zoom", Segmented(ZoomSteps.Select(z => z.Name), _zoomIndex, i =>
+        { _zoomIndex = i; ApplyZoom(); Persist(p => p.Zoom = ZoomSteps[i].Name); RefreshSettings(); })));
+
+        sp.Children.Add(new Separator { Margin = new Thickness(0, 4) });
+        sp.Children.Add(Section("BEHAVIOR"));
+        sp.Children.Add(Check("Custom DNS forwarding", mvm?.HasCustomDns == true, on =>
+        { mvm?.ToggleCustomDns(on); RefreshSettings(); }));
+        sp.Children.Add(Check("Start on Windows startup", prefs?.StartOnBoot == true, on =>
+        { StartupService.Set(on); Persist(p => p.StartOnBoot = on); }));
+        sp.Children.Add(Check("Notifications", prefs?.Notifications == true, on =>
+        { Persist(p => p.Notifications = on); }));
+        return sp;
+    }
+
+    static Control Section(string text) => new TextBlock
+    {
+        Text = text, FontSize = 10, Opacity = 0.5, FontWeight = FontWeight.SemiBold, Margin = new Thickness(0, 2, 0, 0),
+    };
+
+    Control Row(string label, Control content)
+    {
+        var g = new Grid { ColumnDefinitions = new ColumnDefinitions("64,*") };
+        var l = new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center };
+        l.Classes.Add("lbl");
+        Grid.SetColumn(content, 1);
+        g.Children.Add(l);
+        g.Children.Add(content);
+        return g;
+    }
+
+    Control Segmented(IEnumerable<string> options, int current, Action<int> select)
+    {
+        var wp = new WrapPanel();
         var i = 0;
         foreach (var name in options)
         {
             var idx = i++;
-            var item = new NativeMenuItem(name)
-            {
-                ToggleType = NativeMenuItemToggleType.CheckBox,
-                IsChecked = idx == current,
-            };
-            item.Click += (_, _) => select(idx);
-            root.Menu!.Items.Add(item);
+            var b = new Button { Content = name, Margin = new Thickness(0, 0, 4, 4) };
+            b.Classes.Add("seg");
+            if (idx == current) b.Classes.Add("sel");
+            b.Click += (_, _) => select(idx);
+            wp.Children.Add(b);
         }
-        return root;
+        return wp;
     }
 
-    void BuildMenus()
+    Control Swatches(int current, Action<int> select)
     {
-        var mvm = DataContext as MainViewModel;
-        var prefs = mvm?.Prefs;
-        var root = new NativeMenu();
+        var wp = new WrapPanel();
+        var isDark = EffectiveVariant() == ThemeVariant.Dark;
+        var i = 0;
+        foreach (var (name, _) in AccentSteps)
+        {
+            var idx = i++;
+            var color = Accents.Resolve(name, isDark);
+            var dot = new Avalonia.Controls.Shapes.Ellipse { Width = 16, Height = 16, Fill = new SolidColorBrush(color) };
+            var b = new Button
+            {
+                Content = dot,
+                Padding = new Thickness(2),
+                Margin = new Thickness(0, 0, 4, 4),
+                Background = Brushes.Transparent,
+                MinHeight = 0,
+                CornerRadius = new CornerRadius(11),
+                BorderThickness = new Thickness(idx == current ? 2 : 0),
+                BorderBrush = new SolidColorBrush(color),
+            };
+            b.Click += (_, _) => select(idx);
+            wp.Children.Add(b);
+        }
+        return wp;
+    }
 
-        var add = new NativeMenuItem("Add") { Menu = new NativeMenu() };
-        add.Menu!.Items.Add(Action("Import .conf", () => _ = ImportConfAsync()));
-        add.Menu.Items.Add(Action("New empty tunnel", () => (DataContext as MainViewModel)?.CreateEmptyTunnel()));
-        add.Menu.Items.Add(new NativeMenuItemSeparator());
-        add.Menu.Items.Add(Action("Rescan external tunnels", () => (DataContext as MainViewModel)?.RescanExternals()));
-        root.Items.Add(add);
-
-        var view = new NativeMenuItem("View") { Menu = new NativeMenu() };
-        view.Menu!.Items.Add(Picker($"Theme: {Palettes[_themeIndex].Name}", Palettes.Select(p => p.Name), _themeIndex, i =>
-        { _themeIndex = i; ApplyTheme(); Persist(p => p.Theme = Palettes[i].Name); BuildMenus(); }));
-        view.Menu.Items.Add(Picker($"Accent: {AccentSteps[_accentIndex].Name}", AccentSteps.Select(a => a.Name), _accentIndex, i =>
-        { _accentIndex = i; ApplyAccent(); Persist(p => p.Accent = AccentSteps[i].Name); BuildMenus(); }));
-        view.Menu.Items.Add(Picker($"Font: {FontSteps[_fontIndex].Name}", FontSteps.Select(f => f.Name), _fontIndex, i =>
-        { _fontIndex = i; ApplyFont(); Persist(p => p.Font = FontSteps[i].Name); BuildMenus(); }));
-        view.Menu.Items.Add(Picker($"Zoom: {ZoomSteps[_zoomIndex].Name}", ZoomSteps.Select(z => z.Name), _zoomIndex, i =>
-        { _zoomIndex = i; ApplyZoom(); Persist(p => p.Zoom = ZoomSteps[i].Name); BuildMenus(); }));
-        root.Items.Add(view);
-
-        var settings = new NativeMenuItem("Settings") { Menu = new NativeMenu() };
-        var custom = new NativeMenuItem("Custom DNS forwarding")
-        {
-            ToggleType = NativeMenuItemToggleType.CheckBox,
-            IsChecked = mvm?.HasCustomDns == true,
-        };
-        custom.Click += (_, _) => { mvm?.ToggleCustomDns(!(mvm?.HasCustomDns ?? false)); BuildMenus(); };
-        settings.Menu!.Items.Add(custom);
-        var boot = new NativeMenuItem("Start on Windows startup")
-        {
-            ToggleType = NativeMenuItemToggleType.CheckBox,
-            IsChecked = prefs?.StartOnBoot == true,
-        };
-        boot.Click += (_, _) =>
-        {
-            var on = !(prefs?.StartOnBoot ?? false);
-            StartupService.Set(on);
-            Persist(p => p.StartOnBoot = on);
-            BuildMenus();
-        };
-        settings.Menu.Items.Add(boot);
-        var notif = new NativeMenuItem("Notifications")
-        {
-            ToggleType = NativeMenuItemToggleType.CheckBox,
-            IsChecked = prefs?.Notifications == true,
-        };
-        notif.Click += (_, _) =>
-        {
-            var on = !(prefs?.Notifications ?? true);
-            Persist(p => p.Notifications = on);
-            BuildMenus();
-        };
-        settings.Menu.Items.Add(notif);
-        root.Items.Add(settings);
-
-        NativeMenu.SetMenu(this, root);
+    Control Check(string text, bool value, Action<bool> set)
+    {
+        var cb = new CheckBox { Content = text, IsChecked = value };
+        cb.IsCheckedChanged += (_, _) => set(cb.IsChecked == true);
+        return cb;
     }
 
     async Task ImportConfAsync()

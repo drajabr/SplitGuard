@@ -59,6 +59,34 @@
     <Setter Property="MinHeight" Value="0" />
     <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
   </Style>
+  <!-- Header action buttons (Add / Settings): subtle, pill-ish. -->
+  <Style Selector="Button.hdr">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="8,3" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="CornerRadius" Value="5" />
+  </Style>
+  <Style Selector="Button.hdr:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource ItemBrush}" />
+  </Style>
+
+  <!-- Segmented option buttons inside the Settings popover. -->
+  <Style Selector="Button.seg">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{DynamicResource FieldBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="8,2" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="FontSize" Value="{DynamicResource Fs12}" />
+  </Style>
+  <Style Selector="Button.seg.sel">
+    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="Foreground" Value="White" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+  </Style>
+
   <Style Selector="Button.danger">
     <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
   </Style>

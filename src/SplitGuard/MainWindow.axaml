@@ -13,16 +13,29 @@
         RenderOptions.TextRenderingMode="SubpixelAntialias"
         DragDrop.AllowDrop="True">
   <DockPanel>
-    <Border DockPanel.Dock="Top" Padding="10,4,146,4" Name="HeaderBar">
+    <Border DockPanel.Dock="Top" Padding="12,6,146,6" Name="HeaderBar">
       <DockPanel>
-        <TextBlock DockPanel.Dock="Right" Name="VersionLabel" FontSize="{DynamicResource Fs11}" Opacity="0.5"
-                   VerticalAlignment="Center" Margin="0,0,6,0" />
-        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+          <Button Classes="hdr" Name="AddButton">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Classes="glyph" Text="&#xE710;" FontSize="{DynamicResource Fs12}" Foreground="{DynamicResource AccentBrush}" />
+              <TextBlock Text="Add" VerticalAlignment="Center" FontSize="{DynamicResource Fs12}" />
+            </StackPanel>
+          </Button>
+          <Button Classes="hdr" Name="SettingsButton">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Classes="glyph" Text="&#xE713;" FontSize="{DynamicResource Fs12}" Opacity="0.7" />
+              <TextBlock Text="Settings" VerticalAlignment="Center" FontSize="{DynamicResource Fs12}" Opacity="0.85" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
           <Image Name="LogoImage" Source="avares://SplitGuard/Assets/app.ico" Width="17" Height="17"
                  VerticalAlignment="Center" IsHitTestVisible="False" />
           <TextBlock FontSize="{DynamicResource Fs135}" FontWeight="Medium" VerticalAlignment="Center"
-                     Text="SplitGuard" IsHitTestVisible="False" Margin="0,0,4,0" />
-          <NativeMenuBar VerticalAlignment="Center" />
+                     Text="SplitGuard" IsHitTestVisible="False" />
+          <TextBlock Name="VersionLabel" FontSize="{DynamicResource Fs11}" Opacity="0.5"
+                     VerticalAlignment="Bottom" Margin="0,0,0,2" IsHitTestVisible="False" />
         </StackPanel>
       </DockPanel>
     </Border>
