@@ -121,15 +121,13 @@ public partial class TunnelCard : UserControl
         DetailPanel.Children.Clear();
         if (_vm is null) return;
 
-        void AddToken(string text, IBrush brush) =>
-            DetailPanel.Children.Add(new TextBlock
-            {
-                Text = text,
-                Foreground = brush,
-                FontFamily = new FontFamily("Consolas,Courier New,monospace"),
-                FontSize = 12,
-                Margin = new Avalonia.Thickness(0, 0, 10, 2),
-            });
+        void AddToken(string text, IBrush brush)
+        {
+            // Use the "mono" style class so FontSize follows the zoom-scaled Fs12 resource.
+            var tb = new TextBlock { Text = text, Foreground = brush, Margin = new Avalonia.Thickness(0, 0, 10, 2) };
+            tb.Classes.Add("mono");
+            DetailPanel.Children.Add(tb);
+        }
 
         foreach (var addr in _vm.AddressValues) AddToken(addr, Syntax.IpBrush);
         foreach (var domain in _vm.AllDomains) AddToken(domain, Syntax.DomainBrush);

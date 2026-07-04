@@ -52,7 +52,7 @@
         <Border Name="EditorHost" Margin="12,8" CornerRadius="4" BorderBrush="{DynamicResource FieldBorderBrush}" BorderThickness="1"
                 IsVisible="{Binding IsTextMode}">
           <ae:TextEditor Name="ConfEditor" MinHeight="90" Padding="8,6"
-                         FontFamily="Consolas,Courier New,monospace" FontSize="{DynamicResource Fs12}"
+                         FontFamily="Cascadia Mono, Consolas, Courier New, monospace" FontSize="{DynamicResource Fs12}"
                          Background="Transparent"
                          Foreground="{DynamicResource TextControlForeground}"
                          ShowLineNumbers="False"
@@ -77,7 +77,7 @@
             <StackPanel Spacing="3">
               <TextBlock Classes="lbl" Text="Private key · listen port" />
               <Grid ColumnDefinitions="*,Auto,Auto,Auto">
-                <TextBox Grid.Column="0" Classes="mono synkey" PasswordChar="●"
+                <TextBox Grid.Column="0" Classes="mono" PasswordChar="●"
                          RevealPassword="{Binding #PrivEye.IsChecked}" Text="{Binding PrivateKeyEdit}" />
                 <ToggleButton Grid.Column="1" Name="PrivEye" Background="Transparent" BorderThickness="0" Padding="4" ToolTip.Tip="Reveal">
                   <TextBlock Classes="glyph" Text="&#xE7B3;" FontSize="{DynamicResource Fs13}" />
@@ -85,7 +85,7 @@
                 <Button Grid.Column="2" Classes="icon" Command="{Binding GenerateKeyCommand}" ToolTip.Tip="Generate new keypair">
                   <TextBlock Classes="glyph" Text="&#xE72C;" FontSize="{DynamicResource Fs13}" Opacity="0.6" />
                 </Button>
-                <TextBox Grid.Column="3" Classes="mono synnum" Width="56" Text="{Binding ListenPortText}" Watermark="port" ToolTip.Tip="Listen port (blank = automatic)" Margin="4,0,0,0" />
+                <TextBox Grid.Column="3" Classes="mono" Width="56" Text="{Binding ListenPortText}" Watermark="port" ToolTip.Tip="Listen port (blank = automatic)" Margin="4,0,0,0" />
               </Grid>
             </StackPanel>
 
@@ -111,7 +111,7 @@
                     </Border>
                   </DataTemplate>
                   <DataTemplate DataType="vm:AddSlot">
-                    <TextBox Classes="mono addbox synip" Margin="0,0,6,4" Watermark="+"
+                    <TextBox Classes="mono addbox" Margin="0,0,6,4" Watermark="+"
                              Classes.error="{Binding $parent[ItemsControl].DataContext.AddressAddError}"
                              Text="{Binding $parent[ItemsControl].DataContext.NewAddress}">
                       <TextBox.KeyBindings>
