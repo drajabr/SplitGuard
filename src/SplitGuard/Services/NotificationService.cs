@@ -42,7 +42,7 @@ public static class NotificationService
             // Explicit appLogoOverride so our icon shows in the banner (the AUMID IconUri
             // alone is unreliable for unpackaged apps). src must be a file:/// URI.
             var logo = _iconPath.Length > 0
-                ? $"<image placement=\"appLogoOverride\" hint-crop=\"circle\" src=\"file:///{XmlEscape(_iconPath.Replace('\\', '/'))}\"/>"
+                ? $"<image placement=\"appLogoOverride\" src=\"file:///{XmlEscape(_iconPath.Replace('\\', '/'))}\"/>"
                 : "";
             // Single-quoted here-string keeps the XML literal; PowerShell -EncodedCommand
             // avoids all shell-quoting problems.
