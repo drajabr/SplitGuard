@@ -7,7 +7,7 @@
              x:Class="SplitGuard.Views.TunnelCard">
   <Border Classes="card" Classes.editing="{Binding IsEditing}" Background="{DynamicResource SurfaceBrush}">
     <StackPanel>
-      <DockPanel Margin="12,8" Height="{DynamicResource HeaderH}">
+      <DockPanel Name="HeaderRow" Margin="12,8" Height="{DynamicResource HeaderH}">
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
           <TextBlock Classes="muted" Text="{Binding HeaderHandshake}" IsVisible="{Binding StatsVisible}" />
           <StackPanel Orientation="Horizontal" Spacing="3" IsVisible="{Binding StatsVisible}">
@@ -18,8 +18,8 @@
             <TextBlock Classes="glyph accentfg" Text="&#xE74B;" FontSize="{DynamicResource Fs11}" />
             <TextBlock Classes="mono" Text="{Binding DownRate}" Opacity="0.75" />
           </StackPanel>
-          <TextBlock Classes="muted" Text="Disconnected" IsVisible="{Binding !IsConnected}" />
-          <ToggleSwitch IsChecked="{Binding IsConnected}" IsVisible="{Binding !IsExternal}" IsEnabled="{Binding !IsEditing}" />
+          <ToggleSwitch IsChecked="{Binding IsConnected}" IsVisible="{Binding !IsExternal}" IsEnabled="{Binding !IsEditing}"
+                        OnContent="Connected" OffContent="Disconnected" MinWidth="0" />
         </StackPanel>
         <Grid VerticalAlignment="Center" ColumnDefinitions="Auto,Auto,Auto,*">
           <Ellipse Grid.Column="0" Classes="dot" Classes.up="{Binding IsConnected}" />

@@ -135,19 +135,19 @@ public partial class TunnelCard : UserControl
             AddToken("no split DNS configured", Syntax.IpBrush);
     }
 
-    // Clicking blank card space toggles: collapsed → edit, editing → cancel/collapse.
-    // Clicks anywhere inside the expanded body never collapse the card.
+    // Only the header row toggles expand/collapse; the body never does (Save/Cancel
+    // collapse instead). Clicks on interactive controls are ignored.
     void OnCardPressed(object? sender, PointerPressedEventArgs e)
     {
         if (DataContext is not TunnelViewModel vm) return;
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
-        var element = e.Source as Avalonia.Visual;
-        while (element is not null && element != this)
+        var inHeader = false;
+        for (var el = e.Source as Avalonia.Visual; el is not null && el != this; el = el.GetVisualParent())
         {
-            if (element is Button or ToggleButton or ToggleSwitch or TextBox or ComboBox) return;
-            if (element == ExpandHost) return;
-            element = element.GetVisualParent();
+            if (el is Button or ToggleButton or ToggleSwitch or TextBox or ComboBox) return;
+            if (el == HeaderRow) { inHeader = true; break; }
         }
+        if (!inHeader) return;
         if (vm.IsEditing) vm.CancelEditCommand.Execute(null);
         else vm.BeginEditCommand.Execute(null);
     }

@@ -16,10 +16,16 @@
     <Border DockPanel.Dock="Top" Padding="14,8,146,8" Name="HeaderBar">
       <DockPanel>
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
-          <Button Classes="icon" Name="LookButton" Click="OnLookClick" ToolTip.Tip="Look (theme + accent)">
+          <Button Classes="icon" Name="ThemeButton" Click="OnThemeClick" ToolTip.Tip="Theme">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Classes="glyph" Text="&#xE771;" Opacity="0.6" />
+              <TextBlock Name="ThemeLabel" FontSize="{DynamicResource Fs115}" Opacity="0.7" VerticalAlignment="Center" Text="auto" />
+            </StackPanel>
+          </Button>
+          <Button Classes="icon" Name="AccentButton" Click="OnAccentClick" ToolTip.Tip="Accent color">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <Ellipse Width="11" Height="11" Fill="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
-              <TextBlock Name="LookLabel" FontSize="{DynamicResource Fs115}" Opacity="0.7" VerticalAlignment="Center" Text="auto" />
+              <TextBlock Name="AccentLabel" FontSize="{DynamicResource Fs115}" Opacity="0.7" VerticalAlignment="Center" Text="blue" />
             </StackPanel>
           </Button>
           <Button Classes="icon" Name="FontButton" Click="OnFontClick" ToolTip.Tip="UI font">
