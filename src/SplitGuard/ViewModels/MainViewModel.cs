@@ -78,6 +78,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
         if (_config.Custom is not null)
             Tunnels.Add(new TunnelViewModel(this, _config.Custom));
         await RefreshExternalsAsync();
+        SortTunnels();
         await Task.Run(Reconcile);
         RefreshPins();
         await Task.Run(RefreshCatchAll);
@@ -245,21 +246,29 @@ public class MainViewModel : ObservableObject, ITunnelHost
         }
     }
 
-    // UI-thread only: ordered connected-peer DNS (pinned first), or null when nothing is pinned.
+    // UI-thread only: ordered connected-peer DNS, or null when nothing is pinned.
+    // Order: the explicitly pinned server first, then by priority custom → external →
+    // our tunnels (RefreshCatchAll de-duplicates while preserving this order).
     List<string>? SnapshotPinnedChain()
     {
         if (_config.PinnedDns is null) return null;
         var servers = new List<string>();
+
+        // The pinned peer wins outright.
         foreach (var t in Tunnels.Where(t => t.IsConnected))
-        {
             foreach (var p in t.Peers.Where(p => p.HasDns))
-            {
-                var isPinnedPeer = _config.PinnedDns.TunnelName == TunnelKey(t)
-                    && _config.PinnedDns.PeerPublicKey == PeerKey(t, p);
-                if (isPinnedPeer) servers.Insert(0, p.Dns.Trim());
-                else servers.Add(p.Dns.Trim());
-            }
+                if (_config.PinnedDns.TunnelName == TunnelKey(t) && _config.PinnedDns.PeerPublicKey == PeerKey(t, p))
+                    servers.Add(p.Dns.Trim());
+
+        void AddFrom(Func<TunnelViewModel, bool> category)
+        {
+            foreach (var t in Tunnels.Where(t => t.IsConnected && category(t)))
+                foreach (var p in t.Peers.Where(p => p.HasDns))
+                    servers.Add(p.Dns.Trim());
         }
+        AddFrom(t => t.IsCustom);
+        AddFrom(t => t.IsExternal);
+        AddFrom(t => !t.IsCustom && !t.IsExternal);
         return servers;
     }
 
@@ -354,22 +363,38 @@ public class MainViewModel : ObservableObject, ITunnelHost
         _ = Task.Run(RefreshCatchAll);
     }
 
-    // Ctrl+/menu: create the single standalone custom-DNS card and edit it.
-    public void CreateCustomDnsCard()
+    // Settings toggle: the single standalone custom-DNS card. On → create it (top of the
+    // list); off → remove it and its rules.
+    public bool HasCustomDns => _config.Custom is not null;
+
+    public void ToggleCustomDns(bool on)
     {
-        if (_config.Custom is not null)
+        if (on)
         {
+            if (_config.Custom is not null) return;
+            _config.Custom = new CustomDnsConfig();
+            _store.Save(_config);
+            Tunnels.Add(new TunnelViewModel(this, _config.Custom));
+            SortTunnels();
             Tunnels.FirstOrDefault(t => t.IsCustom)?.BeginEditCommand.Execute(null);
-            return;
         }
-        _config.Custom = new CustomDnsConfig();
-        _store.Save(_config);
-        var vm = new TunnelViewModel(this, _config.Custom) { IsDraft = true };
-        Tunnels.Add(vm);
-        vm.BeginEditCommand.Execute(null);
+        else
+        {
+            var vm = Tunnels.FirstOrDefault(t => t.IsCustom);
+            if (vm is not null) RequestDelete(vm);
+        }
     }
 
-    public bool CanAddCustom => _config.Custom is null;
+    // Display/priority order: custom DNS first, then externals, then our tunnels.
+    void SortTunnels()
+    {
+        var ordered = Tunnels.OrderBy(t => t.IsCustom ? 0 : t.IsExternal ? 1 : 2).ToList();
+        for (int i = 0; i < ordered.Count; i++)
+        {
+            var cur = Tunnels.IndexOf(ordered[i]);
+            if (cur != i) Tunnels.Move(cur, i);
+        }
+    }
 
     // Forget dismissed externals so the next scan re-adds any that are still present.
     public void RescanExternals()

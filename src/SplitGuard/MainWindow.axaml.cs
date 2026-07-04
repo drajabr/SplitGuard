@@ -270,16 +270,18 @@ public partial class MainWindow : Window, IDialogs
         addFlyout.Items.Clear();
         addFlyout.Items.Add(ActionItem("Import .conf…", "", () => _ = ImportConfAsync()));
         addFlyout.Items.Add(ActionItem("New empty tunnel", "", () => (DataContext as MainViewModel)?.CreateEmptyTunnel()));
-        var mvm = DataContext as MainViewModel;
-        var customItem = ActionItem("Custom DNS rules", "", () => { (DataContext as MainViewModel)?.CreateCustomDnsCard(); BuildMenus(); });
-        customItem.IsEnabled = mvm?.CanAddCustom ?? true;
-        addFlyout.Items.Add(customItem);
         addFlyout.Items.Add(new Separator());
         addFlyout.Items.Add(ActionItem("Rescan external tunnels", "", () => (DataContext as MainViewModel)?.RescanExternals()));
 
-        var prefs = (DataContext as MainViewModel)?.Prefs;
+        var mvm = DataContext as MainViewModel;
+        var prefs = mvm?.Prefs;
         var settingsFlyout = Flyout(SettingsButton);
         settingsFlyout.Items.Clear();
+        var custom = new MenuItem { Header = "Custom DNS forwarding" };
+        if (mvm?.HasCustomDns == true) custom.Icon = CheckIcon();
+        custom.Click += (_, _) => { mvm?.ToggleCustomDns(!(mvm?.HasCustomDns ?? false)); BuildMenus(); };
+        settingsFlyout.Items.Add(custom);
+        settingsFlyout.Items.Add(new Separator());
         var boot = new MenuItem { Header = "Start on Windows startup" };
         if (prefs?.StartOnBoot == true) boot.Icon = CheckIcon();
         boot.Click += (_, _) =>

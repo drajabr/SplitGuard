@@ -73,6 +73,7 @@ public class TunnelViewModel : ObservableObject
         AddAddressCommand = new RelayCommand(AddAddress);
         RemoveAddressCommand = new RelayCommand(p => Addresses.Remove((string)p!));
         GenerateKeyCommand = new RelayCommand(GenerateKey);
+        ClearListenPortCommand = new RelayCommand(() => ListenPortText = "");
         ToggleTextModeCommand = new RelayCommand(ToggleTextMode);
     }
 
@@ -277,7 +278,18 @@ public class TunnelViewModel : ObservableObject
     public RelayCommand AddAddressCommand { get; private set; } = null!;
     public RelayCommand RemoveAddressCommand { get; private set; } = null!;
     public RelayCommand GenerateKeyCommand { get; private set; } = null!;
+    public RelayCommand ClearListenPortCommand { get; private set; } = null!;
     public RelayCommand ToggleTextModeCommand { get; private set; } = null!;
+
+    // Two-click confirm for generating a new keypair (it discards the current one).
+    bool _generateArmed;
+    public bool GenerateArmed
+    {
+        get => _generateArmed;
+        set { if (Set(ref _generateArmed, value)) Raise(nameof(GenerateLabel)); }
+    }
+    public string GenerateLabel => GenerateArmed ? "Confirm?" : "Generate";
+    int _genArmVersion;
 
     // Raw-config editing (Ctrl+E): the whole staged tunnel as wg-quick text,
     // with per-peer DNS/Domains as SplitGuard extension keys.
@@ -528,9 +540,18 @@ public class TunnelViewModel : ObservableObject
         NewAddress = "";
     }
 
-    void GenerateKey()
+    async void GenerateKey()
     {
-        PrivateKeyEdit = Convert.ToBase64String(Curve25519.GeneratePrivateKey());
+        if (GenerateArmed)
+        {
+            GenerateArmed = false;
+            PrivateKeyEdit = Convert.ToBase64String(Curve25519.GeneratePrivateKey());
+            return;
+        }
+        GenerateArmed = true;
+        var version = ++_genArmVersion;
+        await Task.Delay(3000);
+        if (version == _genArmVersion) GenerateArmed = false;
     }
 
     void RefreshDerivedPublicKey()

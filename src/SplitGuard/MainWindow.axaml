@@ -16,50 +16,50 @@
     <Border DockPanel.Dock="Top" Padding="14,8,146,8" Name="HeaderBar">
       <DockPanel>
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
-          <Button Classes="icon" Name="AddButton" ToolTip.Tip="Add tunnel">
+          <Button Classes="icon drop" Name="AddButton" ToolTip.Tip="Add tunnel">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <TextBlock Classes="glyph" Text="&#xE710;" Foreground="{DynamicResource AccentBrush}" />
               <TextBlock FontSize="{DynamicResource Fs115}" Opacity="0.8" VerticalAlignment="Center" Text="Add" />
             </StackPanel>
             <Button.Flyout>
-              <MenuFlyout Placement="BottomEdgeAlignedRight" />
+              <MenuFlyout Placement="BottomEdgeAlignedLeft" />
             </Button.Flyout>
           </Button>
           <Border Width="1" Background="{DynamicResource HairlineBrush}" Margin="4,4" />
-          <Button Classes="icon" Name="ThemeButton" ToolTip.Tip="Theme">
+          <Button Classes="icon drop" Name="ThemeButton" ToolTip.Tip="Theme">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <TextBlock Classes="glyph" Text="&#xE771;" Opacity="0.6" />
               <TextBlock Name="ThemeLabel" Width="52" FontSize="{DynamicResource Fs115}" Opacity="0.7" VerticalAlignment="Center" Text="auto" />
             </StackPanel>
             <Button.Flyout>
-              <MenuFlyout Placement="BottomEdgeAlignedRight" />
+              <MenuFlyout Placement="BottomEdgeAlignedLeft" />
             </Button.Flyout>
           </Button>
-          <Button Classes="icon" Name="AccentButton" ToolTip.Tip="Accent color">
+          <Button Classes="icon drop" Name="AccentButton" ToolTip.Tip="Accent color">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <Ellipse Width="11" Height="11" Fill="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
               <TextBlock Name="AccentLabel" Width="52" FontSize="{DynamicResource Fs115}" Opacity="0.7" VerticalAlignment="Center" Text="blue" />
             </StackPanel>
             <Button.Flyout>
-              <MenuFlyout Placement="BottomEdgeAlignedRight" />
+              <MenuFlyout Placement="BottomEdgeAlignedLeft" />
             </Button.Flyout>
           </Button>
-          <Button Classes="icon" Name="FontButton" ToolTip.Tip="UI font">
+          <Button Classes="icon drop" Name="FontButton" ToolTip.Tip="UI font">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <TextBlock Classes="glyph" Text="&#xE8D2;" Opacity="0.6" />
               <TextBlock Name="FontLabel" Width="64" FontSize="{DynamicResource Fs115}" Opacity="0.7" VerticalAlignment="Center" Text="segoe" />
             </StackPanel>
             <Button.Flyout>
-              <MenuFlyout Placement="BottomEdgeAlignedRight" />
+              <MenuFlyout Placement="BottomEdgeAlignedLeft" />
             </Button.Flyout>
           </Button>
-          <Button Classes="icon" Name="ZoomButton" ToolTip.Tip="Zoom (fonts and controls)">
+          <Button Classes="icon drop" Name="ZoomButton" ToolTip.Tip="Zoom (fonts and controls)">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <TextBlock Classes="glyph" Text="&#xE71E;" Opacity="0.6" />
               <TextBlock Name="ZoomLabel" Width="36" FontSize="{DynamicResource Fs115}" Opacity="0.7" VerticalAlignment="Center" Text="100%" />
             </StackPanel>
             <Button.Flyout>
-              <MenuFlyout Placement="BottomEdgeAlignedRight" />
+              <MenuFlyout Placement="BottomEdgeAlignedLeft" />
             </Button.Flyout>
           </Button>
           <Button Classes="icon" Name="SettingsButton" ToolTip.Tip="Settings">

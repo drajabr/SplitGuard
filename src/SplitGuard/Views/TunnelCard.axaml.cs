@@ -91,6 +91,18 @@ public partial class TunnelCard : UserControl
         // PointerPressed instead of Tapped: Tapped suppresses the second of two fast
         // clicks (double-tap detection), which made rapid expand/collapse feel dead.
         AddHandler(PointerPressedEvent, OnCardPressed, handledEventsToo: false);
+
+        // While a section is open and settled, keep its MaxHeight glued to the content's
+        // real height so growth (adding a domain, switching mode) is reflected with no
+        // jump. Reads Bounds only — never measures here, so no layout re-entrancy.
+        ExpandContent.LayoutUpdated += (_, _) =>
+        {
+            if (_vm?.IsEditing == true && !_expandAnimating) PinTo(ExpandHost, ExpandContent);
+        };
+        DetailPanel.LayoutUpdated += (_, _) =>
+        {
+            if (_vm?.IsEditing == false && !_collapseAnimating) PinTo(CollapseHost, DetailPanel);
+        };
     }
 
     void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -126,9 +138,16 @@ public partial class TunnelCard : UserControl
             ApplyCardAccent();
         if (e.PropertyName == nameof(TunnelViewModel.IsEditing) && _vm is not null)
         {
-            var editing = _vm.IsEditing;
-            Animate(ExpandHost, ExpandContent, editing, _expandTok);
-            Animate(CollapseHost, DetailPanel, !editing, _collapseTok);
+            if (_vm.IsEditing)
+            {
+                OpenHost(ExpandHost, ExpandContent, v => _expandAnimating = v);
+                CloseHost(CollapseHost, DetailPanel, v => _collapseAnimating = v);
+            }
+            else
+            {
+                CloseHost(ExpandHost, ExpandContent, v => _expandAnimating = v);
+                OpenHost(CollapseHost, DetailPanel, v => _collapseAnimating = v);
+            }
         }
     }
 
@@ -158,12 +177,11 @@ public partial class TunnelCard : UserControl
         }
     }
 
-    // ---- expand/collapse: animate MaxHeight to the exact content height ---------
+    // ---- expand/collapse: animate MaxHeight between 0 and the content height ----
 
-    // Independent generation counters so a rapid re-toggle cancels a pending finalize.
-    sealed class Tok { public int V; }
-    readonly Tok _expandTok = new();
-    readonly Tok _collapseTok = new();
+    const int AnimMs = 170; // must match the MaxHeight transition in Styles.axaml
+    bool _expandAnimating;
+    bool _collapseAnimating;
 
     static void WithoutTransitions(Border b, Action apply)
     {
@@ -173,28 +191,42 @@ public partial class TunnelCard : UserControl
         b.Transitions = t;
     }
 
-    // Open: animate 0 → measured content height, then lift the cap so the content can
-    // grow freely while it stays open. Close: pin to the current height, then animate → 0.
-    async void Animate(Border host, Control content, bool open, Tok tok)
+    static double MeasureHeight(Control content, Border host)
     {
-        var id = ++tok.V;
-        if (open)
-        {
-            var w = host.Bounds.Width;
-            if (w < 1) w = Bounds.Width;
-            if (w < 1) w = 400;
-            content.Measure(new Size(w, double.PositiveInfinity));
-            var h = content.DesiredSize.Height;
-            host.MaxHeight = h; // animates from the current (0) value
-            await Task.Delay(220);
-            if (tok.V == id) WithoutTransitions(host, () => host.MaxHeight = double.PositiveInfinity);
-        }
-        else
-        {
-            var cur = host.Bounds.Height;
-            if (double.IsFinite(cur) && cur > 0) WithoutTransitions(host, () => host.MaxHeight = cur);
-            Dispatcher.UIThread.Post(() => { if (tok.V == id) host.MaxHeight = 0; }, DispatcherPriority.Render);
-        }
+        var w = host.Bounds.Width;
+        if (w < 1) w = 400;
+        content.Measure(new Size(w, double.PositiveInfinity));
+        return content.DesiredSize.Height;
+    }
+
+    // Keep an open section's cap equal to its real content height (no-op if already equal).
+    void PinTo(Border host, Control content)
+    {
+        var h = content.Bounds.Height;
+        if (h > 0 && Math.Abs(host.MaxHeight - h) > 0.5)
+            WithoutTransitions(host, () => host.MaxHeight = h);
+    }
+
+    // Grow 0 → content height, then let the LayoutUpdated pin track any later changes.
+    async void OpenHost(Border host, Control content, Action<bool> setAnimating)
+    {
+        setAnimating(true);
+        var h = MeasureHeight(content, host);
+        if (host.MaxHeight > h + 0.5) WithoutTransitions(host, () => host.MaxHeight = 0);
+        host.MaxHeight = h;
+        await Task.Delay(AnimMs + 40);
+        setAnimating(false);
+    }
+
+    // Pin to the current height, then animate down to 0 on the next render tick.
+    async void CloseHost(Border host, Control content, Action<bool> setAnimating)
+    {
+        setAnimating(true);
+        var cur = host.Bounds.Height;
+        if (double.IsFinite(cur) && cur > 0) WithoutTransitions(host, () => host.MaxHeight = cur);
+        Dispatcher.UIThread.Post(() => host.MaxHeight = 0, DispatcherPriority.Render);
+        await Task.Delay(AnimMs + 40);
+        setAnimating(false);
     }
 
     // Syntax-colored collapsed detail as atomic tokens in a WrapPanel: addresses in

@@ -63,68 +63,70 @@
         </Border>
 
         <Grid Name="FieldsGrid" ColumnDefinitions="3*,7*" IsVisible="{Binding !IsTextMode}">
-          <StackPanel Grid.Column="0" Margin="12,8" Spacing="8" IsVisible="{Binding ShowInterfaceSection}">
-            <StackPanel Spacing="3">
-              <TextBlock Classes="lbl" Text="Public key" />
-              <TextBox Classes="mono synkey" Text="{Binding PublicKeyFull}" IsReadOnly="True">
-                <TextBox.InnerRightContent>
-                  <Button Classes="icon" Command="{Binding CopyPublicKeyCommand}" ToolTip.Tip="Copy full public key">
-                    <TextBlock Classes="glyph" Text="&#xE8C8;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
-                  </Button>
-                </TextBox.InnerRightContent>
-              </TextBox>
-            </StackPanel>
+          <Grid Grid.Column="0" Margin="12,8" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto"
+                IsVisible="{Binding ShowInterfaceSection}">
+            <TextBlock Grid.Row="0" Grid.Column="0" Classes="lbl" Text="Public key" Margin="0,0,10,8" />
+            <TextBox Grid.Row="0" Grid.Column="1" Classes="mono synkey" Text="{Binding PublicKeyFull}" IsReadOnly="True" Margin="0,0,0,8">
+              <TextBox.InnerRightContent>
+                <Button Classes="icon" Command="{Binding CopyPublicKeyCommand}" ToolTip.Tip="Copy full public key">
+                  <TextBlock Classes="glyph" Text="&#xE8C8;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
+                </Button>
+              </TextBox.InnerRightContent>
+            </TextBox>
 
-            <StackPanel Spacing="3">
-              <TextBlock Classes="lbl" Text="Private key" />
-              <TextBox Classes="mono" Text="{Binding PrivateKeyEdit}">
-                <TextBox.InnerRightContent>
-                  <Button Classes="icon" Command="{Binding GenerateKeyCommand}" ToolTip.Tip="Generate new keypair">
-                    <TextBlock Classes="glyph" Text="&#xE72C;" FontSize="{DynamicResource Fs13}" Opacity="0.6" />
-                  </Button>
-                </TextBox.InnerRightContent>
-              </TextBox>
-            </StackPanel>
+            <TextBlock Grid.Row="1" Grid.Column="0" Classes="lbl" Text="Private key" Margin="0,0,10,8" />
+            <TextBox Grid.Row="1" Grid.Column="1" Classes="mono" Text="{Binding PrivateKeyEdit}" Margin="0,0,0,8">
+              <TextBox.InnerRightContent>
+                <Button Classes="icon" Command="{Binding GenerateKeyCommand}" ToolTip.Tip="Generate new keypair (click twice to confirm)">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <TextBlock Classes="glyph" Text="&#xE72C;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
+                    <TextBlock Text="{Binding GenerateLabel}" FontSize="{DynamicResource Fs11}" Opacity="0.7" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+              </TextBox.InnerRightContent>
+            </TextBox>
 
-            <StackPanel Orientation="Horizontal" Spacing="10">
-              <TextBlock Classes="lbl" Text="Listen port" VerticalAlignment="Center" />
-              <TextBox Classes="mono" Width="90" Text="{Binding ListenPortText}" Watermark="automatic" />
-            </StackPanel>
+            <TextBlock Grid.Row="2" Grid.Column="0" Classes="lbl" Text="Listen port" Margin="0,0,10,8" />
+            <TextBox Grid.Row="2" Grid.Column="1" Classes="mono" Text="{Binding ListenPortText}" Watermark="automatic" Margin="0,0,0,8">
+              <TextBox.InnerRightContent>
+                <Button Classes="icon" Command="{Binding ClearListenPortCommand}" ToolTip.Tip="Reset to automatic">
+                  <TextBlock Classes="glyph" Text="&#xE711;" FontSize="{DynamicResource Fs9}" Opacity="0.6" />
+                </Button>
+              </TextBox.InnerRightContent>
+            </TextBox>
 
-            <StackPanel Spacing="3">
-              <TextBlock Classes="lbl" Text="Address" />
-              <ItemsControl ItemsSource="{Binding Addresses}">
-                <ItemsControl.ItemsPanel>
-                  <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.DataTemplates>
-                  <DataTemplate DataType="sys:String">
-                    <Border Classes="item" Margin="0,0,6,4">
-                      <StackPanel Orientation="Horizontal" Spacing="6">
-                        <StackPanel Orientation="Horizontal">
-                          <TextBlock Classes="mono synip" Text="{Binding Converter={x:Static views:Syntax.IpPart}}" />
-                          <TextBlock Classes="mono synnum" Text="{Binding Converter={x:Static views:Syntax.MaskPart}}" />
-                        </StackPanel>
-                        <Button Classes="chipx"
-                                Command="{Binding $parent[ItemsControl].DataContext.RemoveAddressCommand}" CommandParameter="{Binding}">
-                          <TextBlock Classes="glyph" Text="&#xE711;" FontSize="{DynamicResource Fs9}" Opacity="0.6" />
-                        </Button>
+            <TextBlock Grid.Row="3" Grid.Column="0" Classes="lbl" Text="Address" VerticalAlignment="Top" Margin="0,5,10,0" />
+            <ItemsControl Grid.Row="3" Grid.Column="1" ItemsSource="{Binding Addresses}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.DataTemplates>
+                <DataTemplate DataType="sys:String">
+                  <Border Classes="item" Margin="0,0,6,4">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <StackPanel Orientation="Horizontal">
+                        <TextBlock Classes="mono synip" Text="{Binding Converter={x:Static views:Syntax.IpPart}}" />
+                        <TextBlock Classes="mono synnum" Text="{Binding Converter={x:Static views:Syntax.MaskPart}}" />
                       </StackPanel>
-                    </Border>
-                  </DataTemplate>
-                  <DataTemplate DataType="vm:AddSlot">
-                    <TextBox Classes="mono addbox" Margin="0,0,6,4" Watermark="+"
-                             Classes.error="{Binding $parent[ItemsControl].DataContext.AddressAddError}"
-                             Text="{Binding $parent[ItemsControl].DataContext.NewAddress}">
-                      <TextBox.KeyBindings>
-                        <KeyBinding Gesture="Enter" Command="{Binding $parent[ItemsControl].DataContext.AddAddressCommand}" />
-                      </TextBox.KeyBindings>
-                    </TextBox>
-                  </DataTemplate>
-                </ItemsControl.DataTemplates>
-              </ItemsControl>
-            </StackPanel>
-          </StackPanel>
+                      <Button Classes="chipx"
+                              Command="{Binding $parent[ItemsControl].DataContext.RemoveAddressCommand}" CommandParameter="{Binding}">
+                        <TextBlock Classes="glyph" Text="&#xE711;" FontSize="{DynamicResource Fs9}" Opacity="0.6" />
+                      </Button>
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+                <DataTemplate DataType="vm:AddSlot">
+                  <TextBox Classes="mono addbox" Margin="0,0,6,4" Watermark="+"
+                           Classes.error="{Binding $parent[ItemsControl].DataContext.AddressAddError}"
+                           Text="{Binding $parent[ItemsControl].DataContext.NewAddress}">
+                    <TextBox.KeyBindings>
+                      <KeyBinding Gesture="Enter" Command="{Binding $parent[ItemsControl].DataContext.AddAddressCommand}" />
+                    </TextBox.KeyBindings>
+                  </TextBox>
+                </DataTemplate>
+              </ItemsControl.DataTemplates>
+            </ItemsControl>
+          </Grid>
 
           <Border Grid.Column="1" Name="PeersHost" BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="1,0,0,0">
             <StackPanel Margin="0,8,0,2">
