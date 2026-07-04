@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using System.Xml;
 using Avalonia;
+using Avalonia.Animation;
+using Avalonia.Animation.Easings;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Controls.Primitives;
@@ -91,7 +93,17 @@ public partial class TunnelCard : UserControl
         // PointerPressed instead of Tapped: Tapped suppresses the second of two fast
         // clicks (double-tap detection), which made rapid expand/collapse feel dead.
         AddHandler(PointerPressedEvent, OnCardPressed, handledEventsToo: false);
+
+        // Fade a card in the first time it appears, with the same easing as the expand.
+        Opacity = 0;
+        Transitions = new Transitions
+        {
+            new DoubleTransition { Property = OpacityProperty, Duration = TimeSpan.FromMilliseconds(AnimMs), Easing = new CubicEaseOut() },
+        };
+        AttachedToVisualTree += (_, _) => { if (!_appeared) { _appeared = true; Opacity = 1; } };
     }
+
+    bool _appeared;
 
     void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -99,33 +111,24 @@ public partial class TunnelCard : UserControl
         if (e.PropertyName is nameof(TunnelViewModel.ConfigText) or nameof(TunnelViewModel.IsTextMode))
         {
             if (_vm is null) return;
-            // Entering text mode: lock the editor to the exact height the fields area
-            // currently occupies, so toggling modes causes no vertical jump. Read the
-            // bounds synchronously (before the visibility relayout) then apply.
-            if (e.PropertyName == nameof(TunnelViewModel.IsTextMode))
-            {
-                if (_vm.IsTextMode)
-                {
-                    var h = FieldsGrid.Bounds.Height;
-                    if (h > 40) EditorHost.Height = h;
-                }
-                else
-                {
-                    EditorHost.ClearValue(HeightProperty);
-                }
-            }
-            // Always push on mode entry; otherwise only when the texts diverge.
             if (e.PropertyName == nameof(TunnelViewModel.ConfigText) && ConfEditor.Text == _vm.ConfigText) return;
             _syncingEditor = true;
             ConfEditor.Text = _vm.ConfigText;
             _syncingEditor = false;
         }
+        // Switching raw editor <-> fields resizes the body: tween it like expand/collapse.
+        if (e.PropertyName == nameof(TunnelViewModel.IsTextMode) && _vm is { IsEditing: true })
+            TweenBodyToContent();
         if (e.PropertyName == nameof(TunnelViewModel.CollapsedSummary))
             BuildDetail();
         if (e.PropertyName == nameof(TunnelViewModel.Accent))
             ApplyCardAccent();
         if (e.PropertyName == nameof(TunnelViewModel.IsEditing) && _vm is not null)
-            Animate(_vm.IsEditing);
+        {
+            ExpandContent.IsVisible = _vm.IsEditing;
+            DetailPanel.IsVisible = !_vm.IsEditing;
+            TweenBodyToContent();
+        }
     }
 
     // ---- per-card accent -------------------------------------------------------
@@ -173,28 +176,28 @@ public partial class TunnelCard : UserControl
         return content.DesiredSize.Height;
     }
 
-    // Swap the visible content, then tween the shared region's height from where it is now
-    // to the target's natural height — one smooth motion, no overlap, no jump. Afterward
-    // the cap is lifted so edits (adding a domain, raw mode) resize freely.
-    void Animate(bool editing)
+    // Tween the shared region to whatever the currently-visible content wants to be.
+    // The target is measured on the NEXT render tick (after the content is realized and
+    // laid out), so even the first expand lands on the exact height — no settle-snap.
+    // Uncaps after the tween so later edits resize freely.
+    void TweenBodyToContent()
     {
         var gen = ++_animGen;
         var curH = Body.Bounds.Height;
-        var w = Body.Bounds.Width;
-        if (w < 1) w = 400;
+        // Freeze at the current height so the content swap doesn't jump before the tween.
+        WithoutTransitions(Body, () => Body.MaxHeight = double.IsFinite(curH) && curH > 0 ? curH : 0);
 
-        ExpandContent.IsVisible = editing;
-        DetailPanel.IsVisible = !editing;
-
-        var target = NaturalHeight(editing ? ExpandContent : DetailPanel, w);
-        // Pin the current height (finite) as the animation's starting point.
-        WithoutTransitions(Body, () => Body.MaxHeight = double.IsFinite(curH) && curH > 0 ? curH : target);
-        // Next render tick: animate to the target height.
-        Dispatcher.UIThread.Post(() => { if (_animGen == gen) Body.MaxHeight = target; }, DispatcherPriority.Render);
-        // After the tween: uncap so later content changes aren't clipped.
-        DispatcherTimer.RunOnce(
-            () => { if (_animGen == gen) WithoutTransitions(Body, () => Body.MaxHeight = double.PositiveInfinity); },
-            TimeSpan.FromMilliseconds(AnimMs + 60));
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_animGen != gen || _vm is null) return;
+            var w = Body.Bounds.Width;
+            if (w < 1) w = 400;
+            var content = _vm.IsEditing ? (Control)ExpandContent : DetailPanel;
+            Body.MaxHeight = NaturalHeight(content, w); // animate current -> target
+            DispatcherTimer.RunOnce(
+                () => { if (_animGen == gen) WithoutTransitions(Body, () => Body.MaxHeight = double.PositiveInfinity); },
+                TimeSpan.FromMilliseconds(AnimMs + 60));
+        }, DispatcherPriority.Render);
     }
 
     // Syntax-colored collapsed detail as atomic tokens in a WrapPanel: addresses in
