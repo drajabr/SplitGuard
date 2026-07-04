@@ -13,6 +13,9 @@ public static class AppIcons
 {
     static readonly int[] IcoSizes = { 16, 24, 32, 48, 64, 128, 256 };
     static readonly Color TickGreen = Color.FromRgb(0x2E, 0x7D, 0x32);
+    // Enlarge the dragon about the icon center so it nearly fills the silhouette
+    // (the outer accent border was too thick). >1 grows the dragon; clipped by the shape.
+    const double DragonScale = 1.42;
     static readonly Dictionary<uint, (WindowIcon Idle, WindowIcon Active, Bitmap Logo)> Cache = new();
 
     public static (WindowIcon Idle, WindowIcon Active, Bitmap Logo) Get(Color accent)
@@ -47,6 +50,21 @@ public static class AppIcons
             Marshal.Copy(src.Address, srcBytes, 0, srcBytes.Length);
             var dstBytes = new byte[dst.RowBytes * size];
             bool rgba = src.Format == PixelFormat.Rgba8888;
+
+            // Recover the dragon mask for every pixel up front so it can be sampled at
+            // scaled coordinates (bilinear) to enlarge the dragon about the center.
+            var dragonMask = new double[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    int o = y * src.RowBytes + x * 4;
+                    int d = srcBytes[o + (rgba ? 0 : 2)];
+                    int a = srcBytes[o + 3];
+                    if (a > 0 && a < 255) d = Math.Min(255, d * 255 / a);
+                    dragonMask[y * size + x] = d;
+                }
+            double c = (size - 1) / 2.0;
+
             for (int y = 0; y < size; y++)
             {
                 for (int x = 0; x < size; x++)
@@ -54,15 +72,15 @@ public static class AppIcons
                     int so = y * src.RowBytes + x * 4;
                     int check = srcBytes[so + (rgba ? 2 : 0)];
                     int circle = srcBytes[so + 1];
-                    int dragon = srcBytes[so + (rgba ? 0 : 2)];
                     int alpha = srcBytes[so + 3];
                     if (alpha > 0 && alpha < 255)
                     {
                         // decoded premultiplied: recover the masks
                         check = Math.Min(255, check * 255 / alpha);
                         circle = Math.Min(255, circle * 255 / alpha);
-                        dragon = Math.Min(255, dragon * 255 / alpha);
                     }
+                    int dragon = (int)Math.Round(SampleMask(dragonMask, size,
+                        c + (x - c) / DragonScale, c + (y - c) / DragonScale));
                     double r = Lerp(accent.R, 255, dragon);
                     double g = Lerp(accent.G, 255, dragon);
                     double b = Lerp(accent.B, 255, dragon);
@@ -91,6 +109,18 @@ public static class AppIcons
     }
 
     static double Lerp(double from, double to, int mask) => from + (to - from) * mask / 255.0;
+
+    // Bilinear sample of a 0..255 mask; anything outside the image reads as 0 (no dragon).
+    static double SampleMask(double[] mask, int size, double fx, double fy)
+    {
+        if (fx < 0 || fy < 0 || fx > size - 1 || fy > size - 1) return 0;
+        int x0 = (int)Math.Floor(fx), y0 = (int)Math.Floor(fy);
+        int x1 = Math.Min(x0 + 1, size - 1), y1 = Math.Min(y0 + 1, size - 1);
+        double tx = fx - x0, ty = fy - y0;
+        double top = mask[y0 * size + x0] * (1 - tx) + mask[y0 * size + x1] * tx;
+        double bot = mask[y1 * size + x0] * (1 - tx) + mask[y1 * size + x1] * tx;
+        return top * (1 - ty) + bot * ty;
+    }
 
     static byte[] BuildIco(List<byte[]> pngs)
     {
