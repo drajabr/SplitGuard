@@ -86,7 +86,7 @@ public partial class TunnelCard : UserControl
             var editing = _vm?.IsEditing ?? false;
             ExpandContent.IsVisible = editing;
             DetailPanel.IsVisible = !editing;
-            WithoutTransitions(Body, () => Body.MaxHeight = double.PositiveInfinity);
+            Body.Height = double.NaN; // auto — sizes to content
         };
         // Re-resolve a per-card "mono" accent when the app theme flips.
         ActualThemeVariantChanged += (_, _) => ApplyCardAccent();
@@ -157,18 +157,10 @@ public partial class TunnelCard : UserControl
         }
     }
 
-    // ---- expand/collapse: one MaxHeight tween of a single region ----------------
+    // ---- expand/collapse: explicit height animation of a single region ----------
 
-    const int AnimMs = 180; // must match the Border.body MaxHeight transition in Styles.axaml
-    int _animGen;           // cancels a stale "uncap" callback on rapid re-toggle
-
-    static void WithoutTransitions(Border b, Action apply)
-    {
-        var t = b.Transitions;
-        b.Transitions = null;
-        apply();
-        b.Transitions = t;
-    }
+    const int AnimMs = 200;
+    int _animGen; // cancels a stale animation finalize on rapid re-toggle
 
     static double NaturalHeight(Control content, double width)
     {
@@ -176,27 +168,38 @@ public partial class TunnelCard : UserControl
         return content.DesiredSize.Height;
     }
 
-    // Tween the shared region to whatever the currently-visible content wants to be.
-    // The target is measured on the NEXT render tick (after the content is realized and
-    // laid out), so even the first expand lands on the exact height — no settle-snap.
-    // Uncaps after the tween so later edits resize freely.
+    // Animate the shared region's Height from where it is now to the visible content's
+    // natural height, then release it back to Auto so later edits resize freely. Target is
+    // measured on the next render tick (after the swapped content is laid out), so the
+    // first expand lands exactly. Uses an explicit Animation so it always runs.
     void TweenBodyToContent()
     {
         var gen = ++_animGen;
-        var curH = Body.Bounds.Height;
-        // Freeze at the current height so the content swap doesn't jump before the tween.
-        WithoutTransitions(Body, () => Body.MaxHeight = double.IsFinite(curH) && curH > 0 ? curH : 0);
+        var from = Body.Bounds.Height;
+        Body.Height = from; // hold the current height while the new content realizes
 
-        Dispatcher.UIThread.Post(() =>
+        Dispatcher.UIThread.Post(async () =>
         {
             if (_animGen != gen || _vm is null) return;
             var w = Body.Bounds.Width;
             if (w < 1) w = 400;
             var content = _vm.IsEditing ? (Control)ExpandContent : DetailPanel;
-            Body.MaxHeight = NaturalHeight(content, w); // animate current -> target
-            DispatcherTimer.RunOnce(
-                () => { if (_animGen == gen) WithoutTransitions(Body, () => Body.MaxHeight = double.PositiveInfinity); },
-                TimeSpan.FromMilliseconds(AnimMs + 60));
+            var to = NaturalHeight(content, w);
+            if (Math.Abs(to - from) < 0.5) { Body.Height = double.NaN; return; }
+
+            var anim = new Animation
+            {
+                Duration = TimeSpan.FromMilliseconds(AnimMs),
+                Easing = new CubicEaseOut(),
+                FillMode = FillMode.Forward,
+                Children =
+                {
+                    new KeyFrame { Cue = new Cue(0d), Setters = { new Setter(HeightProperty, from) } },
+                    new KeyFrame { Cue = new Cue(1d), Setters = { new Setter(HeightProperty, to) } },
+                },
+            };
+            await anim.RunAsync(Body);
+            if (_animGen == gen) Body.Height = double.NaN; // back to auto
         }, DispatcherPriority.Render);
     }
 

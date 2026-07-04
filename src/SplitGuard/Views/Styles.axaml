@@ -142,16 +142,11 @@
     <Setter Property="Cursor" Value="Arrow" />
   </Style>
 
-  <!-- Single clipped region below the header. Its MaxHeight is tweened by the code-behind
+  <!-- Single clipped region below the header. Its Height is animated by the code-behind
        between the collapsed-detail height and the expanded height, so the card grows and
        shrinks in one smooth motion (no overlap, no fade). -->
   <Style Selector="Border.body">
     <Setter Property="ClipToBounds" Value="True" />
-    <Setter Property="Transitions">
-      <Transitions>
-        <DoubleTransition Property="MaxHeight" Duration="0:0:0.18" Easing="CubicEaseOut" />
-      </Transitions>
-    </Setter>
   </Style>
 
   <Style Selector="Border.peerblock">
