@@ -212,6 +212,17 @@ public partial class MainWindow : Window, IDialogs
         if (Avalonia.Application.Current is App app)
             app.SetAccentIcons(icons.Idle, icons.Active);
         AccentLabel.Text = name;
+
+        // Save a branded PNG and register it as the toast-notification app icon/name.
+        try
+        {
+            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SplitGuard");
+            Directory.CreateDirectory(dir);
+            var iconPath = Path.Combine(dir, "notify.png");
+            icons.Logo.Save(iconPath);
+            NotificationService.Register(iconPath);
+        }
+        catch { }
     }
 
     static Color Shade(Color c, double factor) =>
