@@ -143,7 +143,6 @@ public partial class MainWindow : Window, IDialogs
     {
         var (name, family) = FontSteps[_fontIndex];
         FontFamily = new FontFamily(family);
-        FontMenu.Header = $"Font: {name}";
     }
 
     void ApplyZoom()
@@ -152,7 +151,6 @@ public partial class MainWindow : Window, IDialogs
         var resources = Avalonia.Application.Current!.Resources;
         foreach (var (key, baseValue) in ZoomResources)
             resources[key] = baseValue * scale;
-        ZoomMenu.Header = $"Zoom: {name}";
     }
 
     // Surface theme: page + card/chip fills + borders + text contrast.
@@ -170,7 +168,6 @@ public partial class MainWindow : Window, IDialogs
         resources["DimOpacity"] = t.Dim;
         resources["HairlineBrush"] = new SolidColorBrush(Color.FromArgb(t.Hair, 0x80, 0x80, 0x80));
         resources["FieldBorderBrush"] = new SolidColorBrush(Color.FromArgb(t.Field, 0x80, 0x80, 0x80));
-        ThemeMenu.Header = $"Theme: {t.Name}";
         ApplyAccent(); // re-resolve so a "mono" accent flips with the theme
     }
 
@@ -210,7 +207,6 @@ public partial class MainWindow : Window, IDialogs
         LogoImage.Source = icons.Logo;
         if (Avalonia.Application.Current is App app)
             app.SetAccentIcons(icons.Idle, icons.Active);
-        AccentMenu.Header = $"Accent: {name}";
     }
 
     static Color Shade(Color c, double factor) =>
@@ -229,56 +225,71 @@ public partial class MainWindow : Window, IDialogs
         vm.PersistPrefs();
     }
 
-    // ---- header dropdown menus -------------------------------------------------
+    // ---- native header menu (Add | View | Settings) ----------------------------
 
-    static TextBlock CheckIcon() => new()
+    static NativeMenuItem Action(string header, Action onClick)
     {
-        Text = "", FontFamily = new FontFamily("Segoe MDL2 Assets"), FontSize = 12,
-    };
+        var item = new NativeMenuItem(header);
+        item.Click += (_, _) => onClick();
+        return item;
+    }
 
-    // Build a single-choice picker: one item per option, current one checked.
-    void BuildPicker(MenuItem menu, IEnumerable<string> options, int current, Action<int> select)
+    // A submenu of options with the current one checked.
+    NativeMenuItem Picker(string header, IEnumerable<string> options, int current, Action<int> select)
     {
-        menu.Items.Clear();
+        var root = new NativeMenuItem(header) { Menu = new NativeMenu() };
         var i = 0;
         foreach (var name in options)
         {
             var idx = i++;
-            var item = new MenuItem { Header = name };
-            if (idx == current) item.Icon = CheckIcon();
+            var item = new NativeMenuItem(name)
+            {
+                ToggleType = NativeMenuItemToggleType.CheckBox,
+                IsChecked = idx == current,
+            };
             item.Click += (_, _) => select(idx);
-            menu.Items.Add(item);
+            root.Menu!.Items.Add(item);
         }
+        return root;
     }
 
     void BuildMenus()
     {
-        BuildPicker(ThemeMenu, Palettes.Select(p => p.Name), _themeIndex, i =>
-        { _themeIndex = i; ApplyTheme(); Persist(p => p.Theme = Palettes[i].Name); BuildMenus(); });
-        BuildPicker(AccentMenu, AccentSteps.Select(a => a.Name), _accentIndex, i =>
-        { _accentIndex = i; ApplyAccent(); Persist(p => p.Accent = AccentSteps[i].Name); BuildMenus(); });
-        BuildPicker(FontMenu, FontSteps.Select(f => f.Name), _fontIndex, i =>
-        { _fontIndex = i; ApplyFont(); Persist(p => p.Font = FontSteps[i].Name); BuildMenus(); });
-        BuildPicker(ZoomMenu, ZoomSteps.Select(z => z.Name), _zoomIndex, i =>
-        { _zoomIndex = i; ApplyZoom(); Persist(p => p.Zoom = ZoomSteps[i].Name); BuildMenus(); });
-
-        AddMenu.Items.Clear();
-        AddMenu.Items.Add(ActionItem("Import .conf…", "", () => _ = ImportConfAsync()));
-        AddMenu.Items.Add(ActionItem("New empty tunnel", "", () => (DataContext as MainViewModel)?.CreateEmptyTunnel()));
-        AddMenu.Items.Add(new Separator());
-        AddMenu.Items.Add(ActionItem("Rescan external tunnels", "", () => (DataContext as MainViewModel)?.RescanExternals()));
-
         var mvm = DataContext as MainViewModel;
         var prefs = mvm?.Prefs;
-        
-        SettingsMenu.Items.Clear();
-        var custom = new MenuItem { Header = "Custom DNS forwarding" };
-        if (mvm?.HasCustomDns == true) custom.Icon = CheckIcon();
+        var root = new NativeMenu();
+
+        var add = new NativeMenuItem("Add") { Menu = new NativeMenu() };
+        add.Menu!.Items.Add(Action("Import .conf", () => _ = ImportConfAsync()));
+        add.Menu.Items.Add(Action("New empty tunnel", () => (DataContext as MainViewModel)?.CreateEmptyTunnel()));
+        add.Menu.Items.Add(new NativeMenuItemSeparator());
+        add.Menu.Items.Add(Action("Rescan external tunnels", () => (DataContext as MainViewModel)?.RescanExternals()));
+        root.Items.Add(add);
+
+        var view = new NativeMenuItem("View") { Menu = new NativeMenu() };
+        view.Menu!.Items.Add(Picker($"Theme: {Palettes[_themeIndex].Name}", Palettes.Select(p => p.Name), _themeIndex, i =>
+        { _themeIndex = i; ApplyTheme(); Persist(p => p.Theme = Palettes[i].Name); BuildMenus(); }));
+        view.Menu.Items.Add(Picker($"Accent: {AccentSteps[_accentIndex].Name}", AccentSteps.Select(a => a.Name), _accentIndex, i =>
+        { _accentIndex = i; ApplyAccent(); Persist(p => p.Accent = AccentSteps[i].Name); BuildMenus(); }));
+        view.Menu.Items.Add(Picker($"Font: {FontSteps[_fontIndex].Name}", FontSteps.Select(f => f.Name), _fontIndex, i =>
+        { _fontIndex = i; ApplyFont(); Persist(p => p.Font = FontSteps[i].Name); BuildMenus(); }));
+        view.Menu.Items.Add(Picker($"Zoom: {ZoomSteps[_zoomIndex].Name}", ZoomSteps.Select(z => z.Name), _zoomIndex, i =>
+        { _zoomIndex = i; ApplyZoom(); Persist(p => p.Zoom = ZoomSteps[i].Name); BuildMenus(); }));
+        root.Items.Add(view);
+
+        var settings = new NativeMenuItem("Settings") { Menu = new NativeMenu() };
+        var custom = new NativeMenuItem("Custom DNS forwarding")
+        {
+            ToggleType = NativeMenuItemToggleType.CheckBox,
+            IsChecked = mvm?.HasCustomDns == true,
+        };
         custom.Click += (_, _) => { mvm?.ToggleCustomDns(!(mvm?.HasCustomDns ?? false)); BuildMenus(); };
-        SettingsMenu.Items.Add(custom);
-        SettingsMenu.Items.Add(new Separator());
-        var boot = new MenuItem { Header = "Start on Windows startup" };
-        if (prefs?.StartOnBoot == true) boot.Icon = CheckIcon();
+        settings.Menu!.Items.Add(custom);
+        var boot = new NativeMenuItem("Start on Windows startup")
+        {
+            ToggleType = NativeMenuItemToggleType.CheckBox,
+            IsChecked = prefs?.StartOnBoot == true,
+        };
         boot.Click += (_, _) =>
         {
             var on = !(prefs?.StartOnBoot ?? false);
@@ -286,27 +297,22 @@ public partial class MainWindow : Window, IDialogs
             Persist(p => p.StartOnBoot = on);
             BuildMenus();
         };
-        SettingsMenu.Items.Add(boot);
-        var notif = new MenuItem { Header = "Notifications" };
-        if (prefs?.Notifications == true) notif.Icon = CheckIcon();
+        settings.Menu.Items.Add(boot);
+        var notif = new NativeMenuItem("Notifications")
+        {
+            ToggleType = NativeMenuItemToggleType.CheckBox,
+            IsChecked = prefs?.Notifications == true,
+        };
         notif.Click += (_, _) =>
         {
             var on = !(prefs?.Notifications ?? true);
             Persist(p => p.Notifications = on);
             BuildMenus();
         };
-        SettingsMenu.Items.Add(notif);
-    }
+        settings.Menu.Items.Add(notif);
+        root.Items.Add(settings);
 
-    static MenuItem ActionItem(string header, string glyph, Action onClick)
-    {
-        var item = new MenuItem
-        {
-            Header = header,
-            Icon = new TextBlock { Text = glyph, FontFamily = new FontFamily("Segoe MDL2 Assets"), FontSize = 13, Opacity = 0.7 },
-        };
-        item.Click += (_, _) => onClick();
-        return item;
+        NativeMenu.SetMenu(this, root);
     }
 
     async Task ImportConfAsync()
