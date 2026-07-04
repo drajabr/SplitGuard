@@ -46,19 +46,14 @@ public partial class MainWindow : Window, IDialogs
         ("cyan", "#1394A8"),
     };
 
-    // Proportional UI fonts (values/keys always use the mono stack regardless).
+    // A few visually distinct UI fonts, one per style family (values/keys stay mono).
     static readonly (string Name, string Family)[] FontSteps =
     {
-        ("segoe",   "Segoe UI Variable Text, Segoe UI"),
-        ("calibri", "Calibri, Segoe UI"),
-        ("candara", "Candara, Segoe UI"),
-        ("corbel",  "Corbel, Segoe UI"),
-        ("tahoma",  "Tahoma, Segoe UI"),
-        ("verdana", "Verdana, Segoe UI"),
-        ("cambria", "Cambria, Georgia, serif"),
-        ("georgia", "Georgia, Cambria, serif"),
-        ("sitka",   "Sitka Text, Cambria, serif"),
-        ("consolas","Consolas, monospace"),
+        ("segoe",       "Segoe UI Variable Text, Segoe UI"),   // modern sans (default)
+        ("verdana",     "Verdana, Segoe UI"),                  // wide humanist sans
+        ("bahnschrift", "Bahnschrift, Segoe UI"),              // condensed industrial
+        ("georgia",     "Georgia, Cambria, serif"),            // serif
+        ("consolas",    "Consolas, monospace"),                // monospace
     };
     static readonly (string Name, double Scale)[] ZoomSteps =
     {

@@ -126,6 +126,7 @@ public class TunnelViewModel : ObservableObject
             _isConnected = value;
             Raise();
             Raise(nameof(StatsVisible));
+            Raise(nameof(ConnLabel));
             if (value) Host.RequestConnect(this);
             else Host.RequestDisconnect(this);
         }
@@ -137,9 +138,11 @@ public class TunnelViewModel : ObservableObject
         _isConnected = connected;
         Raise(nameof(IsConnected));
         Raise(nameof(StatsVisible));
+        Raise(nameof(ConnLabel));
     }
 
     public bool StatsVisible => IsConnected;
+    public string ConnLabel => IsConnected ? "Connected" : "Disconnected";
 
     // Expanded IS edit mode: clicking the card opens editing; clicking blank card
     // space again, or Cancel/Save, collapses it. No read-only expanded state.

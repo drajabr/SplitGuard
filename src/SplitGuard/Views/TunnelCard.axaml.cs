@@ -135,8 +135,9 @@ public partial class TunnelCard : UserControl
             AddToken("no split DNS configured", Syntax.IpBrush);
     }
 
-    // Only the header row toggles expand/collapse; the body never does (Save/Cancel
-    // collapse instead). Clicks on interactive controls are ignored.
+    // Collapsed: a click anywhere on the card expands it. Expanded: only a click on
+    // the header bar collapses it (Save/Cancel/delete/other-card-open also collapse);
+    // body clicks do nothing. The connect control and other controls never toggle.
     void OnCardPressed(object? sender, PointerPressedEventArgs e)
     {
         if (DataContext is not TunnelViewModel vm) return;
@@ -145,10 +146,20 @@ public partial class TunnelCard : UserControl
         for (var el = e.Source as Avalonia.Visual; el is not null && el != this; el = el.GetVisualParent())
         {
             if (el is Button or ToggleButton or ToggleSwitch or TextBox or ComboBox) return;
-            if (el == HeaderRow) { inHeader = true; break; }
+            if (el == ConnectBox) return;
+            if (el == HeaderRow) inHeader = true;
         }
-        if (!inHeader) return;
-        if (vm.IsEditing) vm.CancelEditCommand.Execute(null);
-        else vm.BeginEditCommand.Execute(null);
+        if (!vm.IsEditing) vm.BeginEditCommand.Execute(null);
+        else if (inHeader) vm.CancelEditCommand.Execute(null);
+    }
+
+    // Clicking the state label toggles the connection (the switch's own area does too).
+    void OnConnectLabelPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (DataContext is TunnelViewModel vm && !vm.IsEditing && !vm.IsExternal)
+        {
+            vm.IsConnected = !vm.IsConnected;
+            e.Handled = true;
+        }
     }
 }

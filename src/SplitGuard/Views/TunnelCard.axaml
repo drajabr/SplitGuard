@@ -18,8 +18,11 @@
             <TextBlock Classes="glyph accentfg" Text="&#xE74B;" FontSize="{DynamicResource Fs11}" />
             <TextBlock Classes="mono" Text="{Binding DownRate}" Opacity="0.75" />
           </StackPanel>
-          <ToggleSwitch IsChecked="{Binding IsConnected}" IsVisible="{Binding !IsExternal}" IsEnabled="{Binding !IsEditing}"
-                        OnContent="Connected" OffContent="Disconnected" MinWidth="0" />
+          <StackPanel Name="ConnectBox" Orientation="Horizontal" Spacing="7" VerticalAlignment="Center" IsVisible="{Binding !IsExternal}">
+            <TextBlock Name="ConnLabel" Classes="muted" VerticalAlignment="Center" Cursor="Hand"
+                       Text="{Binding ConnLabel}" PointerPressed="OnConnectLabelPressed" />
+            <ToggleSwitch IsChecked="{Binding IsConnected}" IsEnabled="{Binding !IsEditing}" MinWidth="0" />
+          </StackPanel>
         </StackPanel>
         <Grid VerticalAlignment="Center" ColumnDefinitions="Auto,Auto,Auto,*">
           <Ellipse Grid.Column="0" Classes="dot" Classes.up="{Binding IsConnected}" />
