@@ -24,10 +24,12 @@
                      Text="SplitGuard" IsHitTestVisible="False" Margin="0,0,4,0" />
           <Menu Name="HeaderMenu" Background="Transparent" VerticalAlignment="Center">
             <MenuItem Name="AddMenu" Header="Add" />
-            <MenuItem Name="ThemeMenu" Header="Theme" />
-            <MenuItem Name="AccentMenu" Header="Accent" />
-            <MenuItem Name="FontMenu" Header="Font" />
-            <MenuItem Name="ZoomMenu" Header="Zoom" />
+            <MenuItem Header="View">
+              <MenuItem Name="ThemeMenu" Header="Theme" />
+              <MenuItem Name="AccentMenu" Header="Accent" />
+              <MenuItem Name="FontMenu" Header="Font" />
+              <MenuItem Name="ZoomMenu" Header="Zoom" />
+            </MenuItem>
             <MenuItem Name="SettingsMenu" Header="Settings" />
           </Menu>
         </StackPanel>
