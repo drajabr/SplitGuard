@@ -7,7 +7,7 @@
              x:Class="SplitGuard.Views.TunnelCard">
   <Border Classes="card" Classes.editing="{Binding IsEditing}" Background="{DynamicResource SurfaceBrush}">
     <StackPanel>
-      <DockPanel Name="HeaderRow" Margin="12,8" Height="{DynamicResource HeaderH}">
+      <DockPanel Name="HeaderRow" Background="Transparent" Margin="12,8" Height="{DynamicResource HeaderH}">
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
           <TextBlock Classes="muted" Text="{Binding HeaderHandshake}" IsVisible="{Binding StatsVisible}" />
           <StackPanel Orientation="Horizontal" Spacing="3" IsVisible="{Binding StatsVisible}">
