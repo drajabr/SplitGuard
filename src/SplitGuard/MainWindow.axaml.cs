@@ -30,20 +30,19 @@ public partial class MainWindow : Window, IDialogs
         new("dark",     ThemeVariant.Dark,   "#1A1C1F", "#25282C", "#17191C", 0.70, 0x34, 0x44),
     };
 
-    // Accent hue is its own control, independent of the surface theme.
+    // Accent hue is its own control, independent of the surface theme. Distinct hues
+    // spread around the wheel, plus "mono" (neutral: white on dark, black on light).
     static readonly (string Name, string Hex)[] AccentSteps =
     {
-        ("blue", "#3378DD"),
-        ("indigo", "#5566D8"),
-        ("purple", "#7A5BD0"),
-        ("magenta", "#A94BC0"),
-        ("rose", "#C0506E"),
-        ("red", "#CE4038"),
-        ("orange", "#C56A1C"),
-        ("amber", "#C08A12"),
-        ("green", "#4F9A34"),
-        ("teal", "#1D9E75"),
-        ("cyan", "#1394A8"),
+        ("blue",   "#2F7FE4"),
+        ("cyan",   "#159BB3"),
+        ("green",  "#3E9E4E"),
+        ("amber",  "#D79A12"),
+        ("orange", "#E0692A"),
+        ("red",    "#D53E3E"),
+        ("pink",   "#D14BA0"),
+        ("purple", "#8A5CE0"),
+        ("mono",   ""),
     };
 
     // A few visually distinct UI fonts, one per style family (values/keys stay mono).
@@ -143,8 +142,7 @@ public partial class MainWindow : Window, IDialogs
         _accentIndex = Math.Max(0, Array.FindIndex(AccentSteps, a => a.Name == prefs.Accent));
         _fontIndex = Math.Max(0, Array.FindIndex(FontSteps, s => s.Name == prefs.Font));
         _zoomIndex = Math.Max(0, Array.FindIndex(ZoomSteps, s => s.Name == prefs.Zoom));
-        ApplyTheme();
-        ApplyAccent();
+        ApplyTheme();   // also applies the accent (keeps "mono" in sync with the theme)
         ApplyFont();
         ApplyZoom();
     }
@@ -181,13 +179,25 @@ public partial class MainWindow : Window, IDialogs
         resources["HairlineBrush"] = new SolidColorBrush(Color.FromArgb(t.Hair, 0x80, 0x80, 0x80));
         resources["FieldBorderBrush"] = new SolidColorBrush(Color.FromArgb(t.Field, 0x80, 0x80, 0x80));
         ThemeLabel.Text = t.Name;
+        ApplyAccent(); // re-resolve so a "mono" accent flips with the theme
+    }
+
+    // Effective light/dark, resolving the "auto" palette to the OS setting.
+    ThemeVariant EffectiveVariant()
+    {
+        var v = Palettes[_themeIndex].Variant;
+        if (v != ThemeVariant.Default) return v;
+        return ActualThemeVariant == ThemeVariant.Light ? ThemeVariant.Light : ThemeVariant.Dark;
     }
 
     // Accent hue: brushes, Fluent's SystemAccent (toggles/focus/selection), and the icon.
     void ApplyAccent()
     {
         var (name, hex) = AccentSteps[_accentIndex];
-        var color = Color.Parse(hex);
+        // "mono" = neutral accent that tracks the theme: white on dark, black on light.
+        var color = hex.Length > 0
+            ? Color.Parse(hex)
+            : (EffectiveVariant() == ThemeVariant.Dark ? Color.Parse("#FFFFFF") : Color.Parse("#1A1A1A"));
         var resources = Avalonia.Application.Current!.Resources;
         resources["AccentBrush"] = new SolidColorBrush(color);
         resources["AccentDimBrush"] = new SolidColorBrush(color, 0.4);
