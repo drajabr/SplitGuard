@@ -99,20 +99,17 @@
     <Setter Property="Cursor" Value="Arrow" />
   </Style>
 
+  <!-- MaxHeight is driven in code to the measured content height, so the animation
+       range is exact (no dead time). Both hosts share the same eased transition. -->
   <Style Selector="Border.collapsehost">
     <Setter Property="ClipToBounds" Value="True" />
-    <Setter Property="MaxHeight" Value="{DynamicResource CollapseH}" />
     <Setter Property="Opacity" Value="1" />
     <Setter Property="Transitions">
       <Transitions>
-        <DoubleTransition Property="MaxHeight" Duration="0:0:0.14" Easing="CubicEaseOut" />
-        <DoubleTransition Property="Opacity" Duration="0:0:0.10" />
+        <DoubleTransition Property="MaxHeight" Duration="0:0:0.20" Easing="CubicEaseInOut" />
+        <DoubleTransition Property="Opacity" Duration="0:0:0.13" />
       </Transitions>
     </Setter>
-  </Style>
-  <Style Selector="Border.collapsehost.hidden">
-    <Setter Property="MaxHeight" Value="0" />
-    <Setter Property="Opacity" Value="0" />
   </Style>
 
   <Style Selector="Border.expandhost">
@@ -121,14 +118,10 @@
     <Setter Property="Opacity" Value="0" />
     <Setter Property="Transitions">
       <Transitions>
-        <DoubleTransition Property="MaxHeight" Duration="0:0:0.14" Easing="CubicEaseOut" />
-        <DoubleTransition Property="Opacity" Duration="0:0:0.10" />
+        <DoubleTransition Property="MaxHeight" Duration="0:0:0.20" Easing="CubicEaseInOut" />
+        <DoubleTransition Property="Opacity" Duration="0:0:0.13" />
       </Transitions>
     </Setter>
-  </Style>
-  <Style Selector="Border.expandhost.expanded">
-    <Setter Property="MaxHeight" Value="1400" />
-    <Setter Property="Opacity" Value="1" />
   </Style>
 
   <Style Selector="Border.peerblock">
