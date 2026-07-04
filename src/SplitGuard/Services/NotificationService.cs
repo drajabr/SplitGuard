@@ -12,8 +12,9 @@ namespace SplitGuard.Services;
 // The toast itself is shown through the WinRT ToastNotification API via PowerShell.
 public static class NotificationService
 {
-    const string Aumid = "SABA.Energy.SplitGuard";
+    const string Aumid = "drajabr.splitguard";
     const string AppName = "SplitGuard";
+    static string _iconPath = "";
 
     [DllImport("shell32.dll", PreserveSig = false)]
     static extern void SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string appID);
@@ -24,10 +25,10 @@ public static class NotificationService
         try { SetCurrentProcessExplicitAppUserModelID(Aumid); } catch { }
         try
         {
+            if (!string.IsNullOrEmpty(iconPath) && File.Exists(iconPath)) _iconPath = iconPath;
             using var key = Registry.CurrentUser.CreateSubKey($@"SOFTWARE\Classes\AppUserModelId\{Aumid}");
             key?.SetValue("DisplayName", AppName);
-            if (!string.IsNullOrEmpty(iconPath) && File.Exists(iconPath))
-                key?.SetValue("IconUri", iconPath);
+            if (_iconPath.Length > 0) key?.SetValue("IconUri", _iconPath);
         }
         catch { }
     }
@@ -38,13 +39,18 @@ public static class NotificationService
         {
             var t = XmlEscape(title);
             var m = XmlEscape(message);
+            // Explicit appLogoOverride so our icon shows in the banner (the AUMID IconUri
+            // alone is unreliable for unpackaged apps). src must be a file:/// URI.
+            var logo = _iconPath.Length > 0
+                ? $"<image placement=\"appLogoOverride\" hint-crop=\"circle\" src=\"file:///{XmlEscape(_iconPath.Replace('\\', '/'))}\"/>"
+                : "";
             // Single-quoted here-string keeps the XML literal; PowerShell -EncodedCommand
             // avoids all shell-quoting problems.
             var script =
                 "[Windows.UI.Notifications.ToastNotificationManager,Windows.UI.Notifications,ContentType=WindowsRuntime]|Out-Null\n" +
                 "[Windows.Data.Xml.Dom.XmlDocument,Windows.Data.Xml.Dom,ContentType=WindowsRuntime]|Out-Null\n" +
                 "$xml=@'\n" +
-                $"<toast><visual><binding template=\"ToastGeneric\"><text>{t}</text><text>{m}</text></binding></visual></toast>\n" +
+                $"<toast><visual><binding template=\"ToastGeneric\">{logo}<text>{t}</text><text>{m}</text></binding></visual></toast>\n" +
                 "'@\n" +
                 "$doc=New-Object Windows.Data.Xml.Dom.XmlDocument\n" +
                 "$doc.LoadXml($xml)\n" +
