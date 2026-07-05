@@ -34,9 +34,8 @@ public static class AppIcons
         return result;
     }
 
-    // Zoom the whole glyph toward the center so the transparent padding shrinks from
-    // ~20% to ~8%. >1 enlarges; sampled bilinearly, anything outside reads transparent.
-    const double Zoom = 1.40;
+    // Gentle zoom toward the center; kept modest so the dragon never clips at the edges.
+    const double Zoom = 1.12;
 
     static byte[] Compose(int size, Color accent, bool tick)
     {
@@ -88,9 +87,10 @@ public static class AppIcons
                     var dragon = Sample(mDragon, size, sx, sy);
                     var alpha = Sample(mAlpha, size, sx, sy);
 
-                    double r = Lerp(accent.R, 255, dragon);
-                    double g = Lerp(accent.G, 255, dragon);
-                    double b = Lerp(accent.B, 255, dragon);
+                    // The dragon itself is the icon (accent-colored), no background fill.
+                    // Alpha follows the dragon shape; the "active" tick overlay extends it.
+                    double r = accent.R, g = accent.G, b = accent.B;
+                    var shape = dragon;
                     if (tick)
                     {
                         r = Lerp(r, TickGreen.R, circle);
@@ -99,12 +99,14 @@ public static class AppIcons
                         r = Lerp(r, 255, check);
                         g = Lerp(g, 255, check);
                         b = Lerp(b, 255, check);
+                        shape = Math.Max(dragon, circle);
                     }
                     int oo = y * dst.RowBytes + x * 4;
                     dstBytes[oo] = (byte)b;
                     dstBytes[oo + 1] = (byte)g;
                     dstBytes[oo + 2] = (byte)r;
-                    dstBytes[oo + 3] = (byte)Math.Round(alpha);
+                    // Clip the source alpha to the dragon/tick shape.
+                    dstBytes[oo + 3] = (byte)Math.Round(Math.Min(alpha, shape));
                 }
             }
             Marshal.Copy(dstBytes, 0, dst.Address, dstBytes.Length);
