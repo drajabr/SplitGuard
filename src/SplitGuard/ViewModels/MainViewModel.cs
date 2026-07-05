@@ -70,6 +70,14 @@ public class MainViewModel : ObservableObject, ITunnelHost
 
     public void AccentChanged(TunnelViewModel tunnel) => _store.Save(_config);
 
+    // A tunnel refused to turn on because its config is incomplete/invalid.
+    public void ReportError(TunnelViewModel tunnel, string message)
+    {
+        StatusText = $"{tunnel.Name}: {message}";
+        StatusOk = false;
+        Notify(tunnel.Name, message, true);
+    }
+
     // Custom DNS card's activate/deactivate button: apply or remove its NRPT rules.
     public void CustomActiveChanged(TunnelViewModel tunnel)
     {

@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Xml;
 using Avalonia;
@@ -63,9 +64,14 @@ public partial class TunnelCard : UserControl
         };
         DataContextChanged += (_, _) =>
         {
-            if (_vm is not null) _vm.PropertyChanged -= OnVmPropertyChanged;
+            if (_vm is not null) { _vm.PropertyChanged -= OnVmPropertyChanged; HookEditCollections(_vm, false); _vm.RemovalAnimator = null; }
             _vm = DataContext as TunnelViewModel;
-            if (_vm is not null) _vm.PropertyChanged += OnVmPropertyChanged;
+            if (_vm is not null)
+            {
+                _vm.PropertyChanged += OnVmPropertyChanged;
+                HookEditCollections(_vm, true);
+                _vm.RemovalAnimator = PlayRemove;
+            }
             BuildDetail();
 
             // External and custom cards have no interface column: peers span full width.
@@ -94,11 +100,13 @@ public partial class TunnelCard : UserControl
         // clicks (double-tap detection), which made rapid expand/collapse feel dead.
         AddHandler(PointerPressedEvent, OnCardPressed, handledEventsToo: false);
 
-        // Fade a card in the first time it appears, with the same easing as the expand.
+        // Fade a card in the first time it appears; fade + collapse it on removal.
+        ClipToBounds = true;
         Opacity = 0;
         Transitions = new Transitions
         {
             new DoubleTransition { Property = OpacityProperty, Duration = TimeSpan.FromMilliseconds(AnimMs), Easing = new CubicEaseOut() },
+            new DoubleTransition { Property = HeightProperty, Duration = TimeSpan.FromMilliseconds(AnimMs), Easing = new CubicEaseOut() },
         };
         AttachedToVisualTree += (_, _) => { if (!_appeared) { _appeared = true; Opacity = 1; } };
     }
@@ -166,6 +174,53 @@ public partial class TunnelCard : UserControl
     {
         content.Measure(new Size(width, double.PositiveInfinity));
         return content.DesiredSize.Height;
+    }
+
+    // Subscribe to the editable collections so adding/removing peers, domains, allowed IPs
+    // or addresses animates the card's resize (same tween as expand/collapse).
+    void HookEditCollections(TunnelViewModel vm, bool add)
+    {
+        if (add)
+        {
+            vm.Peers.CollectionChanged += OnPeersChanged;
+            vm.Addresses.CollectionChanged += OnContentChanged;
+            foreach (var p in vm.Peers) HookPeer(p, true);
+        }
+        else
+        {
+            vm.Peers.CollectionChanged -= OnPeersChanged;
+            vm.Addresses.CollectionChanged -= OnContentChanged;
+            foreach (var p in vm.Peers) HookPeer(p, false);
+        }
+    }
+
+    void HookPeer(PeerViewModel p, bool add)
+    {
+        if (add) { p.Domains.CollectionChanged += OnContentChanged; p.AllowedIps.CollectionChanged += OnContentChanged; }
+        else { p.Domains.CollectionChanged -= OnContentChanged; p.AllowedIps.CollectionChanged -= OnContentChanged; }
+    }
+
+    void OnPeersChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.OldItems is not null) foreach (PeerViewModel p in e.OldItems) HookPeer(p, false);
+        if (e.NewItems is not null) foreach (PeerViewModel p in e.NewItems) HookPeer(p, true);
+        OnContentChanged(sender, e);
+    }
+
+    void OnContentChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (_vm?.IsEditing == true) TweenBodyToContent();
+    }
+
+    // Fade + collapse the card, then run the real removal.
+    bool PlayRemove(Action complete)
+    {
+        _appeared = true; // don't re-trigger the appear fade
+        Height = Bounds.Height;      // fix height so we can shrink it
+        Opacity = 0;
+        Dispatcher.UIThread.Post(() => Height = 0, DispatcherPriority.Render);
+        DispatcherTimer.RunOnce(complete, TimeSpan.FromMilliseconds(AnimMs + 40));
+        return true;
     }
 
     // Animate the shared region's Height from where it is now to the visible content's

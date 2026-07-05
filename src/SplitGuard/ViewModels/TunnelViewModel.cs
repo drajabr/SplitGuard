@@ -16,6 +16,7 @@ public interface ITunnelHost
     void CopyText(string text);
     void AccentChanged(TunnelViewModel tunnel);
     void CustomActiveChanged(TunnelViewModel tunnel);
+    void ReportError(TunnelViewModel tunnel, string message);
 }
 
 public class TunnelViewModel : ObservableObject
@@ -143,6 +144,21 @@ public class TunnelViewModel : ObservableObject
         {
             if (_isConnected == value) return;
             if (IsExternal) return; // external adapters are driven by the official client
+
+            // Turning a tunnel ON validates the saved config; a bad/empty tunnel can be
+            // saved, but it can't be connected — report the problem and stay off.
+            if (value && !IsCustom)
+            {
+                var error = ValidateConfig();
+                if (error is not null)
+                {
+                    ValidationError = error;
+                    Raise(); // revert the toggle visual
+                    Host.ReportError(this, error);
+                    return;
+                }
+            }
+
             // Optimistic UI: the host reverts via SetConnectedState on failure.
             _isConnected = value;
             Raise();
@@ -253,11 +269,16 @@ public class TunnelViewModel : ObservableObject
 
     int _armVersion;
 
+    // The view sets this to play a fade-out before the tunnel is actually removed. It must
+    // invoke the supplied completion when the animation finishes; returns true if it will.
+    public Func<Action, bool>? RemovalAnimator;
+
     async void DeleteClicked()
     {
         if (DeleteArmed)
         {
             DeleteArmed = false;
+            if (RemovalAnimator is not null && RemovalAnimator(() => Host.RequestDelete(this))) return;
             Host.RequestDelete(this);
             return;
         }
@@ -450,12 +471,8 @@ public class TunnelViewModel : ObservableObject
             ApplyTextToFields();
             IsTextMode = false;
         }
-        var error = Validate();
-        if (error is not null)
-        {
-            ValidationError = error;
-            return;
-        }
+        // A tunnel can be saved incomplete/empty; problems are only enforced when it is
+        // turned on (see ValidateConfig in the IsConnected setter).
         ValidationError = "";
         WarningText = string.Join(" · ", Peers.Select(p => p.DnsRouteWarning()).Where(w => w is not null)!);
         var connectionChanged = !IsExternal && !IsCustom && ConnSnapshot() != _connSnapshot;
@@ -504,27 +521,28 @@ public class TunnelViewModel : ObservableObject
         Host.TunnelSaved(this, connectionChanged);
     }
 
-    string? Validate()
+    // Connect-time validation of the saved config (fields are cleared after save, so this
+    // checks Config, not the edit boxes). Returns the first problem, or null if connectable.
+    string? ValidateConfig()
     {
-        if (!IsExternal && !IsCustom)
+        if (IsExternal || IsCustom) return null;
+        var c = Config!;
+        if (string.IsNullOrWhiteSpace(c.Name)) return "Tunnel needs a name";
+        string priv;
+        try { priv = RuleStore.Unprotect(c.PrivateKeyProtected); } catch { priv = ""; }
+        if (!PeerViewModel.IsValidKey(priv)) return "Private key must be a valid 32-byte base64 key";
+        if (c.Addresses.Count == 0) return "Tunnel needs at least one address";
+        foreach (var a in c.Addresses)
+            if (!WireGuardConf.TryParseCidr(a, out _, out _)) return $"Invalid address: {a}";
+        if (c.Peers.Count == 0) return "Tunnel needs at least one peer";
+        foreach (var p in c.Peers)
         {
-            if (string.IsNullOrWhiteSpace(Name)) return "Tunnel needs a name";
-            if (!PeerViewModel.IsValidKey(PrivateKeyEdit)) return "Private key must be a valid 32-byte base64 key";
-            if (ListenPortText.Trim().Length > 0 && !ushort.TryParse(ListenPortText.Trim(), out _))
-                return $"Listen port must be 0-65535 — got '{ListenPortText}'";
-            if (!AddressValues.Any()) return "Tunnel needs at least one address";
-            foreach (var a in AddressValues)
-                if (!WireGuardConf.TryParseCidr(a, out _, out _)) return $"Invalid address: {a}";
-            if (Peers.Count == 0) return "Tunnel needs at least one peer";
+            if (!PeerViewModel.IsValidKey(p.PublicKey)) return "Peer public key must be a valid 32-byte base64 key";
+            if (!PeerViewModel.IsValidEndpoint(p.Endpoint)) return $"Peer endpoint must be host:port — got '{p.Endpoint}'";
+            if (p.AllowedIps.Count == 0) return "Peer needs at least one allowed IP";
+            foreach (var cidr in p.AllowedIps)
+                if (!WireGuardConf.TryParseCidr(cidr, out _, out _)) return $"Invalid allowed IP: {cidr}";
         }
-        foreach (var p in Peers)
-        {
-            var err = p.Validate();
-            if (err is not null) return err;
-        }
-        var all = Peers.SelectMany(p => p.DomainValues).ToList();
-        var dup = all.GroupBy(d => d, StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1);
-        if (dup is not null) return $"Domain listed twice: {dup.Key}";
         return null;
     }
 
