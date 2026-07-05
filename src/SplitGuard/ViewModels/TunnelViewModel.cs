@@ -145,6 +145,10 @@ public class TunnelViewModel : ObservableObject
             if (_isConnected == value) return;
             if (IsExternal) return; // external adapters are driven by the official client
 
+            // The power button doubles as save-and-apply while editing: commit the edits
+            // first, then connect/activate the freshly-saved config.
+            if (IsEditing) SaveEdit();
+
             // Turning a tunnel ON validates the saved config; a bad/empty tunnel can be
             // saved, but it can't be connected — report the problem and stay off.
             if (value && !IsCustom)

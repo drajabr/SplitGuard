@@ -34,10 +34,10 @@ public class CustomDnsRole
 public class UiPrefs
 {
     public string Theme { get; set; } = "auto";
-    public string Accent { get; set; } = "blue";
-    public string Font { get; set; } = "segoe";
+    public string Accent { get; set; } = "green";
+    public string Font { get; set; } = "mono";
     public string Zoom { get; set; } = "100%";
-    public bool StartOnBoot { get; set; }
+    public bool StartOnBoot { get; set; } = true;
     public bool Notifications { get; set; } = true;
     public bool CustomDnsEnabled { get; set; } = true;
 }

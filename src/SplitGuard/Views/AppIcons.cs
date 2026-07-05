@@ -34,6 +34,10 @@ public static class AppIcons
         return result;
     }
 
+    // Zoom the whole glyph toward the center so the transparent padding shrinks from
+    // ~20% to ~8%. >1 enlarges; sampled bilinearly, anything outside reads transparent.
+    const double Zoom = 1.40;
+
     static byte[] Compose(int size, Color accent, bool tick)
     {
         using var stream = AssetLoader.Open(new Uri($"avares://SplitGuard/Assets/icon-template-{size}.png"));
@@ -45,24 +49,45 @@ public static class AppIcons
         {
             var srcBytes = new byte[src.RowBytes * size];
             Marshal.Copy(src.Address, srcBytes, 0, srcBytes.Length);
-            var dstBytes = new byte[dst.RowBytes * size];
             bool rgba = src.Format == PixelFormat.Rgba8888;
+
+            // Recover all channel masks (un-premultiply) up front so they can be sampled
+            // at fractional, zoomed coordinates.
+            var mCheck = new double[size * size];
+            var mCircle = new double[size * size];
+            var mDragon = new double[size * size];
+            var mAlpha = new double[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    int o = y * src.RowBytes + x * 4;
+                    int a = srcBytes[o + 3];
+                    int check = srcBytes[o + (rgba ? 2 : 0)];
+                    int circle = srcBytes[o + 1];
+                    int dragon = srcBytes[o + (rgba ? 0 : 2)];
+                    if (a > 0 && a < 255)
+                    {
+                        check = Math.Min(255, check * 255 / a);
+                        circle = Math.Min(255, circle * 255 / a);
+                        dragon = Math.Min(255, dragon * 255 / a);
+                    }
+                    int i = y * size + x;
+                    mCheck[i] = check; mCircle[i] = circle; mDragon[i] = dragon; mAlpha[i] = a;
+                }
+
+            var dstBytes = new byte[dst.RowBytes * size];
+            double c = (size - 1) / 2.0;
             for (int y = 0; y < size; y++)
             {
                 for (int x = 0; x < size; x++)
                 {
-                    int so = y * src.RowBytes + x * 4;
-                    int check = srcBytes[so + (rgba ? 2 : 0)];
-                    int circle = srcBytes[so + 1];
-                    int dragon = srcBytes[so + (rgba ? 0 : 2)];
-                    int alpha = srcBytes[so + 3];
-                    if (alpha > 0 && alpha < 255)
-                    {
-                        // decoded premultiplied: recover the masks
-                        check = Math.Min(255, check * 255 / alpha);
-                        circle = Math.Min(255, circle * 255 / alpha);
-                        dragon = Math.Min(255, dragon * 255 / alpha);
-                    }
+                    var sx = c + (x - c) / Zoom;
+                    var sy = c + (y - c) / Zoom;
+                    var check = Sample(mCheck, size, sx, sy);
+                    var circle = Sample(mCircle, size, sx, sy);
+                    var dragon = Sample(mDragon, size, sx, sy);
+                    var alpha = Sample(mAlpha, size, sx, sy);
+
                     double r = Lerp(accent.R, 255, dragon);
                     double g = Lerp(accent.G, 255, dragon);
                     double b = Lerp(accent.B, 255, dragon);
@@ -79,7 +104,7 @@ public static class AppIcons
                     dstBytes[oo] = (byte)b;
                     dstBytes[oo + 1] = (byte)g;
                     dstBytes[oo + 2] = (byte)r;
-                    dstBytes[oo + 3] = (byte)alpha;
+                    dstBytes[oo + 3] = (byte)Math.Round(alpha);
                 }
             }
             Marshal.Copy(dstBytes, 0, dst.Address, dstBytes.Length);
@@ -90,7 +115,18 @@ public static class AppIcons
         return ms.ToArray();
     }
 
-    static double Lerp(double from, double to, int mask) => from + (to - from) * mask / 255.0;
+    static double Sample(double[] a, int size, double fx, double fy)
+    {
+        if (fx < 0 || fy < 0 || fx > size - 1 || fy > size - 1) return 0;
+        int x0 = (int)Math.Floor(fx), y0 = (int)Math.Floor(fy);
+        int x1 = Math.Min(x0 + 1, size - 1), y1 = Math.Min(y0 + 1, size - 1);
+        double tx = fx - x0, ty = fy - y0;
+        double top = a[y0 * size + x0] * (1 - tx) + a[y0 * size + x1] * tx;
+        double bot = a[y1 * size + x0] * (1 - tx) + a[y1 * size + x1] * tx;
+        return top * (1 - ty) + bot * ty;
+    }
+
+    static double Lerp(double from, double to, double mask) => from + (to - from) * mask / 255.0;
 
     static byte[] BuildIco(List<byte[]> pngs)
     {

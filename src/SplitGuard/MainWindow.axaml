@@ -60,36 +60,46 @@
       </StackPanel>
     </Border>
 
+    <!-- Persistent bottom bar: DNS + tunnel status on the left, Add on the right. -->
+    <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="0,1,0,0" Padding="14,6">
+      <DockPanel>
+        <Button DockPanel.Dock="Right" Name="AddButton" Classes="hdr" ToolTip.Tip="Add tunnel">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Classes="glyph" Text="&#xE710;" FontSize="{DynamicResource Fs12}" Foreground="{DynamicResource AccentBrush}" />
+            <TextBlock Text="Add" VerticalAlignment="Center" FontSize="{DynamicResource Fs12}" />
+          </StackPanel>
+        </Button>
+        <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Classes="glyph" Text="&#xE774;" FontSize="{DynamicResource Fs12}" Opacity="0.55" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding DnsStatus}" FontSize="{DynamicResource Fs12}" Opacity="0.85" VerticalAlignment="Center" />
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Classes="glyph" Text="&#xE896;" FontSize="{DynamicResource Fs12}" Opacity="0.55" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding TunnelSummary}" FontSize="{DynamicResource Fs12}" Opacity="0.85" VerticalAlignment="Center" />
+          </StackPanel>
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
     <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="0,1,0,0" Padding="14,6"
             Classes="statusbar" Classes.shown="{Binding HasStatus}">
       <TextBlock Text="{Binding StatusText}" Classes="oktext" Classes.errtext="{Binding !StatusOk}" />
     </Border>
 
-    <Panel>
-      <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Margin="14,8,14,64">
-          <ItemsControl ItemsSource="{Binding Tunnels}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate>
-                <views:TunnelCard Margin="0,0,0,10" />
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-          <TextBlock Classes="muted" Margin="2,6" TextWrapping="Wrap"
-                     IsVisible="{Binding !Tunnels.Count}"
-                     Text="No tunnels yet. Drop a WireGuard .conf file anywhere in this window, or copy a config and press Ctrl+V. Domains you attach to a peer resolve through that peer's DNS while connected; everything else keeps using your normal system DNS." />
-        </StackPanel>
-      </ScrollViewer>
-
-      <!-- Floating Add button (centered at the bottom; opens the add options popover). -->
-      <Button Name="AddButton" Classes="addbtn" HorizontalAlignment="Center" VerticalAlignment="Bottom"
-              Margin="0,0,0,14" ToolTip.Tip="Add tunnel">
-        <StackPanel HorizontalAlignment="Center" Spacing="0">
-          <TextBlock Classes="glyph" Text="&#xE710;" FontSize="{DynamicResource Fs17}" HorizontalAlignment="Center"
-                     Foreground="{DynamicResource AccentBrush}" />
-          <TextBlock Text="Add" FontSize="{DynamicResource Fs11}" Opacity="0.75" HorizontalAlignment="Center" />
-        </StackPanel>
-      </Button>
-    </Panel>
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Margin="14,8,14,12">
+        <ItemsControl ItemsSource="{Binding Tunnels}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <views:TunnelCard Margin="0,0,0,10" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock Classes="muted" Margin="2,6" TextWrapping="Wrap"
+                   IsVisible="{Binding !Tunnels.Count}"
+                   Text="No tunnels yet. Drop a WireGuard .conf file anywhere in this window, or copy a config and press Ctrl+V. Domains you attach to a peer resolve through that peer's DNS while connected; everything else keeps using your normal system DNS." />
+      </StackPanel>
+    </ScrollViewer>
   </DockPanel>
 </Window>

@@ -29,6 +29,37 @@ public class MainViewModel : ObservableObject, ITunnelHost
         _tunnels.StatsUpdated += (name, stats) => Dispatcher.UIThread.Post(() =>
             Tunnels.FirstOrDefault(t => !t.IsExternal && t.Name == name)?.ApplyStats(stats));
         _external.AdaptersChanged += () => Dispatcher.UIThread.Post(() => _ = RefreshExternalsAsync());
+        Tunnels.CollectionChanged += (_, _) => NotifyStatus();
+    }
+
+    // ---- bottom status bar ------------------------------------------------------
+
+    public string TunnelSummary
+    {
+        get
+        {
+            var all = Tunnels.Where(t => !t.IsCustom).ToList();
+            return $"{all.Count(t => t.IsConnected)}/{all.Count} on";
+        }
+    }
+
+    public string DnsStatus
+    {
+        get
+        {
+            if (_config.PinnedDns is null) return "System DNS";
+            foreach (var t in Tunnels.Where(t => t.IsConnected))
+                foreach (var p in t.Peers.Where(p => p.HasDns))
+                    if (_config.PinnedDns.TunnelName == TunnelKey(t) && _config.PinnedDns.PeerPublicKey == PeerKey(t, p))
+                        return $"Device DNS · {p.Dns.Trim()}";
+            return "System DNS";
+        }
+    }
+
+    void NotifyStatus()
+    {
+        Raise(nameof(TunnelSummary));
+        Raise(nameof(DnsStatus));
     }
 
     public UiPrefs Prefs => _config.Ui;
@@ -88,6 +119,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
             else _nrpt.RemoveByTunnel(CustomName);
             RefreshCatchAll();
         });
+        NotifyStatus();
     }
 
     public async Task InitializeAsync()
@@ -249,6 +281,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
             }
             t.NotifyPresentation();
         }
+        NotifyStatus();
     }
 
     // The single catch-all rule: pinned server first, then other live tunnel DNS, then

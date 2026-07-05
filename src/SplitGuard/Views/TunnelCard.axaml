@@ -21,8 +21,8 @@
             <TextBlock Classes="mono" Text="{Binding DownRate}" Opacity="0.75" />
           </StackPanel>
           <StackPanel Name="ConnectBox" Orientation="Horizontal" VerticalAlignment="Center" IsVisible="{Binding ShowConnect}">
-            <ToggleButton Classes="conn" IsChecked="{Binding IsConnected}" IsEnabled="{Binding !IsEditing}"
-                          ToolTip.Tip="Connect / disconnect">
+            <ToggleButton Classes="conn" IsChecked="{Binding IsConnected}"
+                          ToolTip.Tip="Connect / disconnect (saves &amp; applies while editing)">
               <TextBlock Classes="glyph" Text="&#xE7E8;" FontSize="{DynamicResource Fs17}" />
             </ToggleButton>
           </StackPanel>
@@ -31,7 +31,7 @@
           <Ellipse Grid.Column="0" Name="StatusDot" Classes="dot" Classes.up="{Binding IsConnected}"
                    PointerPressed="OnDotPressed" ToolTip.Tip="Click while editing to change this card's accent" />
           <TextBox Grid.Column="1" MinWidth="60" HorizontalAlignment="Left" Margin="10,0,0,0" VerticalAlignment="Center"
-                   FontSize="{DynamicResource Fs135}" FontWeight="Medium"
+                   FontSize="{DynamicResource Fs17}" FontWeight="SemiBold"
                    Foreground="{DynamicResource AccentBrush}" Text="{Binding Name}"
                    Classes.plainname="{Binding !NameEditable}"
                    IsReadOnly="{Binding !NameEditable}" IsHitTestVisible="{Binding NameEditable}" />

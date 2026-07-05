@@ -138,6 +138,8 @@ public partial class MainWindow : Window, IDialogs
         ApplyFont();
         ApplyZoom();
         InitChrome();
+        // Reconcile the run-at-boot registry entry with the (possibly default-on) pref.
+        try { StartupService.Set(prefs.StartOnBoot); } catch { }
     }
 
     void ApplyFont()

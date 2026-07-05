@@ -124,9 +124,13 @@ public partial class TunnelCard : UserControl
             ConfEditor.Text = _vm.ConfigText;
             _syncingEditor = false;
         }
-        // Switching raw editor <-> fields resizes the body: tween it like expand/collapse.
+        // Switching raw editor <-> fields resizes the body and slides the new pane in.
         if (e.PropertyName == nameof(TunnelViewModel.IsTextMode) && _vm is { IsEditing: true })
+        {
             TweenBodyToContent();
+            // Fields -> raw slides in from the right; raw -> fields from the left.
+            SlideIn(_vm.IsTextMode ? EditorHost : FieldsGrid, _vm.IsTextMode ? 36 : -36);
+        }
         if (e.PropertyName == nameof(TunnelViewModel.CollapsedSummary))
             BuildDetail();
         if (e.PropertyName == nameof(TunnelViewModel.Accent))
@@ -136,7 +140,37 @@ public partial class TunnelCard : UserControl
             ExpandContent.IsVisible = _vm.IsEditing;
             DetailPanel.IsVisible = !_vm.IsEditing;
             TweenBodyToContent();
+            if (_vm.IsEditing) DispatcherTimer.RunOnce(ScrollSelfIntoView, TimeSpan.FromMilliseconds(AnimMs + 70));
         }
+    }
+
+    // Slide a pane in horizontally (with a quick fade) — used for the raw/fields swap.
+    async void SlideIn(Control pane, double fromX)
+    {
+        var tt = new TranslateTransform(fromX, 0);
+        pane.RenderTransform = tt;
+        var anim = new Animation
+        {
+            Duration = TimeSpan.FromMilliseconds(AnimMs),
+            Easing = new CubicEaseOut(),
+            FillMode = FillMode.Forward,
+            Children =
+            {
+                new KeyFrame { Cue = new Cue(0d), Setters = { new Setter(TranslateTransform.XProperty, fromX) } },
+                new KeyFrame { Cue = new Cue(1d), Setters = { new Setter(TranslateTransform.XProperty, 0d) } },
+            },
+        };
+        await anim.RunAsync(tt);
+        pane.RenderTransform = null;
+    }
+
+    // Scroll the card near the top of the list when it expands.
+    void ScrollSelfIntoView()
+    {
+        var sv = this.FindAncestorOfType<ScrollViewer>();
+        if (sv?.Content is not Visual content) return;
+        var p = this.TranslatePoint(new Point(0, 0), content);
+        if (p is { } pt) sv.Offset = new Vector(sv.Offset.X, Math.Max(0, pt.Y - 12));
     }
 
     // ---- per-card accent -------------------------------------------------------
@@ -274,8 +308,16 @@ public partial class TunnelCard : UserControl
             return tb;
         }
 
-        // One row: left text and a right-aligned text (either may be blank).
-        void AddRow(string left, IBrush leftBrush, string right, IBrush rightBrush)
+        TextBlock Label(string text)
+        {
+            var tb = new TextBlock { Text = text };
+            tb.Classes.Add("lbl");
+            tb.Margin = new Avalonia.Thickness(0, 0, 6, 0);
+            return tb;
+        }
+
+        // One row: an optional left label + left value, and a right-aligned value.
+        void AddRow(string leftLabel, string left, IBrush leftBrush, string right, IBrush rightBrush)
         {
             var row = new DockPanel { Margin = new Avalonia.Thickness(0, 0, 0, 2) };
             if (right.Length > 0)
@@ -286,6 +328,7 @@ public partial class TunnelCard : UserControl
                 DockPanel.SetDock(r, Dock.Right);
                 row.Children.Add(r);
             }
+            if (leftLabel.Length > 0) row.Children.Add(Label(leftLabel));
             if (left.Length > 0) row.Children.Add(Mono(left, leftBrush));
             DetailPanel.Children.Add(row);
         }
@@ -293,19 +336,19 @@ public partial class TunnelCard : UserControl
         // Line 1: our address(es) on the left, all peers' allowed IPs on the right.
         var ourIps = string.Join(", ", _vm.AddressValues);
         var allowed = string.Join(", ", _vm.Peers.SelectMany(p => p.AllowedIpValues).Distinct());
-        if (ourIps.Length > 0 || allowed.Length > 0) AddRow(ourIps, Syntax.IpBrush, allowed, Syntax.IpBrush);
+        if (ourIps.Length > 0 || allowed.Length > 0) AddRow("Address", ourIps, Syntax.IpBrush, allowed, Syntax.IpBrush);
 
         // Then one line per peer that defines a DNS server and/or domains:
-        //   DNS server on the left, the domains it resolves right-aligned.
+        //   "DNS" + server on the left, the domains it resolves right-aligned.
         foreach (var p in _vm.Peers)
         {
             var domains = string.Join(", ", p.DomainValues);
             if (!p.HasDns && domains.Length == 0) continue;
-            AddRow(p.HasDns ? p.Dns.Trim() : "", Syntax.IpBrush, domains, Syntax.DomainBrush);
+            AddRow(p.HasDns ? "DNS" : "", p.HasDns ? p.Dns.Trim() : "", Syntax.IpBrush, domains, Syntax.DomainBrush);
         }
 
         if (DetailPanel.Children.Count == 0)
-            AddRow("no split DNS configured", Syntax.IpBrush, "", Syntax.IpBrush);
+            AddRow("", "no split DNS configured", Syntax.IpBrush, "", Syntax.IpBrush);
     }
 
     // Collapsed: a click anywhere on the card expands it. Expanded: only a click on
