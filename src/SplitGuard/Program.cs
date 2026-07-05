@@ -10,6 +10,14 @@ static class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        // Build tooling: regenerate Assets/app.ico from the live compositor, then exit.
+        if (args.Length >= 2 && args[0] == "--export-ico")
+        {
+            BuildAvaloniaApp().SetupWithoutStarting();
+            Views.AppIcons.ExportIco(args[1], Avalonia.Media.Color.Parse("#2FA84F"));
+            return;
+        }
+
         // Single instance: a second launch signals the first to show its window, then exits.
         _singleInstance = new Mutex(true, @"Local\SplitGuardClient", out var createdNew);
         var showSignal = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\SplitGuardClient.Show");

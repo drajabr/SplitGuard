@@ -53,6 +53,14 @@ if (Test-Path $out) {
     catch { throw "Cannot clean $out - close any running SplitGuard.exe first (it may be elevated)." }
 }
 
+# Regenerate the app icon from the live compositor so the exe icon always matches.
+Write-Host "Regenerating app icon..."
+& $dotnetExe build (Join-Path $root "src\SplitGuard") -c Debug -v q | Out-Null
+if ($LASTEXITCODE -eq 0) {
+    & $dotnetExe (Join-Path $root "src\SplitGuard\bin\Debug\net8.0-windows\SplitGuard.dll") `
+        --export-ico (Join-Path $root "src\SplitGuard\Assets\app.ico")
+}
+
 Write-Host "Publishing ($Arch)..."
 & $dotnetExe publish (Join-Path $root "src\SplitGuard") -c Release -r "win-$Arch" --self-contained `
     -p:PublishSingleFile=true -o $out -v q

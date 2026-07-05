@@ -34,8 +34,22 @@ public static class AppIcons
         return result;
     }
 
-    // Fraction of the canvas left as padding around the dragon (rest is filled by it).
-    const double Pad = 0.06;
+    // Build a multi-size .ico for the given accent (used to regenerate Assets/app.ico from
+    // the exact same compositor used at runtime).
+    public static void ExportIco(string icoPath, Color accent)
+    {
+        var idle = new List<byte[]>();
+        foreach (var size in IcoSizes) idle.Add(Compose(size, accent, tick: false));
+        File.WriteAllBytes(icoPath, BuildIco(idle));
+    }
+
+    // Inflated (rounded) downward triangle background, in normalized [0,1] coordinates.
+    static readonly (double X, double Y) TriA = (0.15, 0.19); // top-left
+    static readonly (double X, double Y) TriB = (0.85, 0.19); // top-right
+    static readonly (double X, double Y) TriC = (0.50, 0.82); // bottom apex
+    const double TriRound = 0.09;   // corner rounding → the "inflated" look
+    const double DragonFill = 0.50; // dragon size as a fraction of the canvas
+    const double DragonCY = 0.45;   // dragon vertical center (upper part of the triangle)
 
     static byte[] Compose(int size, Color accent, bool tick)
     {
@@ -74,8 +88,7 @@ public static class AppIcons
                     mCheck[i] = check; mCircle[i] = circle; mDragon[i] = dragon; mAlpha[i] = a;
                 }
 
-            // Fit the dragon's bounding box to the canvas (minus padding), centered — the
-            // maximum zoom that never clips, regardless of where the dragon sits.
+            // Fit the dragon's bounding box so it sits, centered, inside the triangle.
             int minX = size, minY = size, maxX = -1, maxY = -1;
             for (int y = 0; y < size; y++)
                 for (int x = 0; x < size; x++)
@@ -84,49 +97,53 @@ public static class AppIcons
                         if (x < minX) minX = x; if (x > maxX) maxX = x;
                         if (y < minY) minY = y; if (y > maxY) maxY = y;
                     }
-            double bcx, bcy, scale;
-            if (maxX < 0) { bcx = bcy = (size - 1) / 2.0; scale = 1; }
+            double bcx, bcy, dscale;
+            if (maxX < 0) { bcx = bcy = (size - 1) / 2.0; dscale = 1; }
             else
             {
                 bcx = (minX + maxX) / 2.0;
                 bcy = (minY + maxY) / 2.0;
                 double bw = maxX - minX + 1, bh = maxY - minY + 1;
-                scale = size * (1 - 2 * Pad) / Math.Max(bw, bh);
+                dscale = size * DragonFill / Math.Max(bw, bh);
             }
 
             var dstBytes = new byte[dst.RowBytes * size];
-            double cc = (size - 1) / 2.0;
+            var aa = 1.5 / size; // edge softness for the triangle, in normalized units
             for (int y = 0; y < size; y++)
             {
                 for (int x = 0; x < size; x++)
                 {
-                    var sx = bcx + (x - cc) / scale;
-                    var sy = bcy + (y - cc) / scale;
-                    var check = Sample(mCheck, size, sx, sy);
-                    var circle = Sample(mCircle, size, sx, sy);
-                    var dragon = Sample(mDragon, size, sx, sy);
-                    var alpha = Sample(mAlpha, size, sx, sy);
+                    // Inflated triangle background coverage (0..1).
+                    var nx = x / (double)(size - 1);
+                    var ny = y / (double)(size - 1);
+                    var sd = SdTriangle(nx, ny) - TriRound;
+                    var bg = Math.Clamp(0.5 - sd / aa, 0, 1);
 
-                    // The dragon itself is the icon (accent-colored), no background fill.
-                    // Alpha follows the dragon shape; the "active" tick overlay extends it.
-                    double r = accent.R, g = accent.G, b = accent.B;
-                    var shape = dragon;
+                    // Dragon (and tick) sampled at the dragon-fit transform.
+                    var dx = bcx + (x - size * 0.5) / dscale;
+                    var dy = bcy + (y - size * DragonCY) / dscale;
+                    var dr = Math.Min(Sample(mDragon, size, dx, dy), Sample(mAlpha, size, dx, dy)) / 255.0;
+
+                    // Triangle in accent; dragon knocked out in white on top of it.
+                    double r = accent.R + (255 - accent.R) * dr;
+                    double g = accent.G + (255 - accent.G) * dr;
+                    double b = accent.B + (255 - accent.B) * dr;
+                    var a = bg; // dragon is clipped to the triangle
+
                     if (tick)
                     {
-                        r = Lerp(r, TickGreen.R, circle);
-                        g = Lerp(g, TickGreen.G, circle);
-                        b = Lerp(b, TickGreen.B, circle);
-                        r = Lerp(r, 255, check);
-                        g = Lerp(g, 255, check);
-                        b = Lerp(b, 255, check);
-                        shape = Math.Max(dragon, circle);
+                        var ci = Sample(mCircle, size, dx, dy) / 255.0;
+                        var ck = Sample(mCheck, size, dx, dy) / 255.0;
+                        r = r * (1 - ci) + TickGreen.R * ci; g = g * (1 - ci) + TickGreen.G * ci; b = b * (1 - ci) + TickGreen.B * ci;
+                        r = r * (1 - ck) + 255 * ck; g = g * (1 - ck) + 255 * ck; b = b * (1 - ck) + 255 * ck;
+                        a = Math.Max(a, Math.Max(ci, ck));
                     }
+
                     int oo = y * dst.RowBytes + x * 4;
-                    dstBytes[oo] = (byte)b;
-                    dstBytes[oo + 1] = (byte)g;
-                    dstBytes[oo + 2] = (byte)r;
-                    // Clip the source alpha to the dragon/tick shape.
-                    dstBytes[oo + 3] = (byte)Math.Round(Math.Min(alpha, shape));
+                    dstBytes[oo] = (byte)Math.Clamp(b, 0, 255);
+                    dstBytes[oo + 1] = (byte)Math.Clamp(g, 0, 255);
+                    dstBytes[oo + 2] = (byte)Math.Clamp(r, 0, 255);
+                    dstBytes[oo + 3] = (byte)Math.Round(a * 255);
                 }
             }
             Marshal.Copy(dstBytes, 0, dst.Address, dstBytes.Length);
@@ -149,6 +166,25 @@ public static class AppIcons
     }
 
     static double Lerp(double from, double to, double mask) => from + (to - from) * mask / 255.0;
+
+    // Signed distance to the triangle (negative inside); subtract a radius to round it.
+    static double SdTriangle(double px, double py)
+    {
+        double ax = TriA.X, ay = TriA.Y, bx = TriB.X, by = TriB.Y, cx = TriC.X, cy = TriC.Y;
+        double e0x = bx - ax, e0y = by - ay, e1x = cx - bx, e1y = cy - by, e2x = ax - cx, e2y = ay - cy;
+        double v0x = px - ax, v0y = py - ay, v1x = px - bx, v1y = py - by, v2x = px - cx, v2y = py - cy;
+        double p0x = v0x - e0x * Math.Clamp((v0x * e0x + v0y * e0y) / (e0x * e0x + e0y * e0y), 0, 1);
+        double p0y = v0y - e0y * Math.Clamp((v0x * e0x + v0y * e0y) / (e0x * e0x + e0y * e0y), 0, 1);
+        double p1x = v1x - e1x * Math.Clamp((v1x * e1x + v1y * e1y) / (e1x * e1x + e1y * e1y), 0, 1);
+        double p1y = v1y - e1y * Math.Clamp((v1x * e1x + v1y * e1y) / (e1x * e1x + e1y * e1y), 0, 1);
+        double p2x = v2x - e2x * Math.Clamp((v2x * e2x + v2y * e2y) / (e2x * e2x + e2y * e2y), 0, 1);
+        double p2y = v2y - e2y * Math.Clamp((v2x * e2x + v2y * e2y) / (e2x * e2x + e2y * e2y), 0, 1);
+        double s = Math.Sign(e0x * e2y - e0y * e2x);
+        double d0 = Math.Min(p0x * p0x + p0y * p0y, p1x * p1x + p1y * p1y);
+        d0 = Math.Min(d0, p2x * p2x + p2y * p2y);
+        double d1 = Math.Min(Math.Min(s * (v0x * e0y - v0y * e0x), s * (v1x * e1y - v1y * e1x)), s * (v2x * e2y - v2y * e2x));
+        return -Math.Sqrt(d0) * Math.Sign(d1);
+    }
 
     static byte[] BuildIco(List<byte[]> pngs)
     {
