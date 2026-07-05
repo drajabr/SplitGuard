@@ -1,5 +1,6 @@
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Xml;
 using Avalonia;
 using Avalonia.Animation;
@@ -140,37 +141,43 @@ public partial class TunnelCard : UserControl
             ExpandContent.IsVisible = _vm.IsEditing;
             DetailPanel.IsVisible = !_vm.IsEditing;
             TweenBodyToContent();
-            if (_vm.IsEditing) DispatcherTimer.RunOnce(ScrollSelfIntoView, TimeSpan.FromMilliseconds(AnimMs + 70));
+            if (_vm.IsEditing) ScrollSelfIntoView(); // starts now, in sync with the expand
         }
     }
 
-    // Slide a pane in horizontally (with a quick fade) — used for the raw/fields swap.
-    async void SlideIn(Control pane, double fromX)
+    // Simple CubicEaseOut tween driven by a timer — reliable for any target (transforms,
+    // scroll offset) without the Animation/RunAsync quirks that crashed on transforms.
+    static void Tween(double from, double to, int ms, Action<double> apply, Action? done = null)
+    {
+        if (Math.Abs(to - from) < 0.5) { apply(to); done?.Invoke(); return; }
+        var sw = Stopwatch.StartNew();
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(15) };
+        timer.Tick += (_, _) =>
+        {
+            var p = Math.Min(1, sw.Elapsed.TotalMilliseconds / ms);
+            var e = 1 - Math.Pow(1 - p, 3);
+            apply(from + (to - from) * e);
+            if (p >= 1) { timer.Stop(); done?.Invoke(); }
+        };
+        timer.Start();
+    }
+
+    // Slide a pane in horizontally — used for the raw <-> fields swap.
+    void SlideIn(Control pane, double fromX)
     {
         var tt = new TranslateTransform(fromX, 0);
         pane.RenderTransform = tt;
-        var anim = new Animation
-        {
-            Duration = TimeSpan.FromMilliseconds(AnimMs),
-            Easing = new CubicEaseOut(),
-            FillMode = FillMode.Forward,
-            Children =
-            {
-                new KeyFrame { Cue = new Cue(0d), Setters = { new Setter(TranslateTransform.XProperty, fromX) } },
-                new KeyFrame { Cue = new Cue(1d), Setters = { new Setter(TranslateTransform.XProperty, 0d) } },
-            },
-        };
-        await anim.RunAsync(tt);
-        pane.RenderTransform = null;
+        Tween(fromX, 0, AnimMs, v => tt.X = v, () => { if (ReferenceEquals(pane.RenderTransform, tt)) pane.RenderTransform = null; });
     }
 
-    // Scroll the card near the top of the list when it expands.
+    // Scroll the card near the top of the list, animated in step with the expand.
     void ScrollSelfIntoView()
     {
         var sv = this.FindAncestorOfType<ScrollViewer>();
         if (sv?.Content is not Visual content) return;
         var p = this.TranslatePoint(new Point(0, 0), content);
-        if (p is { } pt) sv.Offset = new Vector(sv.Offset.X, Math.Max(0, pt.Y - 12));
+        if (p is not { } pt) return;
+        Tween(sv.Offset.Y, Math.Max(0, pt.Y - 12), AnimMs, v => sv.Offset = new Vector(sv.Offset.X, Math.Max(0, v)));
     }
 
     // ---- per-card accent -------------------------------------------------------

@@ -34,8 +34,8 @@ public static class AppIcons
         return result;
     }
 
-    // Gentle zoom toward the center; kept modest so the dragon never clips at the edges.
-    const double Zoom = 1.12;
+    // Fraction of the canvas left as padding around the dragon (rest is filled by it).
+    const double Pad = 0.06;
 
     static byte[] Compose(int size, Color accent, bool tick)
     {
@@ -74,14 +74,34 @@ public static class AppIcons
                     mCheck[i] = check; mCircle[i] = circle; mDragon[i] = dragon; mAlpha[i] = a;
                 }
 
+            // Fit the dragon's bounding box to the canvas (minus padding), centered — the
+            // maximum zoom that never clips, regardless of where the dragon sits.
+            int minX = size, minY = size, maxX = -1, maxY = -1;
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                    if (mDragon[y * size + x] > 30)
+                    {
+                        if (x < minX) minX = x; if (x > maxX) maxX = x;
+                        if (y < minY) minY = y; if (y > maxY) maxY = y;
+                    }
+            double bcx, bcy, scale;
+            if (maxX < 0) { bcx = bcy = (size - 1) / 2.0; scale = 1; }
+            else
+            {
+                bcx = (minX + maxX) / 2.0;
+                bcy = (minY + maxY) / 2.0;
+                double bw = maxX - minX + 1, bh = maxY - minY + 1;
+                scale = size * (1 - 2 * Pad) / Math.Max(bw, bh);
+            }
+
             var dstBytes = new byte[dst.RowBytes * size];
-            double c = (size - 1) / 2.0;
+            double cc = (size - 1) / 2.0;
             for (int y = 0; y < size; y++)
             {
                 for (int x = 0; x < size; x++)
                 {
-                    var sx = c + (x - c) / Zoom;
-                    var sy = c + (y - c) / Zoom;
+                    var sx = bcx + (x - cc) / scale;
+                    var sy = bcy + (y - cc) / scale;
                     var check = Sample(mCheck, size, sx, sy);
                     var circle = Sample(mCircle, size, sx, sy);
                     var dragon = Sample(mDragon, size, sx, sy);
