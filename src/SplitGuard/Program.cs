@@ -28,16 +28,34 @@ static class Program
         })
         { IsBackground = true }.Start();
 
-        // Single-file publish extracts managed assemblies elsewhere; wireguard.dll ships beside the exe.
+        // Single-file publish extracts managed assemblies elsewhere; wireguard.dll is expected
+        // beside the exe, but we also probe a couple of fallback locations so local builds work.
         NativeLibrary.SetDllImportResolver(typeof(Program).Assembly, (name, _, _) =>
         {
-            if (name is "wireguard" or "wireguard.dll")
+            if (name is not ("wireguard" or "wireguard.dll")) return IntPtr.Zero;
+
+            var candidates = new List<string>();
+            var executableDir = Path.GetDirectoryName(Environment.ProcessPath) ?? AppContext.BaseDirectory;
+            var baseDir = AppContext.BaseDirectory;
+
+            foreach (var dir in new[] { executableDir, baseDir })
             {
-                var dir = Path.GetDirectoryName(Environment.ProcessPath) ?? AppContext.BaseDirectory;
-                var full = Path.Combine(dir, "wireguard.dll");
+                if (string.IsNullOrWhiteSpace(dir)) continue;
+                candidates.Add(Path.Combine(dir, "wireguard.dll"));
+                candidates.Add(Path.Combine(dir, "native", "wireguard.dll"));
+            }
+
+            var repoRoot = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", ".."));
+            candidates.Add(Path.Combine(repoRoot, "dist", "win-x64", "wireguard.dll"));
+            candidates.Add(Path.Combine(repoRoot, "dist", "win-arm64", "wireguard.dll"));
+            candidates.Add(Path.Combine(repoRoot, ".cache", "wireguard-nt", "wireguard.dll"));
+
+            foreach (var full in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
                 if (File.Exists(full))
                     return NativeLibrary.Load(full);
             }
+
             return IntPtr.Zero;
         });
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);

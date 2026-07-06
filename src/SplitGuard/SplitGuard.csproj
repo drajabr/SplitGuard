@@ -25,4 +25,13 @@
     <PackageReference Include="Microsoft.Management.Infrastructure" Version="3.0.0" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
   </ItemGroup>
+
+  <Target Name="CopyWireGuardDll" AfterTargets="Build;Publish">
+    <ItemGroup>
+      <WireGuardDllCandidates Include="$(MSBuildProjectDirectory)/../../.cache/**/wireguard.dll" Condition="Exists('$(MSBuildProjectDirectory)/../../.cache')" />
+      <WireGuardDllCandidates Include="$(MSBuildProjectDirectory)/../../dist/win-x64/wireguard.dll" Condition="Exists('$(MSBuildProjectDirectory)/../../dist/win-x64/wireguard.dll')" />
+      <WireGuardDllCandidates Include="$(MSBuildProjectDirectory)/../../dist/win-arm64/wireguard.dll" Condition="Exists('$(MSBuildProjectDirectory)/../../dist/win-arm64/wireguard.dll')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(WireGuardDllCandidates)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="'@(WireGuardDllCandidates)' != ''" />
+  </Target>
 </Project>

@@ -1,13 +1,12 @@
-using Microsoft.Win32;
+using System.Diagnostics;
 
 namespace SplitGuard.Services;
 
-// Run-at-logon via the per-user Run key. No admin needed to write it; because the
-// app requires elevation, Windows will show a UAC prompt at logon when enabled.
+// Run-at-logon via a per-user scheduled task so the app can launch elevated at logon.
+// This is the reliable mechanism for a Windows app that requires elevation.
 public static class StartupService
 {
-    const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    const string ValueName = "SplitGuard";
+    const string TaskName = "SplitGuard";
 
     static string ExePath => Environment.ProcessPath ?? "";
 
@@ -15,8 +14,10 @@ public static class StartupService
     {
         try
         {
-            using var key = Registry.CurrentUser.OpenSubKey(RunKey);
-            return key?.GetValue(ValueName) is string s && s.Trim('"').Equals(ExePath, StringComparison.OrdinalIgnoreCase);
+            using var process = StartSchtasks("/Query", "/TN", TaskName, "/FO", "CSV", "/NH");
+            var output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit();
+            return process.ExitCode == 0 && output.Contains(TaskName, StringComparison.OrdinalIgnoreCase);
         }
         catch { return false; }
     }
@@ -25,11 +26,37 @@ public static class StartupService
     {
         try
         {
-            using var key = Registry.CurrentUser.CreateSubKey(RunKey);
-            if (key is null) return;
-            if (enabled) key.SetValue(ValueName, $"\"{ExePath}\"");
-            else key.DeleteValue(ValueName, throwOnMissingValue: false);
+            if (enabled)
+            {
+                if (string.IsNullOrWhiteSpace(ExePath)) return;
+                StartSchtasks(
+                    "/Create",
+                    "/TN", TaskName,
+                    "/SC", "ONLOGON",
+                    "/TR", $"\"{ExePath}\"",
+                    "/RL", "HIGHEST",
+                    "/DELAY", "0001:00",
+                    "/F");
+            }
+            else
+            {
+                StartSchtasks("/Delete", "/TN", TaskName, "/F");
+            }
         }
         catch { }
+    }
+
+    static Process StartSchtasks(params string[] args)
+    {
+        var psi = new ProcessStartInfo("schtasks.exe")
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        foreach (var arg in args)
+            psi.ArgumentList.Add(arg);
+        return Process.Start(psi)!;
     }
 }
