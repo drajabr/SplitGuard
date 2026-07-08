@@ -165,9 +165,11 @@ public class TunnelViewModel : ObservableObject
 
             // Optimistic UI: the host reverts via SetConnectedState on failure.
             _isConnected = value;
+            if (!value) ResetEstablishment();
             Raise();
             Raise(nameof(StatsVisible));
             Raise(nameof(ConnLabel));
+            RaiseDotState();
             if (IsCustom)
             {
                 Custom!.Active = value;
@@ -183,15 +185,61 @@ public class TunnelViewModel : ObservableObject
     {
         if (_isConnected == connected) return;
         _isConnected = connected;
+        if (!connected) ResetEstablishment();
         Raise(nameof(IsConnected));
         Raise(nameof(StatsVisible));
         Raise(nameof(ConnLabel));
+        RaiseDotState();
     }
+
+    // "Connected" means a WireGuard handshake actually completed — adapter-up alone only
+    // counts as connecting. Externals/custom have no handshake, so up == established.
+    bool _isEstablished;
+    bool _everEstablished;
+    public bool IsEstablished
+    {
+        get => IsExternal || IsCustom ? IsConnected : _isEstablished;
+        private set
+        {
+            if (_isEstablished == value) return;
+            _isEstablished = value;
+            if (value) _everEstablished = true;
+            Raise(nameof(ConnLabel));
+            RaiseDotState();
+        }
+    }
+
+    void ResetEstablishment()
+    {
+        _isEstablished = false;
+        _everEstablished = false;
+    }
+
+    // A connection-affecting save reconnects the tunnel: show "Connecting…" again rather
+    // than "Stalled" while the fresh adapter completes its first handshake.
+    public void MarkReconnecting()
+    {
+        ResetEstablishment();
+        Raise(nameof(ConnLabel));
+        RaiseDotState();
+    }
+
+    void RaiseDotState()
+    {
+        Raise(nameof(IsEstablished));
+        Raise(nameof(ShowUp));
+        Raise(nameof(ShowConnecting));
+    }
+
+    public bool ShowUp => IsConnected && IsEstablished;
+    public bool ShowConnecting => IsConnected && !IsEstablished;
 
     public bool StatsVisible => IsConnected && !IsExternal && !IsCustom;
     public bool ShowConnect => !IsExternal; // WG tunnels connect; custom card activates
     public bool NameEditable => IsEditing && !IsExternal && !IsCustom;
-    public string ConnLabel => IsConnected ? "Connected" : "Disconnected";
+    public string ConnLabel => !IsConnected ? "Disconnected"
+        : IsEstablished ? "Connected"
+        : _everEstablished ? "Stalled — no recent handshake" : "Connecting…";
 
     // Expanded IS edit mode: clicking the card opens editing; clicking blank card
     // space again, or Cancel/Save, collapses it. No read-only expanded state.
@@ -603,6 +651,8 @@ public class TunnelViewModel : ObservableObject
         }
     }
 
+    static readonly TimeSpan HandshakeFresh = TimeSpan.FromSeconds(180);
+
     public void ApplyStats(TunnelStats stats)
     {
         double up = 0, down = 0;
@@ -619,5 +669,7 @@ public class TunnelViewModel : ObservableObject
         UpRate = Format.Rate(up);
         DownRate = Format.Rate(down);
         HeaderHandshake = Peers.Count == 1 ? Format.Ago(newest) : "";
+        if (IsConnected)
+            IsEstablished = newest is not null && DateTime.UtcNow - newest < HandshakeFresh;
     }
 }

@@ -27,7 +27,18 @@ public class MainViewModel : ObservableObject, ITunnelHost
         _dialogs = dialogs;
         _config = _store.Load(); // sync, so UI prefs are available before the window shows
         _tunnels.StatsUpdated += (name, stats) => Dispatcher.UIThread.Post(() =>
-            Tunnels.FirstOrDefault(t => !t.IsExternal && t.Name == name)?.ApplyStats(stats));
+        {
+            var vm = Tunnels.FirstOrDefault(t => !t.IsExternal && t.Name == name);
+            if (vm is null) return;
+            var wasEstablished = vm.IsEstablished;
+            vm.ApplyStats(stats);
+            // "Connected" means a handshake completed — only announce it then.
+            if (!wasEstablished && vm.IsEstablished)
+            {
+                Notify(vm.Name, "Connected", false);
+                NotifyStatus();
+            }
+        });
         _external.AdaptersChanged += () => Dispatcher.UIThread.Post(() => _ = RefreshExternalsAsync());
         Tunnels.CollectionChanged += (_, _) => NotifyStatus();
     }
@@ -219,7 +230,8 @@ public class MainViewModel : ObservableObject, ITunnelHost
             foreach (var p in vm.Config!.Peers.Where(p => p.Dns is not null && p.Domains.Count > 0))
                 _nrpt.ApplyPeerRules(vm.Name, p.PublicKey, p.Domains, p.Dns!);
             RefreshCatchAll();
-            Dispatcher.UIThread.Post(() => { StatusText = ""; RefreshPins(); Notify(vm.Name, "Connected", false); });
+            // No "Connected" announcement yet — that fires on the first handshake.
+            Dispatcher.UIThread.Post(() => { StatusText = ""; RefreshPins(); });
         }
         catch (Exception ex)
         {
@@ -353,6 +365,8 @@ public class MainViewModel : ObservableObject, ITunnelHost
     {
         _store.Save(_config);
         RefreshPins();
+        if (!vm.IsCustom && !vm.IsExternal && vm.IsConnected && connectionChanged)
+            vm.MarkReconnecting();
         _ = Task.Run(() =>
         {
             if (vm.IsCustom)

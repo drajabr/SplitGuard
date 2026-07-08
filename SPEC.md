@@ -32,6 +32,8 @@ Addresses: `InitializeUnicastIpAddressEntry` + `CreateUnicastIpAddressEntry` on 
 
 `Connect(TunnelConfig)`: resolve endpoint hostnames (`Dns.GetHostAddresses`) → create adapter → set configuration → assign addresses → add routes → state Up → notify NrptService. `Disconnect`: notify NrptService first (rules withdrawn), then close adapter. Stats: 1 s `DispatcherTimer`, `WireGuardGetConfiguration` → per-peer rx/tx (rates from deltas) + LastHandshake. Events: `TunnelStateChanged`, `StatsUpdated`.
 
+**Connected = handshake.** Adapter-up is only "connecting" (amber dot, no notification); the green dot + "Connected" notification fire on the first handshake, and a handshake older than 180 s drops the card back to amber ("Stalled").
+
 ## NRPT engine (`Services/NrptService.cs`)
 
 Backend abstraction `INrptBackend` with two implementations, tried in order:

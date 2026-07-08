@@ -252,6 +252,10 @@
   <Style Selector="Ellipse.dot.up">
     <Setter Property="Fill" Value="{DynamicResource AccentBrush}" />
   </Style>
+  <!-- Adapter is up but no handshake yet (or it went stale): amber, not green. -->
+  <Style Selector="Ellipse.dot.connecting">
+    <Setter Property="Fill" Value="{DynamicResource WarningBrush}" />
+  </Style>
 
   <Style Selector="TextBlock.accentfg">
     <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
