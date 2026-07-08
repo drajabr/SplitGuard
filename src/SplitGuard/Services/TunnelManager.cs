@@ -1,23 +1,86 @@
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using SplitGuard.Models;
 
 namespace SplitGuard.Services;
 
-public record TunnelStats(Dictionary<string, (double UpBps, double DownBps, DateTime? Handshake)> PerPeer);
+// Per-peer live signals published every poll tick. FailoverRole: null = not part of an
+// overlap group, otherwise "active" / "standby".
+public record PeerLive(double UpBps, double DownBps, DateTime? Handshake,
+    double? PingMs, bool? PingOk, bool Healthy, string? FailoverRole);
+
+public record TunnelStats(Dictionary<string, PeerLive> PerPeer);
 
 public class TunnelManager : IDisposable
 {
+    // Health thresholds. A handshake refreshes at most every ~2 min under keepalive, so
+    // 3 min without one means the path is dead. New connections get a grace period to
+    // complete their first handshake. Failback waits out a hold-down so a flapping link
+    // doesn't bounce traffic.
+    static readonly TimeSpan HandshakeStale = TimeSpan.FromSeconds(180);
+    static readonly TimeSpan HandshakeGrace = TimeSpan.FromSeconds(60);
+    static readonly TimeSpan FailbackHoldDown = TimeSpan.FromSeconds(30);
+    static readonly TimeSpan FailbackHoldDownMax = TimeSpan.FromMinutes(10);
+    static readonly TimeSpan HoldDownResetAfter = TimeSpan.FromMinutes(10);
+    const int PingFailThreshold = 3;
+    const ushort DefaultPingPeriod = 25; // used when a ping host is set but keepalive is off
+    const uint StandbyMetricBase = 400;  // far above any interface-metric difference
+
     readonly Dictionary<string, ActiveTunnel> _active = new();
     readonly Timer _timer;
     readonly object _gate = new();
+    int _polling;
 
     public event Action<string, TunnelStats>? StatsUpdated;
+    // "10.0.0.0/24: failover tunnelA → tunnelB" style message for the UI.
+    public event Action<string>? FailoverChanged;
+
+    class PeerRuntime
+    {
+        public required string Key; // base64 public key
+        public required byte[] PublicKey;
+        public byte[]? Psk;
+        public IPEndPoint? Endpoint;
+        public ushort Keepalive;
+        public required List<(IPAddress Ip, byte Cidr)> AllowedIps;
+        public int Priority;
+        public string? PingHost;
+        public DateTime ConnectedAt;
+
+        public (ulong Tx, ulong Rx, DateTime At)? Previous;
+        public DateTime? LastHandshake;
+        public double UpBps, DownBps;
+
+        public double? LastPingMs;
+        public bool? LastPingOk;
+        public int PingFailStreak;
+        public DateTime NextPingDue;
+        public bool PingInFlight;
+
+        public bool Healthy = true;
+        public DateTime? GoodSince; // start of the current healthy streak while marked unhealthy
+        public DateTime? HealthySince;
+        // Per-peer failback hold-down, doubled every time this peer fails while active so a
+        // flapping path backs off (30 s → … → 10 min) instead of oscillating forever.
+        public TimeSpan HoldDown = FailbackHoldDown;
+        public string? FailoverRole;
+        // True when a /32 probe route pins this peer's ping host to its own adapter, so
+        // pings test this path even while the peer is standby.
+        public bool HasProbeRoute;
+    }
 
     class ActiveTunnel
     {
         public required WireGuardAdapter Adapter;
-        public Dictionary<string, (ulong Tx, ulong Rx, DateTime At)> Previous = new();
+        public required string Name;
+        public required byte[] PrivateKey;
+        public required ushort ListenPort;
+        public required List<PeerRuntime> Peers;
+        // Overlapped CIDR (within this tunnel) → peer key that currently owns it in the
+        // WireGuard config; peers on one adapter can't share an allowed IP, so ownership
+        // moves on failover via SetConfiguration.
+        public Dictionary<string, string> IntraOwner = new();
     }
 
     public TunnelManager()
@@ -33,9 +96,10 @@ public class TunnelManager : IDisposable
     public void Connect(TunnelConfig config)
     {
         var privateKey = Convert.FromBase64String(RuleStore.Unprotect(config.PrivateKeyProtected));
-        var peers = new List<(byte[], byte[]?, IPEndPoint?, IReadOnlyList<(IPAddress, byte)>, ushort)>();
+        var runtimes = new List<PeerRuntime>();
         var endpointIps = new List<IPAddress>();
         bool fullTunnel = false;
+        var now = DateTime.UtcNow;
 
         foreach (var p in config.Peers)
         {
@@ -52,22 +116,47 @@ public class TunnelManager : IDisposable
                 if (prefix == 0) fullTunnel = true;
                 allowed.Add((net, (byte)prefix));
             }
-            peers.Add((pub, psk, endpoint, allowed, p.PersistentKeepalive));
+            runtimes.Add(new PeerRuntime
+            {
+                Key = Convert.ToBase64String(pub),
+                PublicKey = pub,
+                Psk = psk,
+                Endpoint = endpoint,
+                Keepalive = p.PersistentKeepalive,
+                AllowedIps = allowed,
+                Priority = p.Priority,
+                PingHost = string.IsNullOrWhiteSpace(p.PingHost) ? null : p.PingHost.Trim(),
+                ConnectedAt = now,
+                NextPingDue = now,
+            });
         }
 
         var adapter = WireGuardAdapter.Create(config.Name);
+        var tunnel = new ActiveTunnel
+        {
+            Adapter = adapter,
+            Name = config.Name,
+            PrivateKey = privateKey,
+            ListenPort = config.ListenPort,
+            Peers = runtimes,
+        };
         try
         {
-            adapter.SetConfiguration(privateKey, config.ListenPort, peers);
+            // Within one tunnel WireGuard forbids the same allowed IP on two peers: give
+            // each duplicated CIDR to the best-ranked peer; failover reassigns it live.
+            RecomputeIntraOwners(tunnel);
+            adapter.SetConfiguration(privateKey, config.ListenPort, BuildWgPeers(tunnel));
             foreach (var addr in config.Addresses)
             {
                 if (WireGuardConf.TryParseCidr(addr, out var ip, out var prefix))
                     Netio.AddAddress(adapter.Luid, ip, (byte)prefix);
             }
-            foreach (var (_, _, _, allowed, _) in peers)
+            var added = new HashSet<string>();
+            foreach (var rt in runtimes)
             {
-                foreach (var (ip, cidr) in allowed)
+                foreach (var (ip, cidr) in rt.AllowedIps)
                 {
+                    if (!added.Add(CidrKey(ip, cidr))) continue;
                     if (cidr == 0)
                     {
                         // Default-route split: two /1 routes win over the existing default without replacing it.
@@ -91,6 +180,23 @@ public class TunnelManager : IDisposable
             if (fullTunnel)
                 foreach (var ep in endpointIps)
                     Netio.AddEndpointHostRoute(ep);
+            // Probe routes: pin each unique in-tunnel ping host to its own adapter so the
+            // ping tests *this* path even while the peer is standby in a failover group
+            // (otherwise the probe follows the active route and says nothing about us).
+            // A ping host shared by several peers can't be pinned to one adapter — skipped.
+            List<string?> allPingHosts;
+            lock (_gate) allPingHosts = _active.Values.SelectMany(t => t.Peers).Select(p => p.PingHost).ToList();
+            foreach (var rt in runtimes)
+            {
+                if (rt.PingHost is null || !IPAddress.TryParse(rt.PingHost, out var probeIp)) continue;
+                bool unique = runtimes.Count(p => p.PingHost == rt.PingHost) == 1
+                    && !allPingHosts.Contains(rt.PingHost);
+                bool inTunnel = rt.AllowedIps.Any(a => WireGuardConf.CidrContains($"{a.Ip}/{a.Cidr}", probeIp));
+                if (!unique || !inTunnel) continue;
+                Netio.AddRoute(adapter.Luid, probeIp,
+                    (byte)(probeIp.AddressFamily == AddressFamily.InterNetwork ? 32 : 128));
+                rt.HasProbeRoute = true;
+            }
             adapter.SetState(true);
         }
         catch
@@ -98,7 +204,10 @@ public class TunnelManager : IDisposable
             adapter.Dispose();
             throw;
         }
-        lock (_gate) _active[config.Name] = new ActiveTunnel { Adapter = adapter };
+        lock (_gate) _active[config.Name] = tunnel;
+        // Arbitrate immediately so a standby joining an existing overlap group never
+        // competes with the active route at equal metrics.
+        try { ReconcileFailover(); } catch { }
     }
 
     public void Disconnect(string name)
@@ -109,40 +218,349 @@ public class TunnelManager : IDisposable
             if (!_active.Remove(name, out tunnel)) return;
         }
         tunnel!.Adapter.Dispose(); // destroys adapter, its addresses, and its routes
+        try { ReconcileFailover(); } catch { }
     }
 
     void Poll()
     {
-        List<(string Name, ActiveTunnel T)> snapshot;
-        lock (_gate) snapshot = _active.Select(kv => (kv.Key, kv.Value)).ToList();
-        foreach (var (name, tunnel) in snapshot)
+        if (Interlocked.Exchange(ref _polling, 1) == 1) return; // skip overlapping ticks
+        try
         {
-            List<PeerStats> stats;
-            try { stats = tunnel.Adapter.GetStats(); }
-            catch { continue; }
+            List<ActiveTunnel> snapshot;
+            lock (_gate) snapshot = _active.Values.ToList();
             var now = DateTime.UtcNow;
-            var result = new Dictionary<string, (double, double, DateTime?)>();
-            foreach (var s in stats)
+
+            foreach (var tunnel in snapshot)
             {
-                var key = Convert.ToBase64String(s.PublicKey);
-                double up = 0, down = 0;
-                if (tunnel.Previous.TryGetValue(key, out var prev))
+                List<PeerStats> stats;
+                try { stats = tunnel.Adapter.GetStats(); }
+                catch { continue; }
+                foreach (var s in stats)
                 {
-                    var dt = (now - prev.At).TotalSeconds;
-                    // Counters can reset on rekey/reconnect; clamp so ulong subtraction
-                    // never wraps into a bogus exabyte/sec spike.
-                    if (dt > 0)
+                    var key = Convert.ToBase64String(s.PublicKey);
+                    var rt = tunnel.Peers.FirstOrDefault(p => p.Key == key);
+                    if (rt is null) continue;
+                    double up = 0, down = 0;
+                    if (rt.Previous is { } prev)
                     {
-                        if (s.TxBytes >= prev.Tx) up = (s.TxBytes - prev.Tx) / dt;
-                        if (s.RxBytes >= prev.Rx) down = (s.RxBytes - prev.Rx) / dt;
+                        var dt = (now - prev.At).TotalSeconds;
+                        // Counters can reset on rekey/reconnect; clamp so ulong subtraction
+                        // never wraps into a bogus exabyte/sec spike.
+                        if (dt > 0)
+                        {
+                            if (s.TxBytes >= prev.Tx) up = (s.TxBytes - prev.Tx) / dt;
+                            if (s.RxBytes >= prev.Rx) down = (s.RxBytes - prev.Rx) / dt;
+                        }
                     }
+                    rt.Previous = (s.TxBytes, s.RxBytes, now);
+                    rt.UpBps = up;
+                    rt.DownBps = down;
+                    rt.LastHandshake = s.LastHandshakeUtc;
                 }
-                tunnel.Previous[key] = (s.TxBytes, s.RxBytes, now);
-                result[key] = (up, down, s.LastHandshakeUtc);
+                SchedulePings(tunnel, now);
             }
-            StatsUpdated?.Invoke(name, new TunnelStats(result));
+
+            // Never let an arbitration hiccup escape the timer callback — that would
+            // terminate the process.
+            try { ReconcileFailover(); } catch { }
+
+            foreach (var tunnel in snapshot)
+            {
+                var result = tunnel.Peers.ToDictionary(
+                    p => p.Key,
+                    p => new PeerLive(p.UpBps, p.DownBps, p.LastHandshake,
+                        p.LastPingMs, p.LastPingOk, p.Healthy, p.FailoverRole));
+                StatsUpdated?.Invoke(tunnel.Name, new TunnelStats(result));
+            }
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _polling, 0);
         }
     }
+
+    // ---- keepalive pings ---------------------------------------------------------
+
+    void SchedulePings(ActiveTunnel tunnel, DateTime now)
+    {
+        foreach (var rt in tunnel.Peers)
+        {
+            if (rt.PingHost is null || rt.PingInFlight || now < rt.NextPingDue) continue;
+            if (!IPAddress.TryParse(rt.PingHost, out var target)) continue;
+            var period = rt.Keepalive > 0 ? rt.Keepalive : DefaultPingPeriod;
+            rt.NextPingDue = now.AddSeconds(period);
+            rt.PingInFlight = true;
+            var timeout = Math.Min(4000, period * 1000);
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using var ping = new Ping();
+                    var reply = await ping.SendPingAsync(target, timeout);
+                    if (reply.Status == IPStatus.Success)
+                    {
+                        rt.LastPingMs = reply.RoundtripTime;
+                        rt.LastPingOk = true;
+                        rt.PingFailStreak = 0;
+                    }
+                    else
+                    {
+                        rt.LastPingMs = null;
+                        rt.LastPingOk = false;
+                        rt.PingFailStreak++;
+                    }
+                }
+                catch
+                {
+                    rt.LastPingMs = null;
+                    rt.LastPingOk = false;
+                    rt.PingFailStreak++;
+                }
+                finally
+                {
+                    rt.PingInFlight = false;
+                }
+            });
+        }
+    }
+
+    // ---- health + failover arbitration --------------------------------------------
+
+    static string CidrKey(IPAddress ip, byte cidr)
+    {
+        // Mask host bits so equivalent entries group regardless of how they were typed.
+        var bytes = ip.GetAddressBytes();
+        int bits = cidr;
+        for (int i = 0; i < bytes.Length; i++, bits -= 8)
+        {
+            if (bits >= 8) continue;
+            bytes[i] = bits <= 0 ? (byte)0 : (byte)(bytes[i] & (0xFF << (8 - bits)));
+        }
+        return $"{new IPAddress(bytes)}/{cidr}";
+    }
+
+    void EvaluateHealth(List<(ActiveTunnel Tunnel, PeerRuntime Peer)> members,
+        Dictionary<string, List<(ActiveTunnel Tunnel, PeerRuntime Peer)>> groups, DateTime now)
+    {
+        foreach (var (tunnel, rt) in members)
+        {
+            bool hsOk = rt.LastHandshake is { } h
+                ? now - h < HandshakeStale
+                : now - rt.ConnectedAt < HandshakeGrace;
+
+            // A standby's ping usually routes through the *active* tunnel (the probe target
+            // sits inside the shared range), so it says nothing about this path — only
+            // count ping health when this peer's adapter would carry the probe.
+            bool pingCounts = rt.PingHost is not null
+                && IPAddress.TryParse(rt.PingHost, out var pingIp)
+                && !PingRoutesElsewhere(tunnel, rt, pingIp, groups);
+            bool pingOk = !pingCounts || rt.PingFailStreak < PingFailThreshold;
+
+            bool instant = hsOk && pingOk;
+            if (!instant)
+            {
+                // A path failing while it carried the traffic backs off: each such failure
+                // doubles its personal failback hold-down (capped), so a flapping link
+                // settles on the backup instead of oscillating.
+                if (rt.Healthy && rt.FailoverRole == "active")
+                    rt.HoldDown = TimeSpan.FromTicks(Math.Min(rt.HoldDown.Ticks * 2, FailbackHoldDownMax.Ticks));
+                rt.Healthy = false;
+                rt.GoodSince = null;
+                rt.HealthySince = null;
+            }
+            else if (!rt.Healthy)
+            {
+                rt.GoodSince ??= now;
+                if (now - rt.GoodSince >= rt.HoldDown)
+                {
+                    rt.Healthy = true;
+                    rt.HealthySince = now;
+                }
+            }
+            else
+            {
+                rt.HealthySince ??= now;
+                if (now - rt.HealthySince >= HoldDownResetAfter) rt.HoldDown = FailbackHoldDown;
+            }
+        }
+    }
+
+    bool PingRoutesElsewhere(ActiveTunnel tunnel, PeerRuntime rt, IPAddress pingIp,
+        Dictionary<string, List<(ActiveTunnel Tunnel, PeerRuntime Peer)>> groups)
+    {
+        if (rt.HasProbeRoute) return false; // pinned to this adapter: always meaningful
+        foreach (var (key, members) in groups)
+        {
+            if (!WireGuardConf.CidrContains(key, pingIp)) continue;
+            var active = _groupActive.TryGetValue(key, out var a) ? a : null;
+            if (active is not null && active != MemberKey(tunnel, rt)) return true;
+        }
+        return false;
+    }
+
+    static string MemberKey(ActiveTunnel t, PeerRuntime p) => $"{t.Name}\n{p.Key}";
+
+    // Applied state, so reconcile only touches the system when something changed.
+    // Everything below _reconcileGate (group state, applied metrics, peer health fields)
+    // is only read/written inside ReconcileFailoverCore.
+    readonly object _reconcileGate = new();
+    readonly Dictionary<string, string> _groupActive = new();          // group cidr → member key
+    readonly Dictionary<(ulong Luid, string Cidr), uint> _appliedMetric = new();
+
+    // Serialized: called concurrently from the poll timer and from Connect/Disconnect
+    // background tasks, over shared dictionaries and peer health state.
+    void ReconcileFailover()
+    {
+        lock (_reconcileGate) ReconcileFailoverCore();
+    }
+
+    void ReconcileFailoverCore()
+    {
+        List<ActiveTunnel> snapshot;
+        lock (_gate) snapshot = _active.Values.ToList();
+        var now = DateTime.UtcNow;
+
+        // Group every connected peer's allowed CIDRs; a group is a CIDR claimed twice.
+        var groups = new Dictionary<string, List<(ActiveTunnel Tunnel, PeerRuntime Peer)>>();
+        var all = new List<(ActiveTunnel Tunnel, PeerRuntime Peer)>();
+        foreach (var t in snapshot)
+            foreach (var p in t.Peers)
+            {
+                all.Add((t, p));
+                foreach (var (ip, cidr) in p.AllowedIps)
+                {
+                    var key = CidrKey(ip, cidr);
+                    if (!groups.TryGetValue(key, out var list)) groups[key] = list = new();
+                    if (!list.Any(m => ReferenceEquals(m.Peer, p))) list.Add((t, p));
+                }
+            }
+        foreach (var key in groups.Where(g => g.Value.Count < 2).Select(g => g.Key).ToList())
+            groups.Remove(key);
+
+        EvaluateHealth(all, groups, now);
+
+        // Reset roles; grouped members get theirs below.
+        foreach (var (_, p) in all) p.FailoverRole = null;
+
+        var wgDirty = new HashSet<ActiveTunnel>();
+        foreach (var (key, members) in groups)
+        {
+            var ordered = members
+                .OrderBy(m => m.Peer.Priority)
+                .ThenBy(m => m.Tunnel.Name, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(m => m.Tunnel.Peers.IndexOf(m.Peer))
+                .ToList();
+            var active = ordered.FirstOrDefault(m => m.Peer.Healthy);
+            if (active.Peer is null) active = ordered[0]; // nothing healthy: keep the best-ranked
+            var activeKey = MemberKey(active.Tunnel, active.Peer);
+
+            foreach (var m in ordered)
+                m.Peer.FailoverRole = MemberKey(m.Tunnel, m.Peer) == activeKey ? "active" : "standby";
+
+            if (!_groupActive.TryGetValue(key, out var prevActive) || prevActive != activeKey)
+            {
+                var from = prevActive?.Split('\n')[0];
+                _groupActive[key] = activeKey;
+                if (prevActive is not null && groups.Count > 0)
+                    FailoverChanged?.Invoke($"{key}: {(from == active.Tunnel.Name ? "peer switch" : $"failover {from} → {active.Tunnel.Name}")}");
+            }
+
+            // Route metrics: the active member's adapter wins; every other adapter in the
+            // group is pushed far back. Adapters keep one route per CIDR regardless of how
+            // many of their peers claim it.
+            uint standby = StandbyMetricBase;
+            foreach (var adapterMembers in ordered.GroupBy(m => m.Tunnel))
+            {
+                var t = adapterMembers.Key;
+                var metric = ReferenceEquals(t, active.Tunnel) ? 0u : standby += 16;
+                ApplyMetric(t, key, metric);
+
+                // Within one adapter the CIDR must live on exactly one peer: the group's
+                // active peer if it's here, else the adapter's best healthy member.
+                var owner = ReferenceEquals(t, active.Tunnel)
+                    ? active.Peer
+                    : (adapterMembers.FirstOrDefault(m => m.Peer.Healthy).Peer ?? adapterMembers.First().Peer);
+                if (adapterMembers.Count() > 1 &&
+                    (!t.IntraOwner.TryGetValue(key, out var cur) || cur != owner.Key))
+                {
+                    t.IntraOwner[key] = owner.Key;
+                    wgDirty.Add(t);
+                }
+            }
+        }
+
+        // Groups that dissolved (disconnect / config change): drop state and restore the
+        // surviving route — if any — to the default metric so it isn't stuck on standby.
+        foreach (var stale in _groupActive.Keys.Where(k => !groups.ContainsKey(k)).ToList())
+        {
+            _groupActive.Remove(stale);
+            foreach (var t in snapshot)
+            {
+                _appliedMetric.Remove((t.Adapter.Luid, stale));
+                if (t.Peers.Any(p => p.AllowedIps.Any(a => CidrKey(a.Ip, a.Cidr) == stale)))
+                    ApplyMetric(t, stale, 0);
+            }
+        }
+        // Purge applied-metric state for adapters that no longer exist.
+        var liveLuids = snapshot.Select(t => t.Adapter.Luid).ToHashSet();
+        foreach (var k in _appliedMetric.Keys.Where(k => !liveLuids.Contains(k.Luid)).ToList())
+            _appliedMetric.Remove(k);
+
+        foreach (var t in wgDirty)
+        {
+            try { t.Adapter.SetConfiguration(t.PrivateKey, t.ListenPort, BuildWgPeers(t)); }
+            catch { }
+        }
+    }
+
+    void ApplyMetric(ActiveTunnel tunnel, string groupCidr, uint metric)
+    {
+        var stateKey = (tunnel.Adapter.Luid, groupCidr);
+        if (_appliedMetric.TryGetValue(stateKey, out var cur) && cur == metric) return;
+        _appliedMetric[stateKey] = metric;
+        if (!WireGuardConf.TryParseCidr(groupCidr, out var ip, out var prefix)) return;
+        if (prefix == 0)
+        {
+            // A /0 group is installed as the two /1 halves.
+            if (ip.AddressFamily == AddressFamily.InterNetwork)
+            {
+                Netio.SetRouteMetric(tunnel.Adapter.Luid, IPAddress.Parse("0.0.0.0"), 1, metric);
+                Netio.SetRouteMetric(tunnel.Adapter.Luid, IPAddress.Parse("128.0.0.0"), 1, metric);
+            }
+            else
+            {
+                Netio.SetRouteMetric(tunnel.Adapter.Luid, IPAddress.Parse("::"), 1, metric);
+                Netio.SetRouteMetric(tunnel.Adapter.Luid, IPAddress.Parse("8000::"), 1, metric);
+            }
+        }
+        else
+        {
+            Netio.SetRouteMetric(tunnel.Adapter.Luid, ip, (byte)prefix, metric);
+        }
+    }
+
+    // Initial within-tunnel ownership of duplicated CIDRs: best rank wins.
+    static void RecomputeIntraOwners(ActiveTunnel tunnel)
+    {
+        tunnel.IntraOwner.Clear();
+        var claims = new Dictionary<string, List<PeerRuntime>>();
+        foreach (var p in tunnel.Peers)
+            foreach (var (ip, cidr) in p.AllowedIps)
+            {
+                var key = CidrKey(ip, cidr);
+                if (!claims.TryGetValue(key, out var list)) claims[key] = list = new();
+                if (!list.Contains(p)) list.Add(p);
+            }
+        foreach (var (key, list) in claims.Where(c => c.Value.Count > 1))
+            tunnel.IntraOwner[key] = list.OrderBy(p => p.Priority).ThenBy(p => tunnel.Peers.IndexOf(p)).First().Key;
+    }
+
+    static List<(byte[], byte[]?, IPEndPoint?, IReadOnlyList<(IPAddress, byte)>, ushort)> BuildWgPeers(ActiveTunnel tunnel) =>
+        tunnel.Peers.Select(p => (p.PublicKey, p.Psk, p.Endpoint,
+            (IReadOnlyList<(IPAddress, byte)>)p.AllowedIps
+                .Where(a => !tunnel.IntraOwner.TryGetValue(CidrKey(a.Ip, a.Cidr), out var owner) || owner == p.Key)
+                .ToList(),
+            p.Keepalive)).ToList();
 
     static IPEndPoint? ResolveEndpoint(string endpoint)
     {

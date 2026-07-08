@@ -65,6 +65,9 @@ public class PeerConfig
     // Optional in-tunnel IP pinged once per keepalive period while connected — generates
     // traffic (so handshakes stay fresh) and feeds failover health.
     public string? PingHost { get; set; }
+    // Failover rank when this peer's allowed IPs overlap another connected peer's:
+    // lower wins; equal ranks keep list order. 0 = default.
+    public int Priority { get; set; }
 }
 
 // Domains attached to a tunnel managed by the official WireGuard client.

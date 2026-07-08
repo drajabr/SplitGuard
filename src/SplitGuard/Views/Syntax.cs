@@ -30,4 +30,7 @@ public static class Syntax
         var i = s.IndexOf('/');
         return i < 0 ? "" : s[i..];
     });
+
+    // Failover role badge: highlights the "active" member of an overlap group.
+    public static readonly IValueConverter IsActive = new FuncValueConverter<string?, bool>(s => s == "active");
 }

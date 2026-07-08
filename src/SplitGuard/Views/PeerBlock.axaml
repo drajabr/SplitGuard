@@ -8,6 +8,10 @@
     <StackPanel>
       <DockPanel Margin="10,4">
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
+          <Border Classes="rolebadge" Classes.active="{Binding FailoverRole, Converter={x:Static views:Syntax.IsActive}}"
+                  IsVisible="{Binding FailoverRole, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <TextBlock FontSize="{DynamicResource Fs11}" Text="{Binding FailoverRole}" />
+          </Border>
           <TextBlock Classes="muted" Text="{Binding PingText}"
                      IsVisible="{Binding PingText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
           <TextBlock Classes="muted" Text="{Binding HandshakeText}" IsVisible="{Binding ShowHandshake}" />
@@ -88,6 +92,8 @@
           <TextBox Classes="mono" Width="52" Text="{Binding KeepaliveText}" Watermark="off" />
           <TextBlock Classes="lbl" Text="Ping" ToolTip.Tip="In-tunnel IP pinged once per keepalive period — keeps the handshake fresh and feeds failover health" />
           <TextBox Classes="mono" MinWidth="110" Text="{Binding PingHostText}" Watermark="host to ping" />
+          <TextBlock Classes="lbl" Text="Priority" ToolTip.Tip="Failover rank when allowed IPs overlap another peer's: lower wins" />
+          <TextBox Classes="mono" Width="46" Text="{Binding PriorityText}" Watermark="0" />
         </StackPanel>
 
         <TextBlock Grid.Row="6" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Domains" Margin="0,5,12,0" />

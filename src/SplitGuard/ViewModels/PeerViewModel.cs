@@ -65,6 +65,12 @@ public partial class PeerViewModel : ObservableObject
     string _pingHostText = "";
     public string PingHostText { get => _pingHostText; set => Set(ref _pingHostText, value); }
 
+    // Failover rank for overlapping allowed IPs: lower wins, blank = 0.
+    string _priorityText = "";
+    public string PriorityText { get => _priorityText; set => Set(ref _priorityText, value); }
+
+    public int ParsedPriority => int.TryParse(PriorityText.Trim(), out var v) ? v : 0;
+
     // Strings plus a trailing AddSlot (the inline "+" box).
     public ObservableCollection<object> AllowedIps { get; } = new();
     public ObservableCollection<object> Domains { get; } = new();
@@ -125,6 +131,10 @@ public partial class PeerViewModel : ObservableObject
     string _pingText = "";
     public string PingText { get => _pingText; set => Set(ref _pingText, value); }
 
+    // "active" / "standby" while this peer's allowed IPs overlap another connected peer's.
+    string _failoverRole = "";
+    public string FailoverRole { get => _failoverRole; set => Set(ref _failoverRole, value); }
+
     public RelayCommand AddDomainCommand { get; }
     public RelayCommand RemoveDomainCommand { get; }
     public RelayCommand AddAllowedIpCommand { get; }
@@ -178,6 +188,8 @@ public partial class PeerViewModel : ObservableObject
             return $"Keepalive must be seconds (0-65535) — got '{KeepaliveText}'";
         if (PingHostText.Trim().Length > 0 && !IPAddress.TryParse(PingHostText.Trim(), out _))
             return $"Ping host must be an IP address — got '{PingHostText}'";
+        if (PriorityText.Trim().Length > 0 && !int.TryParse(PriorityText.Trim(), out _))
+            return $"Priority must be a whole number — got '{PriorityText}'";
         foreach (var d in DomainValues)
             if (!IsValidDomain(d)) return $"Invalid domain: {d}";
         return null;

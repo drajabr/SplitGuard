@@ -97,6 +97,7 @@ public class TunnelViewModel : ObservableObject
                 Dns = p.Dns ?? "",
                 KeepaliveText = p.PersistentKeepalive > 0 ? p.PersistentKeepalive.ToString() : "",
                 PingHostText = p.PingHost ?? "",
+                PriorityText = p.Priority != 0 ? p.Priority.ToString() : "",
             };
             PeerViewModel.Fill(vm.AllowedIps, p.AllowedIps.Select(WireGuardConf.NormalizeCidr));
             PeerViewModel.Fill(vm.Domains, p.Domains);
@@ -414,6 +415,7 @@ public class TunnelViewModel : ObservableObject
             if (p.HasDns) sb.AppendLine($"DNS = {p.Dns.Trim()}");
             if (p.DomainValues.Any()) sb.AppendLine($"Domains = {string.Join(", ", p.DomainValues)}");
             if (p.PingHostText.Trim().Length > 0) sb.AppendLine($"PingHost = {p.PingHostText.Trim()}");
+            if (p.ParsedPriority != 0) sb.AppendLine($"Priority = {p.ParsedPriority}");
         }
         return sb.ToString();
     }
@@ -435,6 +437,7 @@ public class TunnelViewModel : ObservableObject
                 Dns = p.Dns ?? "",
                 KeepaliveText = p.PersistentKeepalive > 0 ? p.PersistentKeepalive.ToString() : "",
                 PingHostText = p.PingHost ?? "",
+                PriorityText = p.Priority != 0 ? p.Priority.ToString() : "",
                 IsEditing = true,
             };
             PeerViewModel.Fill(vm.AllowedIps, p.AllowedIps);
@@ -477,7 +480,7 @@ public class TunnelViewModel : ObservableObject
         Name.Trim(), PrivateKeyEdit.Trim(), ListenPortText.Trim(),
         string.Join(",", AddressValues),
         string.Join(";", Peers.Select(p =>
-            $"{p.PublicKey.Trim()},{p.PresharedKey.Trim()},{p.Endpoint.Trim()},{string.Join("+", p.AllowedIpValues)},{p.ParsedKeepalive},{p.PingHostText.Trim()}")));
+            $"{p.PublicKey.Trim()},{p.PresharedKey.Trim()},{p.Endpoint.Trim()},{string.Join("+", p.AllowedIpValues)},{p.ParsedKeepalive},{p.PingHostText.Trim()},{p.ParsedPriority}")));
 
     void CancelEdit()
     {
@@ -567,6 +570,7 @@ public class TunnelViewModel : ObservableObject
                 Dns = p.HasDns ? p.Dns.Trim() : null,
                 Domains = p.DomainValues.ToList(),
                 PingHost = p.PingHostText.Trim().Length > 0 ? p.PingHostText.Trim() : null,
+                Priority = p.ParsedPriority,
             }).ToList();
         }
         IsDraft = false;
@@ -613,7 +617,7 @@ public class TunnelViewModel : ObservableObject
 
     void AddAddress()
     {
-        var cidr = NewAddress.Trim();
+        var cidr = WireGuardConf.NormalizeCidr(NewAddress);
         if (!WireGuardConf.TryParseCidr(cidr, out _, out _))
         {
             AddressAddError = true;
@@ -671,6 +675,13 @@ public class TunnelViewModel : ObservableObject
             if (s.Handshake is not null && (newest is null || s.Handshake > newest)) newest = s.Handshake;
             peer.HandshakeText = Format.Ago(s.Handshake);
             peer.ShowHandshake = Peers.Count > 1;
+            peer.PingText = s.PingOk switch
+            {
+                true => $"ping {s.PingMs:0} ms",
+                false => "ping failed",
+                _ => "",
+            };
+            peer.FailoverRole = s.FailoverRole ?? "";
         }
         UpRate = Format.Rate(up);
         DownRate = Format.Rate(down);

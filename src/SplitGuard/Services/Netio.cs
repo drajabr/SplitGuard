@@ -97,6 +97,9 @@ public static class Netio
     static extern uint GetBestRoute2(IntPtr interfaceLuid, uint interfaceIndex, IntPtr sourceAddress,
         ref SockaddrInet destination, uint options, out MibForwardRow bestRoute, out SockaddrInet bestSource);
 
+    [DllImport("iphlpapi")] static extern uint GetIpForwardEntry2(ref MibForwardRow row);
+    [DllImport("iphlpapi")] static extern uint SetIpForwardEntry2(ref MibForwardRow row);
+
     public static void AddAddress(ulong luid, IPAddress ip, byte prefixLength)
     {
         InitializeUnicastIpAddressEntry(out var row);
@@ -123,6 +126,24 @@ public static class Netio
         var err = CreateIpForwardEntry2(ref row);
         if (err != 0 && err != 5010)
             throw new InvalidOperationException($"Route {destination}/{prefixLength} failed (win32 {err}).");
+    }
+
+    // Retarget an existing route's metric in place (failover arbitration between tunnels
+    // sharing the same destination prefix). Missing routes are ignored — the adapter may
+    // already be tearing down.
+    public static void SetRouteMetric(ulong luid, IPAddress destination, byte prefixLength, uint metric)
+    {
+        destination = MaskToNetwork(destination, prefixLength);
+        InitializeIpForwardEntry(out var row);
+        row.InterfaceLuid = luid;
+        row.DestinationPrefix = SockaddrInet.From(destination);
+        row.DestinationPrefixLength = prefixLength;
+        row.NextHop = SockaddrInet.From(destination.AddressFamily == AddressFamily.InterNetwork
+            ? IPAddress.Any : IPAddress.IPv6Any);
+        if (GetIpForwardEntry2(ref row) != 0) return;
+        if (row.Metric == metric) return;
+        row.Metric = metric;
+        SetIpForwardEntry2(ref row);
     }
 
     static IPAddress MaskToNetwork(IPAddress ip, byte prefixLength)

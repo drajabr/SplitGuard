@@ -39,6 +39,12 @@ public class MainViewModel : ObservableObject, ITunnelHost
                 NotifyStatus();
             }
         });
+        _tunnels.FailoverChanged += msg => Dispatcher.UIThread.Post(() =>
+        {
+            StatusText = msg;
+            StatusOk = true;
+            Notify("Failover", msg, false);
+        });
         _external.AdaptersChanged += () => Dispatcher.UIThread.Post(() => _ = RefreshExternalsAsync());
         Tunnels.CollectionChanged += (_, _) => NotifyStatus();
     }
@@ -361,10 +367,37 @@ public class MainViewModel : ObservableObject, ITunnelHost
 
     // ---- edit/save/delete ---------------------------------------------------
 
+    // Overlapping allowed IPs (same CIDR on several peers/tunnels) are legal — that's the
+    // failover feature — but health judgment needs keepalive or a ping host on each member.
+    string? OverlapHealthWarning()
+    {
+        var claims = new Dictionary<string, List<(string Tunnel, PeerConfig Peer)>>();
+        foreach (var t in _config.Tunnels)
+            foreach (var p in t.Peers)
+                foreach (var cidr in p.AllowedIps.Select(WireGuardConf.NormalizeCidr).Distinct())
+                {
+                    if (!claims.TryGetValue(cidr, out var list)) claims[cidr] = list = new();
+                    list.Add((t.Name, p));
+                }
+        var weak = claims.Values.Where(members => members.Count > 1)
+            .SelectMany(members => members)
+            .Where(m => m.Peer.PersistentKeepalive == 0 && string.IsNullOrEmpty(m.Peer.PingHost))
+            .Select(m => m.Tunnel)
+            .Distinct()
+            .ToList();
+        return weak.Count == 0 ? null
+            : $"Overlapping allowed IPs: set a keepalive or ping host on {string.Join(", ", weak)} so failover can judge health";
+    }
+
     public void TunnelSaved(TunnelViewModel vm, bool connectionChanged)
     {
         _store.Save(_config);
         RefreshPins();
+        if (!vm.IsCustom && !vm.IsExternal && OverlapHealthWarning() is { } overlapWarn)
+        {
+            StatusText = overlapWarn;
+            StatusOk = false;
+        }
         if (!vm.IsCustom && !vm.IsExternal && vm.IsConnected && connectionChanged)
             vm.MarkReconnecting();
         _ = Task.Run(() =>
@@ -538,6 +571,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
                 Dns = p.Dns ?? (ReferenceEquals(p, dnsPeer) ? parsed.InterfaceDns : null),
                 Domains = p.Domains.ToList(),
                 PingHost = p.PingHost,
+                Priority = p.Priority,
             }).ToList(),
         };
         _config.Tunnels.Add(cfg);
