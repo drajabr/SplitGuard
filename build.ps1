@@ -1,7 +1,9 @@
 # Builds SplitGuard into dist\SplitGuard-win-<arch>.zip. Requires only the .NET 8 SDK.
+# -Installer additionally compiles dist\SplitGuard-Setup-<arch>-<version>.exe (needs Inno Setup 6).
 param(
     [ValidateSet("x64", "arm64")]
-    [string]$Arch = "x64"
+    [string]$Arch = "x64",
+    [switch]$Installer
 )
 
 $ErrorActionPreference = "Stop"
@@ -66,3 +68,20 @@ if (Test-Path $zip) { Remove-Item $zip }
 Compress-Archive -Path (Join-Path $out "*") -DestinationPath $zip
 
 Write-Host "Done: $zip"
+
+if ($Installer) {
+    $iscc = (Get-Command ISCC.exe -ErrorAction SilentlyContinue).Source
+    if (-not $iscc) {
+        $iscc = @(
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+            "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+        ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+    }
+    if (-not $iscc) { throw "Inno Setup 6 (ISCC.exe) not found - install it from https://jrsoftware.org/isinfo.php or omit -Installer." }
+    $version = (Get-Content (Join-Path $root "VERSION")).Trim()
+    Write-Host "Compiling installer..."
+    & $iscc /Q "/DAppVersion=$version" "/DArch=$Arch" (Join-Path $root "installer\SplitGuard.iss")
+    if ($LASTEXITCODE -ne 0) { throw "Installer compilation failed." }
+    Write-Host "Done: $(Join-Path $root "dist\SplitGuard-Setup-$Arch-$version.exe")"
+}

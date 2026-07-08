@@ -74,6 +74,10 @@ ViewModels: `MainViewModel` (tunnel collection, pin arbitration, GPO banner, tes
 
 1. Assert `dotnet` ≥ 8 else exit with message. 2. Download `https://download.wireguard.com/wireguard-nt/wireguard-nt-0.10.1.zip` to temp (skip if cached in `.cache/`), extract `bin/amd64/wireguard.dll`. 3. `dotnet publish src/SplitGuard -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o dist/win-x64`. 4. Copy `wireguard.dll` beside exe. 5. `Compress-Archive` → `dist/SplitGuard-win-x64.zip`. Params: `-Arch x64|arm64` (arm64 uses `bin/arm64/`).
 
+## installer/SplitGuard.iss (Inno Setup 6)
+
+`build.ps1 -Installer` compiles it (ISCC located on PATH or the standard install dirs) with `/DAppVersion` from `VERSION` and `/DArch`. Installs `SplitGuard.exe` + `wireguard.dll` to `{autopf}\SplitGuard`, Start Menu shortcut, optional desktop icon, `PrivilegesRequired=admin`. Install kills a running instance first (`PrepareToInstall` → taskkill). Uninstall: taskkill → `SplitGuard.exe --cleanup` (NRPT + scheduled tasks) → remove files; `%ProgramData%\SplitGuard\config.json` is kept.
+
 ## .github/workflows/build-release.yml
 
 `on: push (main, tags v*), pull_request`. Job `build` on `windows-latest`: checkout, `actions/setup-dotnet` v4 (8.0.x), `./build.ps1`, upload artifact `dist/*.zip`. Job `release` (needs build, `if: startsWith(github.ref,'refs/tags/v')`): download artifact, `softprops/action-gh-release@v2` with the zips.

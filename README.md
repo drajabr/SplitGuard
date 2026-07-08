@@ -24,7 +24,9 @@ WireGuard's `DNS =` setting is all-or-nothing: it takes over DNS for the whole m
 
 ## Install
 
-Download the latest zip from the Releases page, extract, and run `SplitGuard.exe`. It requires administrator rights (UAC prompt) because DNS policy and the network driver are system-level. No installer, no background service — delete the folder to uninstall (use "unpin + disconnect" first to clear any active rules).
+**Installer (recommended):** download `SplitGuard-Setup-x64-<version>.exe` from the Releases page. It installs to `Program Files\SplitGuard`, adds a Start Menu shortcut, and the uninstaller removes every trace (NRPT rules, scheduled tasks). **Portable:** grab the zip instead, extract anywhere, run `SplitGuard.exe`.
+
+It requires administrator rights (UAC prompt) because DNS policy and the network driver are system-level.
 
 ## Usage
 
