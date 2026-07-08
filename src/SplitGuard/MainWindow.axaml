@@ -71,7 +71,12 @@
         </Button>
         <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
           <StackPanel Orientation="Horizontal" Spacing="6">
-            <TextBlock Classes="glyph" Text="&#xE774;" FontSize="{DynamicResource Fs12}" Opacity="0.55" VerticalAlignment="Center" />
+            <Panel VerticalAlignment="Center">
+              <TextBlock Classes="glyph" Text="&#xE774;" FontSize="{DynamicResource Fs12}" Opacity="0.55"
+                         IsVisible="{Binding !DnsPinned}" />
+              <TextBlock Classes="glyph" Text="&#xE842;" FontSize="{DynamicResource Fs12}"
+                         Foreground="{DynamicResource AccentBrush}" IsVisible="{Binding DnsPinned}" />
+            </Panel>
             <TextBlock Text="{Binding DnsStatus}" FontSize="{DynamicResource Fs12}" Opacity="0.85" VerticalAlignment="Center" />
           </StackPanel>
           <StackPanel Orientation="Horizontal" Spacing="6">

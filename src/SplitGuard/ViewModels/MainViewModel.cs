@@ -43,23 +43,27 @@ public class MainViewModel : ObservableObject, ITunnelHost
         }
     }
 
-    public string DnsStatus
+    // Bottom-bar pin readout: which tunnel's DNS owns the device, and whether it's live.
+    (bool Pinned, string Text) DnsState()
     {
-        get
-        {
-            if (_config.PinnedDns is null) return "System DNS";
-            foreach (var t in Tunnels.Where(t => t.IsConnected))
-                foreach (var p in t.Peers.Where(p => p.HasDns))
-                    if (_config.PinnedDns.TunnelName == TunnelKey(t) && _config.PinnedDns.PeerPublicKey == PeerKey(t, p))
-                        return $"Device DNS · {p.Dns.Trim()}";
-            return "System DNS";
-        }
+        if (_config.PinnedDns is null) return (false, "System DNS");
+        foreach (var t in Tunnels)
+            foreach (var p in t.Peers.Where(p => p.HasDns))
+                if (_config.PinnedDns.TunnelName == TunnelKey(t) && _config.PinnedDns.PeerPublicKey == PeerKey(t, p))
+                    return t.IsConnected
+                        ? (true, $"Device DNS pinned · {t.Name} · {p.Dns.Trim()}")
+                        : (true, $"Pin suspended ({t.Name} off) · System DNS");
+        return (false, "System DNS");
     }
+
+    public string DnsStatus => DnsState().Text;
+    public bool DnsPinned => DnsState().Pinned;
 
     void NotifyStatus()
     {
         Raise(nameof(TunnelSummary));
         Raise(nameof(DnsStatus));
+        Raise(nameof(DnsPinned));
     }
 
     public UiPrefs Prefs => _config.Ui;

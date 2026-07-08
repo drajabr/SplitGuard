@@ -219,6 +219,10 @@
     <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
     <Setter Property="Opacity" Value="1" />
   </Style>
+  <!-- Pinned but its tunnel is down: filled pin in the warning color. -->
+  <Style Selector="TextBlock.pinicon.pinned.suspended">
+    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+  </Style>
   <Style Selector="TextBlock.accent">
     <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
     <Setter Property="FontSize" Value="{DynamicResource Fs115}" />

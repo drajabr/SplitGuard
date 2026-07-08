@@ -106,20 +106,10 @@ public partial class PeerViewModel : ObservableObject
     public string BlockTitle => IsCustom ? "DNS rule" : "Peer";
 
     bool _isPinned;
-    public bool IsPinned
-    {
-        get => _isPinned;
-        set { if (Set(ref _isPinned, value)) Raise(nameof(PinCaption)); }
-    }
+    public bool IsPinned { get => _isPinned; set => Set(ref _isPinned, value); }
 
     bool _pinSuspended;
-    public bool PinSuspended
-    {
-        get => _pinSuspended;
-        set { if (Set(ref _pinSuspended, value)) Raise(nameof(PinCaption)); }
-    }
-
-    public string PinCaption => !IsPinned ? "" : PinSuspended ? "device DNS · suspended" : "device DNS";
+    public bool PinSuspended { get => _pinSuspended; set => Set(ref _pinSuspended, value); }
 
     string _handshakeText = "";
     public string HandshakeText { get => _handshakeText; set => Set(ref _handshakeText, value); }
