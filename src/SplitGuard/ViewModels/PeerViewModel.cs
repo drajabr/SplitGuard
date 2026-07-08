@@ -150,7 +150,7 @@ public partial class PeerViewModel : ObservableObject
 
     void AddAllowedIp()
     {
-        var cidr = NewAllowedIp.Trim();
+        var cidr = Models.WireGuardConf.NormalizeCidr(NewAllowedIp);
         if (!Models.WireGuardConf.TryParseCidr(cidr, out _, out _))
         {
             AllowedIpAddError = true;

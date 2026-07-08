@@ -86,7 +86,7 @@ public class TunnelViewModel : ObservableObject
     {
         Name = Config!.Name;
         ListenPortText = Config.ListenPort > 0 ? Config.ListenPort.ToString() : "";
-        PeerViewModel.Fill(Addresses, Config.Addresses);
+        PeerViewModel.Fill(Addresses, Config.Addresses.Select(WireGuardConf.NormalizeCidr));
         Peers.Clear();
         foreach (var p in Config.Peers)
         {
@@ -97,7 +97,7 @@ public class TunnelViewModel : ObservableObject
                 Dns = p.Dns ?? "",
                 KeepaliveText = p.PersistentKeepalive > 0 ? p.PersistentKeepalive.ToString() : "",
             };
-            PeerViewModel.Fill(vm.AllowedIps, p.AllowedIps);
+            PeerViewModel.Fill(vm.AllowedIps, p.AllowedIps.Select(WireGuardConf.NormalizeCidr));
             PeerViewModel.Fill(vm.Domains, p.Domains);
             Peers.Add(vm);
         }

@@ -60,7 +60,7 @@ public static class WireGuardConf
                 {
                     case "privatekey": result.PrivateKey = value; break;
                     case "listenport": if (ushort.TryParse(value, out var lp)) result.ListenPort = lp; break;
-                    case "address": result.Addresses.AddRange(SplitList(value)); break;
+                    case "address": result.Addresses.AddRange(SplitList(value).Select(NormalizeCidr)); break;
                     case "dns": result.InterfaceDns = SplitList(value).FirstOrDefault(); break;
                     default: result.Warnings.Add($"Ignored [Interface] {key}"); break;
                 }
@@ -72,7 +72,7 @@ public static class WireGuardConf
                     case "publickey": peer.PublicKey = value; break;
                     case "presharedkey": peer.PresharedKey = value; break;
                     case "endpoint": peer.Endpoint = value; break;
-                    case "allowedips": peer.AllowedIps.AddRange(SplitList(value)); break;
+                    case "allowedips": peer.AllowedIps.AddRange(SplitList(value).Select(NormalizeCidr)); break;
                     case "persistentkeepalive": if (ushort.TryParse(value, out var ka)) peer.PersistentKeepalive = ka; break;
                     case "dns": peer.Dns = SplitList(value).FirstOrDefault(); break;
                     case "domains": peer.Domains.AddRange(SplitList(value)); break;
@@ -104,6 +104,15 @@ public static class WireGuardConf
             if ((nb[i] & mask) != (ib[i] & mask)) return false;
         }
         return true;
+    }
+
+    // A bare IP means a single host: make the /32 (or /128) explicit so every stored
+    // value carries its prefix. Invalid input is returned untouched for validation to catch.
+    public static string NormalizeCidr(string cidr)
+    {
+        var s = cidr.Trim();
+        if (s.Contains('/') || !IPAddress.TryParse(s, out var ip)) return s;
+        return $"{s}/{(ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork ? 32 : 128)}";
     }
 
     public static bool TryParseCidr(string cidr, out IPAddress network, out int prefix)
