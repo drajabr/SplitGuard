@@ -15,6 +15,7 @@ WireGuard's `DNS =` setting is all-or-nothing: it takes over DNS for the whole m
 - Full embedded WireGuard client (official WireGuardNT driver) — no other software needed
 - Per-peer DNS and domain lists; add or remove domains live while connected
 - Pin any peer's DNS as the device-wide resolver, with smart fallback and auto-failover
+- Optional per-peer keepalive ping: probe an in-tunnel host once per keepalive period
 - Works alongside tunnels managed by the official WireGuard app (attach domains to them too)
 - Everything not listed resolves via your normal system DNS — guaranteed untouched
 

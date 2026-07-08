@@ -60,6 +60,11 @@ public partial class PeerViewModel : ObservableObject
 
     public ushort ParsedKeepalive => ushort.TryParse(KeepaliveText.Trim(), out var v) ? v : (ushort)0;
 
+    // Optional in-tunnel IP pinged once per keepalive period (25 s when keepalive is off):
+    // keeps handshakes fresh and feeds failover health.
+    string _pingHostText = "";
+    public string PingHostText { get => _pingHostText; set => Set(ref _pingHostText, value); }
+
     // Strings plus a trailing AddSlot (the inline "+" box).
     public ObservableCollection<object> AllowedIps { get; } = new();
     public ObservableCollection<object> Domains { get; } = new();
@@ -117,6 +122,9 @@ public partial class PeerViewModel : ObservableObject
     bool _showHandshake;
     public bool ShowHandshake { get => _showHandshake; set => Set(ref _showHandshake, value); }
 
+    string _pingText = "";
+    public string PingText { get => _pingText; set => Set(ref _pingText, value); }
+
     public RelayCommand AddDomainCommand { get; }
     public RelayCommand RemoveDomainCommand { get; }
     public RelayCommand AddAllowedIpCommand { get; }
@@ -168,6 +176,8 @@ public partial class PeerViewModel : ObservableObject
         if (HasDns && !IPAddress.TryParse(Dns.Trim(), out _)) return $"Invalid DNS server: {Dns}";
         if (KeepaliveText.Trim().Length > 0 && !ushort.TryParse(KeepaliveText.Trim(), out _))
             return $"Keepalive must be seconds (0-65535) — got '{KeepaliveText}'";
+        if (PingHostText.Trim().Length > 0 && !IPAddress.TryParse(PingHostText.Trim(), out _))
+            return $"Ping host must be an IP address — got '{PingHostText}'";
         foreach (var d in DomainValues)
             if (!IsValidDomain(d)) return $"Invalid domain: {d}";
         return null;
@@ -179,6 +189,14 @@ public partial class PeerViewModel : ObservableObject
         return AllowedIpValues.Any(c => Models.WireGuardConf.CidrContains(c, ip))
             ? null
             : $"DNS {Dns} is outside this peer's allowed IPs — queries would leak outside the tunnel";
+    }
+
+    public string? PingRouteWarning()
+    {
+        if (IsDnsOnly || !IPAddress.TryParse(PingHostText.Trim(), out var ip)) return null;
+        return AllowedIpValues.Any(c => Models.WireGuardConf.CidrContains(c, ip))
+            ? null
+            : $"Ping host {PingHostText.Trim()} is outside this peer's allowed IPs — probes wouldn't test the tunnel";
     }
 
     public static bool IsValidDomain(string domain) =>

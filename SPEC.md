@@ -34,6 +34,8 @@ Addresses: `InitializeUnicastIpAddressEntry` + `CreateUnicastIpAddressEntry` on 
 
 **Connected = handshake.** Adapter-up is only "connecting" (amber dot, no notification); the green dot + "Connected" notification fire on the first handshake, and a handshake older than 180 s drops the card back to amber ("Stalled").
 
+**Keepalive ping (`PeerConfig.PingHost`).** Optional in-tunnel IP pinged once per keepalive period (25 s when keepalive is 0), timeout ≤ 4 s. Keeps handshakes fresh and feeds health. Warn (not block) when outside the peer's allowed IPs.
+
 ## NRPT engine (`Services/NrptService.cs`)
 
 Backend abstraction `INrptBackend` with two implementations, tried in order:

@@ -8,6 +8,8 @@
     <StackPanel>
       <DockPanel Margin="10,4">
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
+          <TextBlock Classes="muted" Text="{Binding PingText}"
+                     IsVisible="{Binding PingText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
           <TextBlock Classes="muted" Text="{Binding HandshakeText}" IsVisible="{Binding ShowHandshake}" />
           <Button Classes="link danger" Content="Remove peer" Command="{Binding RemovePeerCommand}" IsVisible="{Binding IsEditing}" FontSize="{DynamicResource Fs115}" />
         </StackPanel>
@@ -18,7 +20,7 @@
       <Separator />
 
       <!-- Label column is Auto: inputs begin just past the widest label. -->
-      <Grid Margin="10,6" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
+      <Grid Margin="10,6" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
 
         <TextBlock Grid.Row="0" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Endpoint" IsVisible="{Binding ShowWgFields}" Margin="0,5,12,4" />
         <Grid Grid.Row="0" Grid.Column="1" ColumnDefinitions="*,Auto,86" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
@@ -68,25 +70,28 @@
         </ItemsControl>
 
         <TextBlock Grid.Row="4" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="DNS" Margin="0,5,12,4" />
-        <Grid Grid.Row="4" Grid.Column="1" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,4">
-          <TextBox Grid.Column="0" Classes="mono" Text="{Binding Dns}" Watermark="optional">
-            <TextBox.InnerRightContent>
-              <Button Classes="icon" Command="{Binding TogglePinCommand}" IsEnabled="{Binding PinEnabled}"
-                      ToolTip.Tip="Use as device-wide DNS">
-                <Panel>
-                  <TextBlock Classes="glyph pinicon" Text="&#xE718;" IsVisible="{Binding !IsPinned}" />
-                  <TextBlock Classes="glyph pinicon pinned" Classes.suspended="{Binding PinSuspended}"
-                             Text="&#xE842;" IsVisible="{Binding IsPinned}" />
-                </Panel>
-              </Button>
-            </TextBox.InnerRightContent>
-          </TextBox>
-          <TextBlock Grid.Column="1" Classes="lbl" Text="Keepalive" VerticalAlignment="Center" Margin="12,0,8,0" IsVisible="{Binding ShowWgFields}" />
-          <TextBox Grid.Column="2" Classes="mono" Width="52" Text="{Binding KeepaliveText}" Watermark="off" IsVisible="{Binding ShowWgFields}" />
-        </Grid>
+        <TextBox Grid.Row="4" Grid.Column="1" Classes="mono" Text="{Binding Dns}" Watermark="optional" Margin="0,0,0,4">
+          <TextBox.InnerRightContent>
+            <Button Classes="icon" Command="{Binding TogglePinCommand}" IsEnabled="{Binding PinEnabled}"
+                    ToolTip.Tip="Use as device-wide DNS">
+              <Panel>
+                <TextBlock Classes="glyph pinicon" Text="&#xE718;" IsVisible="{Binding !IsPinned}" />
+                <TextBlock Classes="glyph pinicon pinned" Classes.suspended="{Binding PinSuspended}"
+                           Text="&#xE842;" IsVisible="{Binding IsPinned}" />
+              </Panel>
+            </Button>
+          </TextBox.InnerRightContent>
+        </TextBox>
 
-        <TextBlock Grid.Row="5" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Domains" Margin="0,5,12,0" />
-        <ItemsControl Grid.Row="5" Grid.Column="1" ItemsSource="{Binding Domains}">
+        <TextBlock Grid.Row="5" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Keepalive" IsVisible="{Binding ShowWgFields}" Margin="0,5,12,4" />
+        <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
+          <TextBox Classes="mono" Width="52" Text="{Binding KeepaliveText}" Watermark="off" />
+          <TextBlock Classes="lbl" Text="Ping" ToolTip.Tip="In-tunnel IP pinged once per keepalive period — keeps the handshake fresh and feeds failover health" />
+          <TextBox Classes="mono" MinWidth="110" Text="{Binding PingHostText}" Watermark="host to ping" />
+        </StackPanel>
+
+        <TextBlock Grid.Row="6" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Domains" Margin="0,5,12,0" />
+        <ItemsControl Grid.Row="6" Grid.Column="1" ItemsSource="{Binding Domains}">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>

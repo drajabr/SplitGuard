@@ -62,6 +62,9 @@ public class PeerConfig
     public ushort PersistentKeepalive { get; set; }
     public string? Dns { get; set; }
     public List<string> Domains { get; set; } = new();
+    // Optional in-tunnel IP pinged once per keepalive period while connected — generates
+    // traffic (so handshakes stay fresh) and feeds failover health.
+    public string? PingHost { get; set; }
 }
 
 // Domains attached to a tunnel managed by the official WireGuard client.

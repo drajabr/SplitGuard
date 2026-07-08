@@ -22,9 +22,10 @@ public class ParsedPeer
     public string Endpoint { get; set; } = "";
     public List<string> AllowedIps { get; } = new();
     public ushort PersistentKeepalive { get; set; }
-    // SplitGuard extensions: per-peer split DNS, accepted in raw .conf text too
+    // SplitGuard extensions: per-peer split DNS + liveness, accepted in raw .conf text too
     public string? Dns { get; set; }
     public List<string> Domains { get; } = new();
+    public string? PingHost { get; set; }
 }
 
 public static class WireGuardConf
@@ -76,6 +77,7 @@ public static class WireGuardConf
                     case "persistentkeepalive": if (ushort.TryParse(value, out var ka)) peer.PersistentKeepalive = ka; break;
                     case "dns": peer.Dns = SplitList(value).FirstOrDefault(); break;
                     case "domains": peer.Domains.AddRange(SplitList(value)); break;
+                    case "pinghost": peer.PingHost = value; break;
                     default: result.Warnings.Add($"Ignored [Peer] {key}"); break;
                 }
             }

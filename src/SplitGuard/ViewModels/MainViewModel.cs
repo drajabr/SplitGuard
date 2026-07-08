@@ -537,6 +537,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
                 // Prefer the peer's own DNS extension; fall back to the interface DNS on its peer.
                 Dns = p.Dns ?? (ReferenceEquals(p, dnsPeer) ? parsed.InterfaceDns : null),
                 Domains = p.Domains.ToList(),
+                PingHost = p.PingHost,
             }).ToList(),
         };
         _config.Tunnels.Add(cfg);

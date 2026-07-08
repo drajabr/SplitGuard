@@ -96,6 +96,7 @@ public class TunnelViewModel : ObservableObject
                 Endpoint = p.Endpoint,
                 Dns = p.Dns ?? "",
                 KeepaliveText = p.PersistentKeepalive > 0 ? p.PersistentKeepalive.ToString() : "",
+                PingHostText = p.PingHost ?? "",
             };
             PeerViewModel.Fill(vm.AllowedIps, p.AllowedIps.Select(WireGuardConf.NormalizeCidr));
             PeerViewModel.Fill(vm.Domains, p.Domains);
@@ -412,6 +413,7 @@ public class TunnelViewModel : ObservableObject
             if (p.ParsedKeepalive > 0) sb.AppendLine($"PersistentKeepalive = {p.ParsedKeepalive}");
             if (p.HasDns) sb.AppendLine($"DNS = {p.Dns.Trim()}");
             if (p.DomainValues.Any()) sb.AppendLine($"Domains = {string.Join(", ", p.DomainValues)}");
+            if (p.PingHostText.Trim().Length > 0) sb.AppendLine($"PingHost = {p.PingHostText.Trim()}");
         }
         return sb.ToString();
     }
@@ -432,6 +434,7 @@ public class TunnelViewModel : ObservableObject
                 Endpoint = p.Endpoint,
                 Dns = p.Dns ?? "",
                 KeepaliveText = p.PersistentKeepalive > 0 ? p.PersistentKeepalive.ToString() : "",
+                PingHostText = p.PingHost ?? "",
                 IsEditing = true,
             };
             PeerViewModel.Fill(vm.AllowedIps, p.AllowedIps);
@@ -474,7 +477,7 @@ public class TunnelViewModel : ObservableObject
         Name.Trim(), PrivateKeyEdit.Trim(), ListenPortText.Trim(),
         string.Join(",", AddressValues),
         string.Join(";", Peers.Select(p =>
-            $"{p.PublicKey.Trim()},{p.PresharedKey.Trim()},{p.Endpoint.Trim()},{string.Join("+", p.AllowedIpValues)},{p.ParsedKeepalive}")));
+            $"{p.PublicKey.Trim()},{p.PresharedKey.Trim()},{p.Endpoint.Trim()},{string.Join("+", p.AllowedIpValues)},{p.ParsedKeepalive},{p.PingHostText.Trim()}")));
 
     void CancelEdit()
     {
@@ -526,7 +529,7 @@ public class TunnelViewModel : ObservableObject
         // A tunnel can be saved incomplete/empty; problems are only enforced when it is
         // turned on (see ValidateConfig in the IsConnected setter).
         ValidationError = "";
-        WarningText = string.Join(" · ", Peers.Select(p => p.DnsRouteWarning()).Where(w => w is not null)!);
+        WarningText = string.Join(" · ", Peers.SelectMany(p => new[] { p.DnsRouteWarning(), p.PingRouteWarning() }).Where(w => w is not null)!);
         var connectionChanged = !IsExternal && !IsCustom && ConnSnapshot() != _connSnapshot;
         if (IsCustom)
         {
@@ -563,6 +566,7 @@ public class TunnelViewModel : ObservableObject
                 PersistentKeepalive = p.ParsedKeepalive,
                 Dns = p.HasDns ? p.Dns.Trim() : null,
                 Domains = p.DomainValues.ToList(),
+                PingHost = p.PingHostText.Trim().Length > 0 ? p.PingHostText.Trim() : null,
             }).ToList();
         }
         IsDraft = false;
@@ -594,6 +598,8 @@ public class TunnelViewModel : ObservableObject
             if (p.AllowedIps.Count == 0) return "Peer needs at least one allowed IP";
             foreach (var cidr in p.AllowedIps)
                 if (!WireGuardConf.TryParseCidr(cidr, out _, out _)) return $"Invalid allowed IP: {cidr}";
+            if (!string.IsNullOrEmpty(p.PingHost) && !System.Net.IPAddress.TryParse(p.PingHost, out _))
+                return $"Ping host must be an IP address — got '{p.PingHost}'";
         }
         return null;
     }
