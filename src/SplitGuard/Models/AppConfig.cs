@@ -40,6 +40,9 @@ public class UiPrefs
     public bool StartOnBoot { get; set; } = true;
     public bool Notifications { get; set; } = true;
     public bool CustomDnsEnabled { get; set; } = true;
+    // Keep the trigger-less "SplitGuardLaunch" scheduled task registered so opening the
+    // app doesn't show a UAC prompt.
+    public bool SkipUacLaunch { get; set; } = true;
 }
 
 public class TunnelConfig

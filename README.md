@@ -26,7 +26,7 @@ WireGuard's `DNS =` setting is all-or-nothing: it takes over DNS for the whole m
 
 **Installer (recommended):** download `SplitGuard-Setup-x64-<version>.exe` from the Releases page. It installs to `Program Files\SplitGuard`, adds a Start Menu shortcut, and the uninstaller removes every trace (NRPT rules, scheduled tasks). **Portable:** grab the zip instead, extract anywhere, run `SplitGuard.exe`.
 
-It requires administrator rights (UAC prompt) because DNS policy and the network driver are system-level.
+Everything the app does is system-level (DNS policy, the network driver), so it always runs elevated — but you only see a UAC prompt the first time. On that first elevated run it registers a "run with highest privileges" scheduled task; later launches go through that task and start with no prompt (toggle under tray → Settings → "Skip UAC prompt on launch").
 
 ## Usage
 

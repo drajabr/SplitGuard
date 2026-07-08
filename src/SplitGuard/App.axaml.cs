@@ -45,6 +45,9 @@ public class App : Application
             SetupTray(desktop, window);
             _vm.Tunnels.CollectionChanged += OnTunnelsChanged;
             HookTunnels();
+            // Keep the no-UAC launcher task registered (and pointing at the current exe).
+            if (_vm.Prefs.SkipUacLaunch)
+                _ = Task.Run(Services.StartupService.RegisterLaunchTask);
             _ = _vm.InitializeAsync();
         }
         base.OnFrameworkInitializationCompleted();
@@ -160,6 +163,24 @@ public class App : Application
             RebuildTrayMenu();
         };
         settings.Menu.Items.Add(boot);
+        var skipUac = new NativeMenuItem("Skip UAC prompt on launch")
+        {
+            ToggleType = NativeMenuItemToggleType.CheckBox,
+            IsChecked = _vm.Prefs.SkipUacLaunch,
+        };
+        skipUac.Click += (_, _) =>
+        {
+            var on = !_vm.Prefs.SkipUacLaunch;
+            _vm.Prefs.SkipUacLaunch = on;
+            _vm.PersistPrefs();
+            _ = Task.Run(() =>
+            {
+                if (on) Services.StartupService.RegisterLaunchTask();
+                else Services.StartupService.UnregisterLaunchTask();
+            });
+            RebuildTrayMenu();
+        };
+        settings.Menu.Items.Add(skipUac);
         var notif = new NativeMenuItem("Notifications")
         {
             ToggleType = NativeMenuItemToggleType.CheckBox,

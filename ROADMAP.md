@@ -31,3 +31,4 @@ No DNS blocking, no local DNS forwarder, no general VPN-manager features, no per
 - **M5 — UI** ✅ window, cards, peer blocks, view/edit, pin, live domain cards, import
 - **M6 — Test bar + external tunnels** ✅
 - **M7 — Release v0.1.0** — push to GitHub, tag `v0.1.0`, verify Actions release; first on-machine verification of tunnel + NRPT behavior (needs a real WireGuard endpoint and admin session)
+- **M8 — Reliability + distribution** ✅ handshake-based connected state · keepalive ping probes · priority failover for overlapping allowed IPs (across tunnels via route metrics, within a tunnel via live config reassignment) · UAC-skip launcher task · Inno Setup installer (`build.ps1 -Installer`) with cleanup-on-uninstall

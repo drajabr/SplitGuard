@@ -5,8 +5,8 @@ Complete technical spec. Every decision is final — implement, don't research a
 ## Project
 
 `src/SplitGuard/SplitGuard.csproj`: `net8.0-windows`, `WinExe`, nullable, unsafe allowed, `ApplicationManifest=app.manifest`. Publish: `-r win-x64 --self-contained -p:PublishSingleFile=true`.
-Packages: `Avalonia` + `Avalonia.Desktop` + `Avalonia.Themes.Fluent` 11.2.*, `Microsoft.Management.Infrastructure` 3.0.*, `System.Security.Cryptography.ProtectedData` 8.0.*.
-`app.manifest`: `requireAdministrator` + Win10/11 supportedOS GUIDs.
+Packages: `Avalonia` + `Avalonia.Desktop` + `Avalonia.Themes.Fluent` 11.2.*, `Microsoft.Management.Infrastructure` 3.0.*, `System.Security.Cryptography.ProtectedData` 8.0.*, `System.Threading.AccessControl` 8.0.*.
+`app.manifest`: `asInvoker` + Win10/11 supportedOS GUIDs. The app still always runs elevated: `Program.Main` redirects a non-elevated start through the trigger-less `SplitGuardLaunch` scheduled task (`/RL HIGHEST`, registered on every elevated start while `UiPrefs.SkipUacLaunch` — so no UAC prompt after the first run), falling back to a `runas` relaunch. The show event carries an explicit ACL (Authenticated Users modify) so the non-elevated stub can surface an already-running instance. `--cleanup` (uninstaller hook) removes all tagged NRPT rules, the catch-all, and both scheduled tasks. The rejected alternative — a named-pipe privileged helper (old `skip-UAC` branch) — still prompted to start the helper and exposed an unauthenticated pipe.
 
 ## Data model (`Models/`)
 
