@@ -77,12 +77,18 @@
         <TextBox Grid.Row="4" Grid.Column="1" Classes="mono" Text="{Binding Dns}" Watermark="optional" Margin="0,0,0,4">
           <TextBox.InnerRightContent>
             <Button Classes="icon" Command="{Binding TogglePinCommand}" IsEnabled="{Binding PinEnabled}"
-                    ToolTip.Tip="Use as device-wide DNS">
-              <Panel>
-                <TextBlock Classes="glyph pinicon" Text="&#xE718;" IsVisible="{Binding !IsPinned}" />
-                <TextBlock Classes="glyph pinicon pinned" Classes.suspended="{Binding PinSuspended}"
-                           Text="&#xE842;" IsVisible="{Binding IsPinned}" />
-              </Panel>
+                    ToolTip.Tip="Pin this server as the device-wide DNS (with automatic fallback)">
+              <StackPanel Orientation="Horizontal" Spacing="5">
+                <Panel>
+                  <TextBlock Classes="glyph pinicon" Text="&#xE718;" IsVisible="{Binding !IsPinned}" />
+                  <TextBlock Classes="glyph pinicon pinned" Classes.suspended="{Binding PinSuspended}"
+                             Text="&#xE842;" IsVisible="{Binding IsPinned}" />
+                </Panel>
+                <TextBlock FontSize="{DynamicResource Fs11}" VerticalAlignment="Center" Opacity="0.7"
+                           Text="pin as device DNS" IsVisible="{Binding !IsPinned}" />
+                <TextBlock FontSize="{DynamicResource Fs11}" VerticalAlignment="Center" Classes="accentfg"
+                           Text="device DNS" IsVisible="{Binding IsPinned}" />
+              </StackPanel>
             </Button>
           </TextBox.InnerRightContent>
         </TextBox>
