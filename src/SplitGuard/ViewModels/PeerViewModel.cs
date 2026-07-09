@@ -19,8 +19,6 @@ public partial class PeerViewModel : ObservableObject
         RemoveAllowedIpCommand = new RelayCommand(p => AllowedIps.Remove((string)p!));
         TogglePinCommand = new RelayCommand(() => _tunnel.Host.TogglePin(_tunnel, this));
         RemovePeerCommand = new RelayCommand(() => _tunnel.RemovePeer(this));
-        // Route groups follow allowed IPs, so edits change which metric values are taken.
-        AllowedIps.CollectionChanged += (_, _) => _tunnel.Host.MetricContextChanged();
     }
 
     string _publicKey = "";
@@ -67,48 +65,24 @@ public partial class PeerViewModel : ObservableObject
     string _pingHostText = "";
     public string PingHostText { get => _pingHostText; set => Set(ref _pingHostText, value); }
 
-    // Failover rank (0-10) for overlapping allowed IPs: lower wins. Values already taken
-    // by peers sharing a CIDR with this one are withdrawn from the dropdown, so members
-    // of a route group always carry distinct metrics.
-    int _metric;
-    public int Metric
-    {
-        get => _metric;
-        set { if (Set(ref _metric, value)) _tunnel.Host.MetricContextChanged(); }
-    }
+    // Per-ping timeout in seconds; blank = default (3 s). Only meaningful with a ping host.
+    string _pingTimeoutText = "";
+    public string PingTimeoutText { get => _pingTimeoutText; set => Set(ref _pingTimeoutText, value); }
 
-    public List<int> MetricOptions
-    {
-        get
-        {
-            var taken = _tunnel.Host.TakenMetrics(this).ToHashSet();
-            return Enumerable.Range(0, 11).Where(m => m == Metric || !taken.Contains(m)).ToList();
-        }
-    }
+    public int ParsedPingTimeout => int.TryParse(PingTimeoutText.Trim(), out var v) ? v : 0;
 
-    public void RaiseMetricOptions() => Raise(nameof(MetricOptions));
+    // Consecutive pings that flip health down/up; blank = default (3).
+    string _pingCountText = "";
+    public string PingCountText { get => _pingCountText; set => Set(ref _pingCountText, value); }
 
-    // Failover mode: how this peer's health is judged inside a route group.
-    public string[] FailoverModeItems { get; } = { "None", "Handshake", "Handshake + ping" };
-    public string[] SensitivityItems { get; } = { "Aggressive", "Normal", "Soft" };
+    public int ParsedPingCount => int.TryParse(PingCountText.Trim(), out var v) ? v : 0;
 
-    int _failoverModeIndex = 1; // handshake by default
-    public int FailoverModeIndex
-    {
-        get => _failoverModeIndex;
-        set { if (Set(ref _failoverModeIndex, value)) Raise(nameof(SensitivityEnabled)); }
-    }
+    // Failover rank (0-10) for overlapping allowed IPs: lower wins; peers in the same
+    // route group must use distinct values (checked when connecting).
+    string _metricText = "";
+    public string MetricText { get => _metricText; set => Set(ref _metricText, value); }
 
-    int _sensitivityIndex = 1; // normal by default
-    public int SensitivityIndex { get => _sensitivityIndex; set => Set(ref _sensitivityIndex, value); }
-
-    public bool SensitivityEnabled => FailoverModeIndex != 0;
-
-    public string FailoverModeValue => FailoverModeIndex switch { 0 => "none", 2 => "ping", _ => "handshake" };
-    public string SensitivityValue => SensitivityIndex switch { 0 => "aggressive", 2 => "soft", _ => "normal" };
-
-    public void SetFailoverMode(string? v) => FailoverModeIndex = v == "none" ? 0 : v == "ping" ? 2 : 1;
-    public void SetSensitivity(string? v) => SensitivityIndex = v == "aggressive" ? 0 : v == "soft" ? 2 : 1;
+    public int ParsedMetric => int.TryParse(MetricText.Trim(), out var v) ? v : 0;
 
     // Strings plus a trailing AddSlot (the inline "+" box).
     public ObservableCollection<object> AllowedIps { get; } = new();
@@ -227,8 +201,12 @@ public partial class PeerViewModel : ObservableObject
             return $"Keepalive must be seconds (0-65535) — got '{KeepaliveText}'";
         if (PingHostText.Trim().Length > 0 && !IPAddress.TryParse(PingHostText.Trim(), out _))
             return $"Ping host must be an IP address — got '{PingHostText}'";
-        if (FailoverModeValue == "ping" && PingHostText.Trim().Length == 0)
-            return "Handshake + ping failover needs a ping host";
+        if (PingTimeoutText.Trim().Length > 0 && ParsedPingTimeout is < 1 or > 60)
+            return $"Ping timeout must be 1-60 seconds — got '{PingTimeoutText}'";
+        if (PingCountText.Trim().Length > 0 && ParsedPingCount is < 1 or > 100)
+            return $"Ping count must be 1-100 — got '{PingCountText}'";
+        if (MetricText.Trim().Length > 0 && (!int.TryParse(MetricText.Trim(), out var metric) || metric is < 0 or > 10))
+            return $"Metric must be 0-10 — got '{MetricText}'";
         foreach (var d in DomainValues)
             if (!IsValidDomain(d)) return $"Invalid domain: {d}";
         return null;

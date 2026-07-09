@@ -94,23 +94,22 @@
         </TextBox>
 
         <TextBlock Grid.Row="5" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Keepalive" IsVisible="{Binding ShowWgFields}" Margin="0,5,12,4" />
-        <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
-          <TextBox Classes="mono" Width="52" Text="{Binding KeepaliveText}" Watermark="off" />
-          <TextBlock Classes="lbl" Text="Ping" ToolTip.Tip="In-tunnel IP pinged once per keepalive period — keeps the handshake fresh and feeds failover health" />
-          <TextBox Classes="mono" MinWidth="110" Text="{Binding PingHostText}" Watermark="host to ping" />
-        </StackPanel>
+        <WrapPanel Grid.Row="5" Grid.Column="1" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
+          <TextBox Classes="mono" Width="52" Text="{Binding KeepaliveText}" Watermark="off" Margin="0,0,8,4" />
+          <TextBlock Classes="lbl" Text="Metric" Margin="0,0,8,4"
+                     ToolTip.Tip="Failover rank (0-10) when allowed IPs overlap another peer's — lower wins; peers in the same route group must use distinct values" />
+          <TextBox Classes="mono" Width="46" Text="{Binding MetricText}" Watermark="0" Margin="0,0,0,4" />
+        </WrapPanel>
 
-        <TextBlock Grid.Row="6" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Metric" IsVisible="{Binding ShowWgFields}" Margin="0,5,12,4"
-                   ToolTip.Tip="Failover rank when allowed IPs overlap another peer's — lower wins; peers in the same route group must use distinct values" />
-        <StackPanel Grid.Row="6" Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
-          <ComboBox Width="62" ItemsSource="{Binding MetricOptions}" SelectedItem="{Binding Metric}" />
-          <TextBlock Classes="lbl" Text="Failover"
-                     ToolTip.Tip="None: lowest metric always carries traffic · Handshake: fail over when the handshake goes stale · Handshake + ping: also fail over on ping timeouts (needs a ping host)" />
-          <ComboBox Width="140" ItemsSource="{Binding FailoverModeItems}" SelectedIndex="{Binding FailoverModeIndex}" />
-          <TextBlock Classes="lbl" Text="Sensitivity" IsEnabled="{Binding SensitivityEnabled}"
-                     ToolTip.Tip="How quickly an unhealthy path is declared dead — aggressive reacts fastest, soft tolerates blips" />
-          <ComboBox Width="110" ItemsSource="{Binding SensitivityItems}" SelectedIndex="{Binding SensitivityIndex}" IsEnabled="{Binding SensitivityEnabled}" />
-        </StackPanel>
+        <TextBlock Grid.Row="6" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Ping" IsVisible="{Binding ShowWgFields}" Margin="0,5,12,4"
+                   ToolTip.Tip="In-tunnel IP pinged once per keepalive period. When set, it decides failover health: count consecutive failures = down, count consecutive successes = up. Without it, handshake freshness decides." />
+        <WrapPanel Grid.Row="6" Grid.Column="1" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
+          <TextBox Classes="mono" Width="130" Text="{Binding PingHostText}" Watermark="host to ping" Margin="0,0,8,4" />
+          <TextBlock Classes="lbl" Text="Timeout" Margin="0,0,8,4" ToolTip.Tip="Seconds to wait for each ping reply (1-60, default 3)" />
+          <TextBox Classes="mono" Width="42" Text="{Binding PingTimeoutText}" Watermark="3" Margin="0,0,8,4" />
+          <TextBlock Classes="lbl" Text="Count" Margin="0,0,8,4" ToolTip.Tip="Consecutive pings that flip this peer down or back up (1-100, default 3)" />
+          <TextBox Classes="mono" Width="42" Text="{Binding PingCountText}" Watermark="3" Margin="0,0,0,4" />
+        </WrapPanel>
 
         <TextBlock Grid.Row="7" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Domains" Margin="0,5,12,0" />
         <ItemsControl Grid.Row="7" Grid.Column="1" ItemsSource="{Binding Domains}">

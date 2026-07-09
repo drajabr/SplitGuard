@@ -14,13 +14,17 @@ public record TunnelStats(Dictionary<string, PeerLive> PerPeer);
 
 public class TunnelManager : IDisposable
 {
-    // Health thresholds. New connections get a grace period to complete their first
-    // handshake. Failback waits out a hold-down so a flapping link doesn't bounce
-    // traffic. Per-peer staleness/ping thresholds come from the failover sensitivity.
+    // Health model, one rule per signal:
+    //  - Ping host set (and the probe actually tests this path): PingCount consecutive
+    //    failures = down, PingCount consecutive successes = up. The count IS the
+    //    hysteresis — raise it to tolerate a flappier link.
+    //  - No ping host: handshake freshness decides. A handshake refreshes at most every
+    //    ~2 min under traffic/keepalive, so >3 min old = down; a fresh one = up.
+    // New connections get a grace period to complete their first handshake.
+    static readonly TimeSpan HandshakeStale = TimeSpan.FromSeconds(180);
     static readonly TimeSpan HandshakeGrace = TimeSpan.FromSeconds(60);
-    static readonly TimeSpan FailbackHoldDown = TimeSpan.FromSeconds(30);
-    static readonly TimeSpan FailbackHoldDownMax = TimeSpan.FromMinutes(10);
-    static readonly TimeSpan HoldDownResetAfter = TimeSpan.FromMinutes(10);
+    const int DefaultPingTimeoutSec = 3;
+    const int DefaultPingCount = 3;
     const ushort DefaultPingPeriod = 25; // used when a ping host is set but keepalive is off
     const uint StandbyMetricBase = 400;  // far above any interface-metric difference
 
@@ -42,10 +46,8 @@ public class TunnelManager : IDisposable
         public ushort Keepalive;
         public required List<(IPAddress Ip, byte Cidr)> AllowedIps;
         public int Metric;
-        public string Mode = "handshake"; // none | handshake | ping
-        public TimeSpan HandshakeStaleFor;
-        public int PingFailLimit;
         public int PingTimeoutMs;
+        public int PingCount;
         public string? PingHost;
         public DateTime ConnectedAt;
 
@@ -56,15 +58,11 @@ public class TunnelManager : IDisposable
         public double? LastPingMs;
         public bool? LastPingOk;
         public int PingFailStreak;
+        public int PingOkStreak;
         public DateTime NextPingDue;
         public bool PingInFlight;
 
         public bool Healthy = true;
-        public DateTime? GoodSince; // start of the current healthy streak while marked unhealthy
-        public DateTime? HealthySince;
-        // Per-peer failback hold-down, doubled every time this peer fails while active so a
-        // flapping path backs off (30 s → … → 10 min) instead of oscillating forever.
-        public TimeSpan HoldDown = FailbackHoldDown;
         public string? FailoverRole;
         // True when a /32 probe route pins this peer's ping host to its own adapter, so
         // pings test this path even while the peer is standby.
@@ -117,15 +115,6 @@ public class TunnelManager : IDisposable
                 if (prefix == 0) fullTunnel = true;
                 allowed.Add((net, (byte)prefix));
             }
-            // Sensitivity → thresholds. Handshake staleness is anchored just past
-            // WireGuard's ~2 min rekey cadence (keepalive doesn't refresh handshakes any
-            // faster); the ping tiers are where fast detection actually comes from.
-            var (stale, fails, timeoutMs) = p.FailoverSensitivity switch
-            {
-                "aggressive" => (TimeSpan.FromSeconds(135), 2, 1000),
-                "soft" => (TimeSpan.FromSeconds(300), 5, 5000),
-                _ => (TimeSpan.FromSeconds(180), 3, 3000),
-            };
             runtimes.Add(new PeerRuntime
             {
                 Key = Convert.ToBase64String(pub),
@@ -135,10 +124,8 @@ public class TunnelManager : IDisposable
                 Keepalive = p.PersistentKeepalive,
                 AllowedIps = allowed,
                 Metric = p.Metric,
-                Mode = p.FailoverMode is "none" or "ping" ? p.FailoverMode : "handshake",
-                HandshakeStaleFor = stale,
-                PingFailLimit = fails,
-                PingTimeoutMs = timeoutMs,
+                PingTimeoutMs = (p.PingTimeout is >= 1 and <= 60 ? p.PingTimeout : DefaultPingTimeoutSec) * 1000,
+                PingCount = p.PingCount is >= 1 and <= 100 ? p.PingCount : DefaultPingCount,
                 PingHost = string.IsNullOrWhiteSpace(p.PingHost) ? null : p.PingHost.Trim(),
                 ConnectedAt = now,
                 NextPingDue = now,
@@ -316,12 +303,14 @@ public class TunnelManager : IDisposable
                         rt.LastPingMs = reply.RoundtripTime;
                         rt.LastPingOk = true;
                         rt.PingFailStreak = 0;
+                        rt.PingOkStreak++;
                     }
                     else
                     {
                         rt.LastPingMs = null;
                         rt.LastPingOk = false;
                         rt.PingFailStreak++;
+                        rt.PingOkStreak = 0;
                     }
                 }
                 catch
@@ -329,6 +318,7 @@ public class TunnelManager : IDisposable
                     rt.LastPingMs = null;
                     rt.LastPingOk = false;
                     rt.PingFailStreak++;
+                    rt.PingOkStreak = 0;
                 }
                 finally
                 {
@@ -358,54 +348,26 @@ public class TunnelManager : IDisposable
     {
         foreach (var (tunnel, rt) in members)
         {
-            if (rt.Mode == "none")
-            {
-                // Health never demotes this peer: the lowest metric always carries traffic.
-                rt.Healthy = true;
-                rt.GoodSince = null;
-                rt.HealthySince ??= now;
-                continue;
-            }
-
-            bool hsOk = rt.LastHandshake is { } h
-                ? now - h < rt.HandshakeStaleFor
-                : now - rt.ConnectedAt < HandshakeGrace;
-
-            // Ping only judges health in "ping" mode. A standby's ping usually routes
-            // through the *active* tunnel (the probe target sits inside the shared range),
-            // so it says nothing about this path — only count ping health when this peer's
-            // adapter would carry the probe.
-            bool pingCounts = rt.Mode == "ping"
-                && rt.PingHost is not null
+            // Ping decides health when a ping host is set AND the probe actually tests
+            // this path. A standby's ping usually routes through the *active* tunnel (the
+            // probe target sits inside the shared range) — unless a /32 probe route pins
+            // it here — so an untestable probe falls back to the handshake rule.
+            bool pingBased = rt.PingHost is not null
                 && IPAddress.TryParse(rt.PingHost, out var pingIp)
                 && !PingRoutesElsewhere(tunnel, rt, pingIp, groups);
-            bool pingOk = !pingCounts || rt.PingFailStreak < rt.PingFailLimit;
 
-            bool instant = hsOk && pingOk;
-            if (!instant)
+            if (pingBased)
             {
-                // A path failing while it carried the traffic backs off: each such failure
-                // doubles its personal failback hold-down (capped), so a flapping link
-                // settles on the backup instead of oscillating.
-                if (rt.Healthy && rt.FailoverRole == "active")
-                    rt.HoldDown = TimeSpan.FromTicks(Math.Min(rt.HoldDown.Ticks * 2, FailbackHoldDownMax.Ticks));
-                rt.Healthy = false;
-                rt.GoodSince = null;
-                rt.HealthySince = null;
-            }
-            else if (!rt.Healthy)
-            {
-                rt.GoodSince ??= now;
-                if (now - rt.GoodSince >= rt.HoldDown)
-                {
-                    rt.Healthy = true;
-                    rt.HealthySince = now;
-                }
+                // Count-based hysteresis: the state only flips once a full streak of
+                // PingCount agrees, and holds between thresholds.
+                if (rt.PingFailStreak >= rt.PingCount) rt.Healthy = false;
+                else if (rt.PingOkStreak >= rt.PingCount) rt.Healthy = true;
             }
             else
             {
-                rt.HealthySince ??= now;
-                if (now - rt.HealthySince >= HoldDownResetAfter) rt.HoldDown = FailbackHoldDown;
+                rt.Healthy = rt.LastHandshake is { } h
+                    ? now - h < HandshakeStale
+                    : now - rt.ConnectedAt < HandshakeGrace;
             }
         }
     }

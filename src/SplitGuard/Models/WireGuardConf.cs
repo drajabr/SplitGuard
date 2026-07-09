@@ -26,9 +26,9 @@ public class ParsedPeer
     public string? Dns { get; set; }
     public List<string> Domains { get; } = new();
     public string? PingHost { get; set; }
+    public int PingTimeout { get; set; }
+    public int PingCount { get; set; }
     public int Metric { get; set; }
-    public string? FailoverMode { get; set; }
-    public string? FailoverSensitivity { get; set; }
 }
 
 public static class WireGuardConf
@@ -81,12 +81,12 @@ public static class WireGuardConf
                     case "dns": peer.Dns = SplitList(value).FirstOrDefault(); break;
                     case "domains": peer.Domains.AddRange(SplitList(value)); break;
                     case "pinghost": peer.PingHost = value; break;
+                    case "pingtimeout": if (int.TryParse(value, out var pt)) peer.PingTimeout = Math.Clamp(pt, 0, 60); break;
+                    case "pingcount": if (int.TryParse(value, out var pc)) peer.PingCount = Math.Clamp(pc, 0, 100); break;
                     case "metric":
                     case "priority": // legacy name
                         if (int.TryParse(value, out var pr)) peer.Metric = Math.Clamp(pr, 0, 10);
                         break;
-                    case "failovermode": peer.FailoverMode = value.ToLowerInvariant(); break;
-                    case "failoversensitivity": peer.FailoverSensitivity = value.ToLowerInvariant(); break;
                     default: result.Warnings.Add($"Ignored [Peer] {key}"); break;
                 }
             }
