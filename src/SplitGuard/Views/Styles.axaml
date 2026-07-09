@@ -30,6 +30,16 @@
     <Setter Property="FontSize" Value="{DynamicResource Fs12}" />
   </Style>
 
+  <!-- Selectors (metric / failover mode / sensitivity) match the input-box density. -->
+  <Style Selector="ComboBox">
+    <Setter Property="MinHeight" Value="{DynamicResource CtrlH}" />
+    <Setter Property="FontSize" Value="{DynamicResource Fs12}" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{DynamicResource FieldBorderBrush}" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+
   <Style Selector="Button">
     <Setter Property="MinHeight" Value="{DynamicResource CtrlH}" />
     <Setter Property="Padding" Value="10,3" />

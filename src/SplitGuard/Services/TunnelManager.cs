@@ -14,16 +14,13 @@ public record TunnelStats(Dictionary<string, PeerLive> PerPeer);
 
 public class TunnelManager : IDisposable
 {
-    // Health thresholds. A handshake refreshes at most every ~2 min under keepalive, so
-    // 3 min without one means the path is dead. New connections get a grace period to
-    // complete their first handshake. Failback waits out a hold-down so a flapping link
-    // doesn't bounce traffic.
-    static readonly TimeSpan HandshakeStale = TimeSpan.FromSeconds(180);
+    // Health thresholds. New connections get a grace period to complete their first
+    // handshake. Failback waits out a hold-down so a flapping link doesn't bounce
+    // traffic. Per-peer staleness/ping thresholds come from the failover sensitivity.
     static readonly TimeSpan HandshakeGrace = TimeSpan.FromSeconds(60);
     static readonly TimeSpan FailbackHoldDown = TimeSpan.FromSeconds(30);
     static readonly TimeSpan FailbackHoldDownMax = TimeSpan.FromMinutes(10);
     static readonly TimeSpan HoldDownResetAfter = TimeSpan.FromMinutes(10);
-    const int PingFailThreshold = 3;
     const ushort DefaultPingPeriod = 25; // used when a ping host is set but keepalive is off
     const uint StandbyMetricBase = 400;  // far above any interface-metric difference
 
@@ -44,7 +41,11 @@ public class TunnelManager : IDisposable
         public IPEndPoint? Endpoint;
         public ushort Keepalive;
         public required List<(IPAddress Ip, byte Cidr)> AllowedIps;
-        public int Priority;
+        public int Metric;
+        public string Mode = "handshake"; // none | handshake | ping
+        public TimeSpan HandshakeStaleFor;
+        public int PingFailLimit;
+        public int PingTimeoutMs;
         public string? PingHost;
         public DateTime ConnectedAt;
 
@@ -116,6 +117,15 @@ public class TunnelManager : IDisposable
                 if (prefix == 0) fullTunnel = true;
                 allowed.Add((net, (byte)prefix));
             }
+            // Sensitivity → thresholds. Handshake staleness is anchored just past
+            // WireGuard's ~2 min rekey cadence (keepalive doesn't refresh handshakes any
+            // faster); the ping tiers are where fast detection actually comes from.
+            var (stale, fails, timeoutMs) = p.FailoverSensitivity switch
+            {
+                "aggressive" => (TimeSpan.FromSeconds(135), 2, 1000),
+                "soft" => (TimeSpan.FromSeconds(300), 5, 5000),
+                _ => (TimeSpan.FromSeconds(180), 3, 3000),
+            };
             runtimes.Add(new PeerRuntime
             {
                 Key = Convert.ToBase64String(pub),
@@ -124,7 +134,11 @@ public class TunnelManager : IDisposable
                 Endpoint = endpoint,
                 Keepalive = p.PersistentKeepalive,
                 AllowedIps = allowed,
-                Priority = p.Priority,
+                Metric = p.Metric,
+                Mode = p.FailoverMode is "none" or "ping" ? p.FailoverMode : "handshake",
+                HandshakeStaleFor = stale,
+                PingFailLimit = fails,
+                PingTimeoutMs = timeoutMs,
                 PingHost = string.IsNullOrWhiteSpace(p.PingHost) ? null : p.PingHost.Trim(),
                 ConnectedAt = now,
                 NextPingDue = now,
@@ -290,7 +304,7 @@ public class TunnelManager : IDisposable
             var period = rt.Keepalive > 0 ? rt.Keepalive : DefaultPingPeriod;
             rt.NextPingDue = now.AddSeconds(period);
             rt.PingInFlight = true;
-            var timeout = Math.Min(4000, period * 1000);
+            var timeout = Math.Min(rt.PingTimeoutMs, period * 1000);
             _ = Task.Run(async () =>
             {
                 try
@@ -344,17 +358,28 @@ public class TunnelManager : IDisposable
     {
         foreach (var (tunnel, rt) in members)
         {
+            if (rt.Mode == "none")
+            {
+                // Health never demotes this peer: the lowest metric always carries traffic.
+                rt.Healthy = true;
+                rt.GoodSince = null;
+                rt.HealthySince ??= now;
+                continue;
+            }
+
             bool hsOk = rt.LastHandshake is { } h
-                ? now - h < HandshakeStale
+                ? now - h < rt.HandshakeStaleFor
                 : now - rt.ConnectedAt < HandshakeGrace;
 
-            // A standby's ping usually routes through the *active* tunnel (the probe target
-            // sits inside the shared range), so it says nothing about this path — only
-            // count ping health when this peer's adapter would carry the probe.
-            bool pingCounts = rt.PingHost is not null
+            // Ping only judges health in "ping" mode. A standby's ping usually routes
+            // through the *active* tunnel (the probe target sits inside the shared range),
+            // so it says nothing about this path — only count ping health when this peer's
+            // adapter would carry the probe.
+            bool pingCounts = rt.Mode == "ping"
+                && rt.PingHost is not null
                 && IPAddress.TryParse(rt.PingHost, out var pingIp)
                 && !PingRoutesElsewhere(tunnel, rt, pingIp, groups);
-            bool pingOk = !pingCounts || rt.PingFailStreak < PingFailThreshold;
+            bool pingOk = !pingCounts || rt.PingFailStreak < rt.PingFailLimit;
 
             bool instant = hsOk && pingOk;
             if (!instant)
@@ -446,7 +471,7 @@ public class TunnelManager : IDisposable
         foreach (var (key, members) in groups)
         {
             var ordered = members
-                .OrderBy(m => m.Peer.Priority)
+                .OrderBy(m => m.Peer.Metric)
                 .ThenBy(m => m.Tunnel.Name, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(m => m.Tunnel.Peers.IndexOf(m.Peer))
                 .ToList();
@@ -552,7 +577,7 @@ public class TunnelManager : IDisposable
                 if (!list.Contains(p)) list.Add(p);
             }
         foreach (var (key, list) in claims.Where(c => c.Value.Count > 1))
-            tunnel.IntraOwner[key] = list.OrderBy(p => p.Priority).ThenBy(p => tunnel.Peers.IndexOf(p)).First().Key;
+            tunnel.IntraOwner[key] = list.OrderBy(p => p.Metric).ThenBy(p => tunnel.Peers.IndexOf(p)).First().Key;
     }
 
     static List<(byte[], byte[]?, IPEndPoint?, IReadOnlyList<(IPAddress, byte)>, ushort)> BuildWgPeers(ActiveTunnel tunnel) =>

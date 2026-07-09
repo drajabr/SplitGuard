@@ -365,6 +365,36 @@ public class MainViewModel : ObservableObject, ITunnelHost
             .SelectMany(p => p.DomainValues)
             .Contains(domain, StringComparer.OrdinalIgnoreCase);
 
+    // ---- route-group metrics -------------------------------------------------
+
+    IEnumerable<PeerViewModel> WgPeerVms() =>
+        Tunnels.Where(t => !t.IsExternal && !t.IsCustom).SelectMany(t => t.Peers);
+
+    static bool SharesCidr(PeerViewModel a, PeerViewModel b) =>
+        a.AllowedIpValues.Select(WireGuardConf.CanonicalCidr)
+            .Intersect(b.AllowedIpValues.Select(WireGuardConf.CanonicalCidr)).Any();
+
+    // Metrics already claimed inside `except`'s route group(s): withdrawn from its dropdown.
+    public IEnumerable<int> TakenMetrics(PeerViewModel except) =>
+        WgPeerVms().Where(p => !ReferenceEquals(p, except) && SharesCidr(p, except)).Select(p => p.Metric);
+
+    public void MetricContextChanged()
+    {
+        foreach (var p in WgPeerVms()) p.RaiseMetricOptions();
+    }
+
+    // A route group with duplicate metrics can't be arbitrated; blocks connect.
+    public string? MetricConflict(TunnelViewModel tunnel)
+    {
+        foreach (var p in tunnel.Peers)
+        {
+            var clash = WgPeerVms().FirstOrDefault(o => !ReferenceEquals(o, p) && o.Metric == p.Metric && SharesCidr(o, p));
+            if (clash is not null)
+                return $"Overlapping allowed IPs share metric {p.Metric} — give each peer in the group a distinct metric";
+        }
+        return null;
+    }
+
     // ---- edit/save/delete ---------------------------------------------------
 
     // Overlapping allowed IPs (same CIDR on several peers/tunnels) are legal — that's the
@@ -379,14 +409,22 @@ public class MainViewModel : ObservableObject, ITunnelHost
                     if (!claims.TryGetValue(cidr, out var list)) claims[cidr] = list = new();
                     list.Add((t.Name, p));
                 }
-        var weak = claims.Values.Where(members => members.Count > 1)
-            .SelectMany(members => members)
-            .Where(m => m.Peer.PersistentKeepalive == 0 && string.IsNullOrEmpty(m.Peer.PingHost))
+        var grouped = claims.Values.Where(members => members.Count > 1).SelectMany(members => members).ToList();
+        var weak = grouped
+            .Where(m => m.Peer.FailoverMode != "none"
+                && m.Peer.PersistentKeepalive == 0 && string.IsNullOrEmpty(m.Peer.PingHost))
             .Select(m => m.Tunnel)
             .Distinct()
             .ToList();
-        return weak.Count == 0 ? null
-            : $"Overlapping allowed IPs: set a keepalive or ping host on {string.Join(", ", weak)} so failover can judge health";
+        if (weak.Count > 0)
+            return $"Overlapping allowed IPs: set a keepalive or ping host on {string.Join(", ", weak)} so failover can judge health";
+        var pingless = grouped
+            .Where(m => m.Peer.FailoverMode == "ping" && string.IsNullOrEmpty(m.Peer.PingHost))
+            .Select(m => m.Tunnel)
+            .Distinct()
+            .ToList();
+        return pingless.Count == 0 ? null
+            : $"Handshake + ping failover without a ping host on {string.Join(", ", pingless)} — it falls back to handshake-only";
     }
 
     public void TunnelSaved(TunnelViewModel vm, bool connectionChanged)
@@ -571,7 +609,9 @@ public class MainViewModel : ObservableObject, ITunnelHost
                 Dns = p.Dns ?? (ReferenceEquals(p, dnsPeer) ? parsed.InterfaceDns : null),
                 Domains = p.Domains.ToList(),
                 PingHost = p.PingHost,
-                Priority = p.Priority,
+                Metric = Math.Clamp(p.Metric, 0, 10),
+                FailoverMode = p.FailoverMode ?? "handshake",
+                FailoverSensitivity = p.FailoverSensitivity ?? "normal",
             }).ToList(),
         };
         _config.Tunnels.Add(cfg);

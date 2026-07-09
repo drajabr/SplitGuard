@@ -24,7 +24,7 @@
       <Separator />
 
       <!-- Label column is Auto: inputs begin just past the widest label. -->
-      <Grid Margin="10,6" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+      <Grid Margin="10,6" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
 
         <TextBlock Grid.Row="0" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Endpoint" IsVisible="{Binding ShowWgFields}" Margin="0,5,12,4" />
         <Grid Grid.Row="0" Grid.Column="1" ColumnDefinitions="*,Auto,86" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
@@ -98,12 +98,22 @@
           <TextBox Classes="mono" Width="52" Text="{Binding KeepaliveText}" Watermark="off" />
           <TextBlock Classes="lbl" Text="Ping" ToolTip.Tip="In-tunnel IP pinged once per keepalive period — keeps the handshake fresh and feeds failover health" />
           <TextBox Classes="mono" MinWidth="110" Text="{Binding PingHostText}" Watermark="host to ping" />
-          <TextBlock Classes="lbl" Text="Priority" ToolTip.Tip="Failover rank when allowed IPs overlap another peer's: lower wins" />
-          <TextBox Classes="mono" Width="46" Text="{Binding PriorityText}" Watermark="0" />
         </StackPanel>
 
-        <TextBlock Grid.Row="6" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Domains" Margin="0,5,12,0" />
-        <ItemsControl Grid.Row="6" Grid.Column="1" ItemsSource="{Binding Domains}">
+        <TextBlock Grid.Row="6" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Metric" IsVisible="{Binding ShowWgFields}" Margin="0,5,12,4"
+                   ToolTip.Tip="Failover rank when allowed IPs overlap another peer's — lower wins; peers in the same route group must use distinct values" />
+        <StackPanel Grid.Row="6" Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
+          <ComboBox Width="62" ItemsSource="{Binding MetricOptions}" SelectedItem="{Binding Metric}" />
+          <TextBlock Classes="lbl" Text="Failover"
+                     ToolTip.Tip="None: lowest metric always carries traffic · Handshake: fail over when the handshake goes stale · Handshake + ping: also fail over on ping timeouts (needs a ping host)" />
+          <ComboBox Width="140" ItemsSource="{Binding FailoverModeItems}" SelectedIndex="{Binding FailoverModeIndex}" />
+          <TextBlock Classes="lbl" Text="Sensitivity" IsEnabled="{Binding SensitivityEnabled}"
+                     ToolTip.Tip="How quickly an unhealthy path is declared dead — aggressive reacts fastest, soft tolerates blips" />
+          <ComboBox Width="110" ItemsSource="{Binding SensitivityItems}" SelectedIndex="{Binding SensitivityIndex}" IsEnabled="{Binding SensitivityEnabled}" />
+        </StackPanel>
+
+        <TextBlock Grid.Row="7" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Domains" Margin="0,5,12,0" />
+        <ItemsControl Grid.Row="7" Grid.Column="1" ItemsSource="{Binding Domains}">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>

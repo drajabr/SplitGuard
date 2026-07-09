@@ -26,7 +26,9 @@ public class ParsedPeer
     public string? Dns { get; set; }
     public List<string> Domains { get; } = new();
     public string? PingHost { get; set; }
-    public int Priority { get; set; }
+    public int Metric { get; set; }
+    public string? FailoverMode { get; set; }
+    public string? FailoverSensitivity { get; set; }
 }
 
 public static class WireGuardConf
@@ -79,7 +81,12 @@ public static class WireGuardConf
                     case "dns": peer.Dns = SplitList(value).FirstOrDefault(); break;
                     case "domains": peer.Domains.AddRange(SplitList(value)); break;
                     case "pinghost": peer.PingHost = value; break;
-                    case "priority": if (int.TryParse(value, out var pr)) peer.Priority = pr; break;
+                    case "metric":
+                    case "priority": // legacy name
+                        if (int.TryParse(value, out var pr)) peer.Metric = Math.Clamp(pr, 0, 10);
+                        break;
+                    case "failovermode": peer.FailoverMode = value.ToLowerInvariant(); break;
+                    case "failoversensitivity": peer.FailoverSensitivity = value.ToLowerInvariant(); break;
                     default: result.Warnings.Add($"Ignored [Peer] {key}"); break;
                 }
             }
@@ -108,6 +115,21 @@ public static class WireGuardConf
             if ((nb[i] & mask) != (ib[i] & mask)) return false;
         }
         return true;
+    }
+
+    // Canonical "network/prefix" key (host bits masked) so equivalent entries compare
+    // equal — used to detect overlapping allowed IPs across peers/tunnels.
+    public static string CanonicalCidr(string cidr)
+    {
+        if (!TryParseCidr(cidr, out var ip, out var prefix)) return cidr.Trim();
+        var bytes = ip.GetAddressBytes();
+        int bits = prefix;
+        for (int i = 0; i < bytes.Length; i++, bits -= 8)
+        {
+            if (bits >= 8) continue;
+            bytes[i] = bits <= 0 ? (byte)0 : (byte)(bytes[i] & (0xFF << (8 - bits)));
+        }
+        return $"{new IPAddress(bytes)}/{prefix}";
     }
 
     // A bare IP means a single host: make the /32 (or /128) explicit so every stored

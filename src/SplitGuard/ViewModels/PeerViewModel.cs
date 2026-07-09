@@ -19,6 +19,8 @@ public partial class PeerViewModel : ObservableObject
         RemoveAllowedIpCommand = new RelayCommand(p => AllowedIps.Remove((string)p!));
         TogglePinCommand = new RelayCommand(() => _tunnel.Host.TogglePin(_tunnel, this));
         RemovePeerCommand = new RelayCommand(() => _tunnel.RemovePeer(this));
+        // Route groups follow allowed IPs, so edits change which metric values are taken.
+        AllowedIps.CollectionChanged += (_, _) => _tunnel.Host.MetricContextChanged();
     }
 
     string _publicKey = "";
@@ -65,11 +67,48 @@ public partial class PeerViewModel : ObservableObject
     string _pingHostText = "";
     public string PingHostText { get => _pingHostText; set => Set(ref _pingHostText, value); }
 
-    // Failover rank for overlapping allowed IPs: lower wins, blank = 0.
-    string _priorityText = "";
-    public string PriorityText { get => _priorityText; set => Set(ref _priorityText, value); }
+    // Failover rank (0-10) for overlapping allowed IPs: lower wins. Values already taken
+    // by peers sharing a CIDR with this one are withdrawn from the dropdown, so members
+    // of a route group always carry distinct metrics.
+    int _metric;
+    public int Metric
+    {
+        get => _metric;
+        set { if (Set(ref _metric, value)) _tunnel.Host.MetricContextChanged(); }
+    }
 
-    public int ParsedPriority => int.TryParse(PriorityText.Trim(), out var v) ? v : 0;
+    public List<int> MetricOptions
+    {
+        get
+        {
+            var taken = _tunnel.Host.TakenMetrics(this).ToHashSet();
+            return Enumerable.Range(0, 11).Where(m => m == Metric || !taken.Contains(m)).ToList();
+        }
+    }
+
+    public void RaiseMetricOptions() => Raise(nameof(MetricOptions));
+
+    // Failover mode: how this peer's health is judged inside a route group.
+    public string[] FailoverModeItems { get; } = { "None", "Handshake", "Handshake + ping" };
+    public string[] SensitivityItems { get; } = { "Aggressive", "Normal", "Soft" };
+
+    int _failoverModeIndex = 1; // handshake by default
+    public int FailoverModeIndex
+    {
+        get => _failoverModeIndex;
+        set { if (Set(ref _failoverModeIndex, value)) Raise(nameof(SensitivityEnabled)); }
+    }
+
+    int _sensitivityIndex = 1; // normal by default
+    public int SensitivityIndex { get => _sensitivityIndex; set => Set(ref _sensitivityIndex, value); }
+
+    public bool SensitivityEnabled => FailoverModeIndex != 0;
+
+    public string FailoverModeValue => FailoverModeIndex switch { 0 => "none", 2 => "ping", _ => "handshake" };
+    public string SensitivityValue => SensitivityIndex switch { 0 => "aggressive", 2 => "soft", _ => "normal" };
+
+    public void SetFailoverMode(string? v) => FailoverModeIndex = v == "none" ? 0 : v == "ping" ? 2 : 1;
+    public void SetSensitivity(string? v) => SensitivityIndex = v == "aggressive" ? 0 : v == "soft" ? 2 : 1;
 
     // Strings plus a trailing AddSlot (the inline "+" box).
     public ObservableCollection<object> AllowedIps { get; } = new();
@@ -188,8 +227,8 @@ public partial class PeerViewModel : ObservableObject
             return $"Keepalive must be seconds (0-65535) — got '{KeepaliveText}'";
         if (PingHostText.Trim().Length > 0 && !IPAddress.TryParse(PingHostText.Trim(), out _))
             return $"Ping host must be an IP address — got '{PingHostText}'";
-        if (PriorityText.Trim().Length > 0 && !int.TryParse(PriorityText.Trim(), out _))
-            return $"Priority must be a whole number — got '{PriorityText}'";
+        if (FailoverModeValue == "ping" && PingHostText.Trim().Length == 0)
+            return "Handshake + ping failover needs a ping host";
         foreach (var d in DomainValues)
             if (!IsValidDomain(d)) return $"Invalid domain: {d}";
         return null;

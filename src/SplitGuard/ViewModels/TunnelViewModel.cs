@@ -10,6 +10,12 @@ public interface ITunnelHost
     void RequestDisconnect(TunnelViewModel tunnel);
     void TogglePin(TunnelViewModel tunnel, PeerViewModel peer);
     bool IsDomainInUse(string domain, PeerViewModel except);
+    // Metric values already claimed by peers whose allowed IPs overlap `except`'s.
+    IEnumerable<int> TakenMetrics(PeerViewModel except);
+    // Allowed IPs or a metric changed somewhere: every peer refreshes its metric options.
+    void MetricContextChanged();
+    // Overlapping peers with equal metrics (a route group can't arbitrate them).
+    string? MetricConflict(TunnelViewModel tunnel);
     void EditStarted(TunnelViewModel tunnel);
     void TunnelSaved(TunnelViewModel tunnel, bool connectionChanged);
     void RequestDelete(TunnelViewModel tunnel);
@@ -97,8 +103,10 @@ public class TunnelViewModel : ObservableObject
                 Dns = p.Dns ?? "",
                 KeepaliveText = p.PersistentKeepalive > 0 ? p.PersistentKeepalive.ToString() : "",
                 PingHostText = p.PingHost ?? "",
-                PriorityText = p.Priority != 0 ? p.Priority.ToString() : "",
+                Metric = Math.Clamp(p.Metric, 0, 10),
             };
+            vm.SetFailoverMode(p.FailoverMode);
+            vm.SetSensitivity(p.FailoverSensitivity);
             PeerViewModel.Fill(vm.AllowedIps, p.AllowedIps.Select(WireGuardConf.NormalizeCidr));
             PeerViewModel.Fill(vm.Domains, p.Domains);
             Peers.Add(vm);
@@ -415,7 +423,9 @@ public class TunnelViewModel : ObservableObject
             if (p.HasDns) sb.AppendLine($"DNS = {p.Dns.Trim()}");
             if (p.DomainValues.Any()) sb.AppendLine($"Domains = {string.Join(", ", p.DomainValues)}");
             if (p.PingHostText.Trim().Length > 0) sb.AppendLine($"PingHost = {p.PingHostText.Trim()}");
-            if (p.ParsedPriority != 0) sb.AppendLine($"Priority = {p.ParsedPriority}");
+            if (p.Metric != 0) sb.AppendLine($"Metric = {p.Metric}");
+            if (p.FailoverModeValue != "handshake") sb.AppendLine($"FailoverMode = {p.FailoverModeValue}");
+            if (p.SensitivityValue != "normal") sb.AppendLine($"FailoverSensitivity = {p.SensitivityValue}");
         }
         return sb.ToString();
     }
@@ -437,9 +447,11 @@ public class TunnelViewModel : ObservableObject
                 Dns = p.Dns ?? "",
                 KeepaliveText = p.PersistentKeepalive > 0 ? p.PersistentKeepalive.ToString() : "",
                 PingHostText = p.PingHost ?? "",
-                PriorityText = p.Priority != 0 ? p.Priority.ToString() : "",
+                Metric = Math.Clamp(p.Metric, 0, 10),
                 IsEditing = true,
             };
+            vm.SetFailoverMode(p.FailoverMode);
+            vm.SetSensitivity(p.FailoverSensitivity);
             PeerViewModel.Fill(vm.AllowedIps, p.AllowedIps);
             PeerViewModel.Fill(vm.Domains, p.Domains);
             Peers.Add(vm);
@@ -480,7 +492,7 @@ public class TunnelViewModel : ObservableObject
         Name.Trim(), PrivateKeyEdit.Trim(), ListenPortText.Trim(),
         string.Join(",", AddressValues),
         string.Join(";", Peers.Select(p =>
-            $"{p.PublicKey.Trim()},{p.PresharedKey.Trim()},{p.Endpoint.Trim()},{string.Join("+", p.AllowedIpValues)},{p.ParsedKeepalive},{p.PingHostText.Trim()},{p.ParsedPriority}")));
+            $"{p.PublicKey.Trim()},{p.PresharedKey.Trim()},{p.Endpoint.Trim()},{string.Join("+", p.AllowedIpValues)},{p.ParsedKeepalive},{p.PingHostText.Trim()},{p.Metric},{p.FailoverModeValue},{p.SensitivityValue}")));
 
     void CancelEdit()
     {
@@ -570,7 +582,9 @@ public class TunnelViewModel : ObservableObject
                 Dns = p.HasDns ? p.Dns.Trim() : null,
                 Domains = p.DomainValues.ToList(),
                 PingHost = p.PingHostText.Trim().Length > 0 ? p.PingHostText.Trim() : null,
-                Priority = p.ParsedPriority,
+                Metric = p.Metric,
+                FailoverMode = p.FailoverModeValue,
+                FailoverSensitivity = p.SensitivityValue,
             }).ToList();
         }
         IsDraft = false;
@@ -604,7 +618,11 @@ public class TunnelViewModel : ObservableObject
                 if (!WireGuardConf.TryParseCidr(cidr, out _, out _)) return $"Invalid allowed IP: {cidr}";
             if (!string.IsNullOrEmpty(p.PingHost) && !System.Net.IPAddress.TryParse(p.PingHost, out _))
                 return $"Ping host must be an IP address — got '{p.PingHost}'";
+            if (p.FailoverMode == "ping" && string.IsNullOrEmpty(p.PingHost))
+                return "Handshake + ping failover needs a ping host on every peer using it";
         }
+        // Overlapping allowed IPs with equal metrics can't be arbitrated.
+        if (Host.MetricConflict(this) is { } conflict) return conflict;
         return null;
     }
 
