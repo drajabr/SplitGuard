@@ -74,20 +74,6 @@ public partial class TunnelCard : UserControl
                 _vm.RemovalAnimator = PlayRemove;
             }
             BuildDetail();
-
-            // External and custom cards have no interface column: peers span full width.
-            if (_vm is { ShowInterfaceSection: false })
-            {
-                Grid.SetColumn(PeersHost, 0);
-                Grid.SetColumnSpan(PeersHost, 2);
-                PeersHost.BorderThickness = new Avalonia.Thickness(0);
-            }
-            else
-            {
-                Grid.SetColumn(PeersHost, 1);
-                Grid.SetColumnSpan(PeersHost, 1);
-            }
-
             ApplyCardAccent();
             // Initial state (no animation): show the right content at its natural height.
             var editing = _vm?.IsEditing ?? false;

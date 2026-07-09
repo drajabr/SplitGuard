@@ -353,11 +353,8 @@ public class MainViewModel : ObservableObject, ITunnelHost
         return servers;
     }
 
-    public void EditStarted(TunnelViewModel tunnel)
-    {
-        foreach (var other in Tunnels.Where(t => t.IsEditing && !ReferenceEquals(t, tunnel)).ToList())
-            other.CancelEditCommand.Execute(null);
-    }
+    // Any number of cards may be expanded/editing at once (single-edit rule dropped).
+    public void EditStarted(TunnelViewModel tunnel) { }
 
     public bool IsDomainInUse(string domain, PeerViewModel except) =>
         Tunnels.SelectMany(t => t.Peers)
@@ -596,7 +593,8 @@ public class MainViewModel : ObservableObject, ITunnelHost
                 Domains = p.Domains.ToList(),
                 PingHost = p.PingHost,
                 PingTimeout = p.PingTimeout,
-                PingCount = p.PingCount,
+                PingDownCount = p.PingDownCount,
+                PingUpCount = p.PingUpCount,
                 Metric = Math.Clamp(p.Metric, 0, 10),
             }).ToList(),
         };

@@ -61,91 +61,84 @@
                          VerticalScrollBarVisibility="Disabled" />
         </Border>
 
-        <Grid Name="FieldsGrid" ColumnDefinitions="40*,60*" IsVisible="{Binding !IsTextMode}">
-          <Border Grid.Column="0" Classes="peerblock" Margin="10,8,8,6" VerticalAlignment="Top" IsVisible="{Binding ShowInterfaceSection}">
-          <StackPanel>
-          <DockPanel Margin="10,4">
-            <Button Classes="link" DockPanel.Dock="Right" Command="{Binding GenerateKeyCommand}"
-                    ToolTip.Tip="Generate a new keypair (click twice to confirm)" FontSize="{DynamicResource Fs115}">
-              <StackPanel Orientation="Horizontal" Spacing="5">
-                <TextBlock Classes="glyph" Text="&#xE72C;" FontSize="{DynamicResource Fs12}" />
-                <TextBlock Text="{Binding GenerateLabel}" VerticalAlignment="Center" />
+        <StackPanel Name="FieldsGrid" IsVisible="{Binding !IsTextMode}">
+          <!-- Interface: one full-width line — keys and addresses flow left, generate +
+               listen port dock to the upper-right corner. -->
+          <Border Classes="peerblock" Margin="12,8,12,6" IsVisible="{Binding ShowInterfaceSection}">
+            <DockPanel Margin="10,6">
+              <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
+                <Button Classes="link" Command="{Binding GenerateKeyCommand}"
+                        ToolTip.Tip="Generate a new keypair (click twice to confirm)" FontSize="{DynamicResource Fs115}">
+                  <StackPanel Orientation="Horizontal" Spacing="5">
+                    <TextBlock Classes="glyph" Text="&#xE72C;" FontSize="{DynamicResource Fs12}" />
+                    <TextBlock Text="{Binding GenerateLabel}" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+                <TextBlock Classes="lbl" Text="Port" Margin="4,0,0,0" />
+                <TextBox Classes="mono" Width="72" Text="{Binding ListenPortText}" Watermark="auto">
+                  <TextBox.InnerRightContent>
+                    <Button Classes="icon" Command="{Binding ClearListenPortCommand}" ToolTip.Tip="Reset to automatic">
+                      <TextBlock Classes="glyph" Text="&#xE711;" FontSize="{DynamicResource Fs9}" Opacity="0.6" />
+                    </Button>
+                  </TextBox.InnerRightContent>
+                </TextBox>
               </StackPanel>
-            </Button>
-            <TextBlock Classes="accentfg" FontSize="{DynamicResource Fs115}" FontWeight="Medium"
-                       VerticalAlignment="Center" Text="Interface" />
-          </DockPanel>
-          <Separator />
-          <Grid Margin="12,8" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto">
-            <TextBlock Grid.Row="0" Grid.Column="0" Classes="lbl" Text="Public key" Margin="0,0,10,8" />
-            <TextBox Grid.Row="0" Grid.Column="1" Classes="mono synkey" Text="{Binding PublicKeyFull}" IsReadOnly="True" Margin="0,0,0,8">
-              <TextBox.InnerRightContent>
-                <Button Classes="icon" Command="{Binding CopyPublicKeyCommand}" ToolTip.Tip="Copy full public key">
-                  <TextBlock Classes="glyph" Text="&#xE8C8;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
-                </Button>
-              </TextBox.InnerRightContent>
-            </TextBox>
+              <WrapPanel VerticalAlignment="Center">
+                <TextBlock Classes="accentfg" FontSize="{DynamicResource Fs115}" FontWeight="Medium" VerticalAlignment="Center" Text="Interface" Margin="0,0,8,4" />
+                <TextBox Classes="mono synkey" Width="150" Text="{Binding PublicKeyFull}" IsReadOnly="True" ToolTip.Tip="{Binding PublicKeyFull}" Margin="0,0,6,4">
+                  <TextBox.InnerRightContent>
+                    <Button Classes="icon" Command="{Binding CopyPublicKeyCommand}" ToolTip.Tip="Copy full public key">
+                      <TextBlock Classes="glyph" Text="&#xE8C8;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
+                    </Button>
+                  </TextBox.InnerRightContent>
+                </TextBox>
+                <TextBox Classes="mono" Width="150" Text="{Binding PrivateKeyEdit}" Watermark="private key" Margin="0,0,6,4" />
+                <ItemsControl ItemsSource="{Binding Addresses}" VerticalAlignment="Center">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.DataTemplates>
+                    <DataTemplate DataType="sys:String">
+                      <Border Classes="item" Margin="0,0,6,4">
+                        <DockPanel>
+                          <Button Classes="chipx" DockPanel.Dock="Right" VerticalAlignment="Top" Margin="6,3,0,0"
+                                  Command="{Binding $parent[ItemsControl].DataContext.RemoveAddressCommand}" CommandParameter="{Binding}">
+                            <TextBlock Classes="glyph" Text="&#xE711;" FontSize="{DynamicResource Fs9}" Opacity="0.6" />
+                          </Button>
+                          <WrapPanel VerticalAlignment="Center">
+                            <TextBlock Classes="mono synip" TextWrapping="Wrap" Text="{Binding Converter={x:Static views:Syntax.IpPart}}" />
+                            <TextBlock Classes="mono synnum" Text="{Binding Converter={x:Static views:Syntax.MaskPart}}" />
+                          </WrapPanel>
+                        </DockPanel>
+                      </Border>
+                    </DataTemplate>
+                    <DataTemplate DataType="vm:AddSlot">
+                      <TextBox Classes="mono addbox" Margin="0,0,6,4" Watermark="+"
+                               Classes.error="{Binding $parent[ItemsControl].DataContext.AddressAddError}"
+                               Text="{Binding $parent[ItemsControl].DataContext.NewAddress}">
+                        <TextBox.KeyBindings>
+                          <KeyBinding Gesture="Enter" Command="{Binding $parent[ItemsControl].DataContext.AddAddressCommand}" />
+                        </TextBox.KeyBindings>
+                      </TextBox>
+                    </DataTemplate>
+                  </ItemsControl.DataTemplates>
+                </ItemsControl>
+              </WrapPanel>
+            </DockPanel>
+          </Border>
 
-            <TextBlock Grid.Row="1" Grid.Column="0" Classes="lbl" Text="Private key" Margin="0,0,10,8" />
-            <TextBox Grid.Row="1" Grid.Column="1" Classes="mono" Text="{Binding PrivateKeyEdit}" Margin="0,0,0,8" />
-
-            <TextBlock Grid.Row="2" Grid.Column="0" Classes="lbl" Text="Listen port" Margin="0,0,10,8" />
-            <TextBox Grid.Row="2" Grid.Column="1" Classes="mono" Text="{Binding ListenPortText}" Watermark="automatic" Margin="0,0,0,8">
-              <TextBox.InnerRightContent>
-                <Button Classes="icon" Command="{Binding ClearListenPortCommand}" ToolTip.Tip="Reset to automatic">
-                  <TextBlock Classes="glyph" Text="&#xE711;" FontSize="{DynamicResource Fs9}" Opacity="0.6" />
-                </Button>
-              </TextBox.InnerRightContent>
-            </TextBox>
-
-            <TextBlock Grid.Row="3" Grid.Column="0" Classes="lbl" Text="Address" VerticalAlignment="Top" Margin="0,5,10,0" />
-            <ItemsControl Grid.Row="3" Grid.Column="1" ItemsSource="{Binding Addresses}">
-              <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
-              </ItemsControl.ItemsPanel>
-              <ItemsControl.DataTemplates>
-                <DataTemplate DataType="sys:String">
-                  <Border Classes="item" Margin="0,0,6,4">
-                    <DockPanel>
-                      <Button Classes="chipx" DockPanel.Dock="Right" VerticalAlignment="Top" Margin="6,3,0,0"
-                              Command="{Binding $parent[ItemsControl].DataContext.RemoveAddressCommand}" CommandParameter="{Binding}">
-                        <TextBlock Classes="glyph" Text="&#xE711;" FontSize="{DynamicResource Fs9}" Opacity="0.6" />
-                      </Button>
-                      <WrapPanel VerticalAlignment="Center">
-                        <TextBlock Classes="mono synip" TextWrapping="Wrap" Text="{Binding Converter={x:Static views:Syntax.IpPart}}" />
-                        <TextBlock Classes="mono synnum" Text="{Binding Converter={x:Static views:Syntax.MaskPart}}" />
-                      </WrapPanel>
-                    </DockPanel>
-                  </Border>
+          <!-- Peers: full-width cards stacking vertically. -->
+          <StackPanel Name="PeersHost" Margin="0,2,0,2">
+            <ItemsControl ItemsSource="{Binding Peers}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <views:PeerBlock />
                 </DataTemplate>
-                <DataTemplate DataType="vm:AddSlot">
-                  <TextBox Classes="mono addbox" Margin="0,0,6,4" Watermark="+"
-                           Classes.error="{Binding $parent[ItemsControl].DataContext.AddressAddError}"
-                           Text="{Binding $parent[ItemsControl].DataContext.NewAddress}">
-                    <TextBox.KeyBindings>
-                      <KeyBinding Gesture="Enter" Command="{Binding $parent[ItemsControl].DataContext.AddAddressCommand}" />
-                    </TextBox.KeyBindings>
-                  </TextBox>
-                </DataTemplate>
-              </ItemsControl.DataTemplates>
+              </ItemsControl.ItemTemplate>
             </ItemsControl>
-          </Grid>
+            <Button Classes="link" Content="{Binding AddPeerLabel}" Command="{Binding AddPeerCommand}" Margin="12,0,0,6" FontSize="{DynamicResource Fs115}" />
           </StackPanel>
-          </Border>
-
-          <Border Grid.Column="1" Name="PeersHost">
-            <StackPanel Margin="0,8,0,2">
-              <ItemsControl ItemsSource="{Binding Peers}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate>
-                    <views:PeerBlock />
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-              <Button Classes="link" Content="{Binding AddPeerLabel}" Command="{Binding AddPeerCommand}" Margin="8,0,0,6" FontSize="{DynamicResource Fs115}" />
-            </StackPanel>
-          </Border>
-        </Grid>
+        </StackPanel>
 
         <TextBlock Classes="warntext" Margin="12,0,12,8" Text="{Binding WarningText}"
                    IsVisible="{Binding WarningText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />

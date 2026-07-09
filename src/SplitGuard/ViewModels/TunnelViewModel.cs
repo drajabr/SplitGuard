@@ -102,7 +102,8 @@ public class TunnelViewModel : ObservableObject
                 KeepaliveText = p.PersistentKeepalive > 0 ? p.PersistentKeepalive.ToString() : "",
                 PingHostText = p.PingHost ?? "",
                 PingTimeoutText = p.PingTimeout > 0 ? p.PingTimeout.ToString() : "",
-                PingCountText = p.PingCount > 0 ? p.PingCount.ToString() : "",
+                PingDownText = p.PingDownCount > 0 ? p.PingDownCount.ToString() : "",
+                PingUpText = p.PingUpCount > 0 ? p.PingUpCount.ToString() : "",
                 MetricText = p.Metric != 0 ? p.Metric.ToString() : "",
             };
             PeerViewModel.Fill(vm.AllowedIps, p.AllowedIps.Select(WireGuardConf.NormalizeCidr));
@@ -422,7 +423,8 @@ public class TunnelViewModel : ObservableObject
             if (p.DomainValues.Any()) sb.AppendLine($"Domains = {string.Join(", ", p.DomainValues)}");
             if (p.PingHostText.Trim().Length > 0) sb.AppendLine($"PingHost = {p.PingHostText.Trim()}");
             if (p.ParsedPingTimeout > 0) sb.AppendLine($"PingTimeout = {p.ParsedPingTimeout}");
-            if (p.ParsedPingCount > 0) sb.AppendLine($"PingCount = {p.ParsedPingCount}");
+            if (p.ParsedPingDown > 0) sb.AppendLine($"PingDownCount = {p.ParsedPingDown}");
+            if (p.ParsedPingUp > 0) sb.AppendLine($"PingUpCount = {p.ParsedPingUp}");
             if (p.ParsedMetric != 0) sb.AppendLine($"Metric = {p.ParsedMetric}");
         }
         return sb.ToString();
@@ -446,7 +448,8 @@ public class TunnelViewModel : ObservableObject
                 KeepaliveText = p.PersistentKeepalive > 0 ? p.PersistentKeepalive.ToString() : "",
                 PingHostText = p.PingHost ?? "",
                 PingTimeoutText = p.PingTimeout > 0 ? p.PingTimeout.ToString() : "",
-                PingCountText = p.PingCount > 0 ? p.PingCount.ToString() : "",
+                PingDownText = p.PingDownCount > 0 ? p.PingDownCount.ToString() : "",
+                PingUpText = p.PingUpCount > 0 ? p.PingUpCount.ToString() : "",
                 MetricText = p.Metric != 0 ? p.Metric.ToString() : "",
                 IsEditing = true,
             };
@@ -490,7 +493,7 @@ public class TunnelViewModel : ObservableObject
         Name.Trim(), PrivateKeyEdit.Trim(), ListenPortText.Trim(),
         string.Join(",", AddressValues),
         string.Join(";", Peers.Select(p =>
-            $"{p.PublicKey.Trim()},{p.PresharedKey.Trim()},{p.Endpoint.Trim()},{string.Join("+", p.AllowedIpValues)},{p.ParsedKeepalive},{p.PingHostText.Trim()},{p.ParsedPingTimeout},{p.ParsedPingCount},{p.ParsedMetric}")));
+            $"{p.PublicKey.Trim()},{p.PresharedKey.Trim()},{p.Endpoint.Trim()},{string.Join("+", p.AllowedIpValues)},{p.ParsedKeepalive},{p.PingHostText.Trim()},{p.ParsedPingTimeout},{p.ParsedPingDown},{p.ParsedPingUp},{p.ParsedMetric}")));
 
     void CancelEdit()
     {
@@ -581,7 +584,8 @@ public class TunnelViewModel : ObservableObject
                 Domains = p.DomainValues.ToList(),
                 PingHost = p.PingHostText.Trim().Length > 0 ? p.PingHostText.Trim() : null,
                 PingTimeout = Math.Clamp(p.ParsedPingTimeout, 0, 60),
-                PingCount = Math.Clamp(p.ParsedPingCount, 0, 100),
+                PingDownCount = Math.Clamp(p.ParsedPingDown, 0, 100),
+                PingUpCount = Math.Clamp(p.ParsedPingUp, 0, 100),
                 Metric = Math.Clamp(p.ParsedMetric, 0, 10),
             }).ToList();
         }

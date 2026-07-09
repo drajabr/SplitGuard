@@ -27,7 +27,8 @@ public class ParsedPeer
     public List<string> Domains { get; } = new();
     public string? PingHost { get; set; }
     public int PingTimeout { get; set; }
-    public int PingCount { get; set; }
+    public int PingDownCount { get; set; }
+    public int PingUpCount { get; set; }
     public int Metric { get; set; }
 }
 
@@ -82,7 +83,15 @@ public static class WireGuardConf
                     case "domains": peer.Domains.AddRange(SplitList(value)); break;
                     case "pinghost": peer.PingHost = value; break;
                     case "pingtimeout": if (int.TryParse(value, out var pt)) peer.PingTimeout = Math.Clamp(pt, 0, 60); break;
-                    case "pingcount": if (int.TryParse(value, out var pc)) peer.PingCount = Math.Clamp(pc, 0, 100); break;
+                    case "pingdowncount": if (int.TryParse(value, out var pd)) peer.PingDownCount = Math.Clamp(pd, 0, 100); break;
+                    case "pingupcount": if (int.TryParse(value, out var pu)) peer.PingUpCount = Math.Clamp(pu, 0, 100); break;
+                    case "pingcount": // legacy single count: applies to both directions
+                        if (int.TryParse(value, out var pc))
+                        {
+                            peer.PingDownCount = Math.Clamp(pc, 0, 100);
+                            peer.PingUpCount = peer.PingDownCount;
+                        }
+                        break;
                     case "metric":
                     case "priority": // legacy name
                         if (int.TryParse(value, out var pr)) peer.Metric = Math.Clamp(pr, 0, 10);

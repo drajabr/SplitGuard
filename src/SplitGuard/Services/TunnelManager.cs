@@ -15,9 +15,9 @@ public record TunnelStats(Dictionary<string, PeerLive> PerPeer);
 public class TunnelManager : IDisposable
 {
     // Health model, one rule per signal:
-    //  - Ping host set (and the probe actually tests this path): PingCount consecutive
-    //    failures = down, PingCount consecutive successes = up. The count IS the
-    //    hysteresis — raise it to tolerate a flappier link.
+    //  - Ping host set (and the probe actually tests this path): PingDownCount
+    //    consecutive failures = down, PingUpCount consecutive successes = up. The
+    //    counts ARE the hysteresis — raise them to tolerate a flappier link.
     //  - No ping host: handshake freshness decides. A handshake refreshes at most every
     //    ~2 min under traffic/keepalive, so >3 min old = down; a fresh one = up.
     // New connections get a grace period to complete their first handshake.
@@ -47,7 +47,8 @@ public class TunnelManager : IDisposable
         public required List<(IPAddress Ip, byte Cidr)> AllowedIps;
         public int Metric;
         public int PingTimeoutMs;
-        public int PingCount;
+        public int PingDownCount;
+        public int PingUpCount;
         public string? PingHost;
         public DateTime ConnectedAt;
 
@@ -125,7 +126,8 @@ public class TunnelManager : IDisposable
                 AllowedIps = allowed,
                 Metric = p.Metric,
                 PingTimeoutMs = (p.PingTimeout is >= 1 and <= 60 ? p.PingTimeout : DefaultPingTimeoutSec) * 1000,
-                PingCount = p.PingCount is >= 1 and <= 100 ? p.PingCount : DefaultPingCount,
+                PingDownCount = p.PingDownCount is >= 1 and <= 100 ? p.PingDownCount : DefaultPingCount,
+                PingUpCount = p.PingUpCount is >= 1 and <= 100 ? p.PingUpCount : DefaultPingCount,
                 PingHost = string.IsNullOrWhiteSpace(p.PingHost) ? null : p.PingHost.Trim(),
                 ConnectedAt = now,
                 NextPingDue = now,
@@ -358,10 +360,11 @@ public class TunnelManager : IDisposable
 
             if (pingBased)
             {
-                // Count-based hysteresis: the state only flips once a full streak of
-                // PingCount agrees, and holds between thresholds.
-                if (rt.PingFailStreak >= rt.PingCount) rt.Healthy = false;
-                else if (rt.PingOkStreak >= rt.PingCount) rt.Healthy = true;
+                // Count-based hysteresis with separate directions: the state only flips
+                // once a full streak agrees, and holds between thresholds. Down and up
+                // counts are independent so recovery can be judged more cautiously.
+                if (rt.PingFailStreak >= rt.PingDownCount) rt.Healthy = false;
+                else if (rt.PingOkStreak >= rt.PingUpCount) rt.Healthy = true;
             }
             else
             {

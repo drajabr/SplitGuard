@@ -67,13 +67,16 @@ public class PeerConfig
     public List<string> Domains { get; set; } = new();
     // Optional in-tunnel IP pinged once per keepalive period while connected — generates
     // traffic (so handshakes stay fresh) and, when set, decides failover health:
-    // PingCount consecutive failures (PingTimeout seconds each) = down, PingCount
-    // consecutive successes = up. Without a ping host, handshake freshness decides.
+    // PingDownCount consecutive failures (PingTimeout seconds each) = down,
+    // PingUpCount consecutive successes = up. Without one, handshake freshness decides.
     public string? PingHost { get; set; }
     // Per-ping timeout in seconds (1-60); 0 = default (3 s).
     public int PingTimeout { get; set; }
-    // Consecutive pings to flip health down/up (1-100); 0 = default (3).
-    public int PingCount { get; set; }
+    // Consecutive ping failures to flip health down (1-100); 0 = default (3).
+    public int PingDownCount { get; set; }
+    // Consecutive ping successes to flip health back up (1-100); 0 = default (3).
+    // Separate from down so recovery can be judged more cautiously than failure.
+    public int PingUpCount { get; set; }
     // Failover rank (0-10) when this peer's allowed IPs overlap another connected peer's:
     // lower wins; peers in a route group must use distinct values (checked at connect).
     public int Metric { get; set; }

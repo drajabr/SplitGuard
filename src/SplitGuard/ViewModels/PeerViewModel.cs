@@ -72,11 +72,17 @@ public partial class PeerViewModel : ObservableObject
 
     public int ParsedPingTimeout => int.TryParse(PingTimeoutText.Trim(), out var v) ? v : 0;
 
-    // Consecutive pings that flip health down/up; blank = default (3).
-    string _pingCountText = "";
-    public string PingCountText { get => _pingCountText; set => Set(ref _pingCountText, value); }
+    // Consecutive ping failures that flip health down; blank = default (3).
+    string _pingDownText = "";
+    public string PingDownText { get => _pingDownText; set => Set(ref _pingDownText, value); }
 
-    public int ParsedPingCount => int.TryParse(PingCountText.Trim(), out var v) ? v : 0;
+    public int ParsedPingDown => int.TryParse(PingDownText.Trim(), out var v) ? v : 0;
+
+    // Consecutive ping successes that flip health back up; blank = default (3).
+    string _pingUpText = "";
+    public string PingUpText { get => _pingUpText; set => Set(ref _pingUpText, value); }
+
+    public int ParsedPingUp => int.TryParse(PingUpText.Trim(), out var v) ? v : 0;
 
     // Failover rank (0-10) for overlapping allowed IPs: lower wins; peers in the same
     // route group must use distinct values (checked when connecting).
@@ -208,8 +214,10 @@ public partial class PeerViewModel : ObservableObject
             return $"Ping host must be an IP address — got '{PingHostText}'";
         if (PingTimeoutText.Trim().Length > 0 && ParsedPingTimeout is < 1 or > 60)
             return $"Ping timeout must be 1-60 seconds — got '{PingTimeoutText}'";
-        if (PingCountText.Trim().Length > 0 && ParsedPingCount is < 1 or > 100)
-            return $"Ping count must be 1-100 — got '{PingCountText}'";
+        if (PingDownText.Trim().Length > 0 && ParsedPingDown is < 1 or > 100)
+            return $"Ping down count must be 1-100 — got '{PingDownText}'";
+        if (PingUpText.Trim().Length > 0 && ParsedPingUp is < 1 or > 100)
+            return $"Ping up count must be 1-100 — got '{PingUpText}'";
         if (MetricText.Trim().Length > 0 && (!int.TryParse(MetricText.Trim(), out var metric) || metric is < 0 or > 10))
             return $"Metric must be 0-10 — got '{MetricText}'";
         foreach (var d in DomainValues)
