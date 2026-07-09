@@ -52,4 +52,4 @@ Avalonia 11 Fluent, stock controls + the single shared style set in `Views/Style
 
 ## Release
 
-Bump version in csproj → tag `vX.Y.Z` → push tag → Actions attaches zips to a GitHub Release. Notes: user-facing changes only, one line each.
+Bump the repo-root `VERSION` file → push to main → Actions builds the installer and publishes a `vX.Y.Z` GitHub Release with it as the sole asset (skipped if the tag already exists). Notes: user-facing changes only, one line each.

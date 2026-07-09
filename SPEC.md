@@ -72,15 +72,15 @@ ViewModels: `MainViewModel` (tunnel collection, pin arbitration, GPO banner, tes
 
 ## build.ps1
 
-1. Assert `dotnet` ≥ 8 else exit with message. 2. Download `https://download.wireguard.com/wireguard-nt/wireguard-nt-0.10.1.zip` to temp (skip if cached in `.cache/`), extract `bin/amd64/wireguard.dll`. 3. `dotnet publish src/SplitGuard -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o dist/win-x64`. 4. Copy `wireguard.dll` beside exe. 5. `Compress-Archive` → `dist/SplitGuard-win-x64.zip`. Params: `-Arch x64|arm64` (arm64 uses `bin/arm64/`).
+x64 only (arm64 dropped for now); the installer is the one and only build artifact. 1. Assert an SDK-bearing `dotnet` ≥ 8 (PATH may hold a runtime-only host) and locate ISCC.exe — fail fast if either is missing. 2. Download `https://download.wireguard.com/wireguard-nt/wireguard-nt-0.10.1.zip` (cached in `.cache/`), extract `bin/amd64/wireguard.dll`. 3. Stop a running instance, wipe `dist/` so stale artifacts never leak into a release. 4. `dotnet publish src/SplitGuard -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o dist/win-x64`, copy `wireguard.dll` beside the exe, drop pdbs. 5. Compile the installer → `dist/SplitGuard-Setup-<version>.exe`. Version = repo-root `VERSION` file (also read by csproj and the CI release tag — single source of truth).
 
 ## installer/SplitGuard.iss (Inno Setup 6)
 
-`build.ps1 -Installer` compiles it (ISCC located on PATH or the standard install dirs) with `/DAppVersion` from `VERSION` and `/DArch`. Installs `SplitGuard.exe` + `wireguard.dll` to `{autopf}\SplitGuard`, Start Menu shortcut, optional desktop icon, `PrivilegesRequired=admin`. Install kills a running instance first (`PrepareToInstall` → taskkill). Uninstall: taskkill → `SplitGuard.exe --cleanup` (NRPT + scheduled tasks) → remove files; `%ProgramData%\SplitGuard\config.json` is kept.
+Compiled by `build.ps1` with `/DAppVersion` from `VERSION`; `ArchitecturesAllowed=x64os` (strict — the WireGuardNT driver is native-only, no ARM emulation). Installs `SplitGuard.exe` + `wireguard.dll` to `{autopf}\SplitGuard`, Start Menu shortcut, optional desktop icon, `PrivilegesRequired=admin`. Install kills a running instance first (`PrepareToInstall` → taskkill). Uninstall: taskkill → `SplitGuard.exe --cleanup` (NRPT + scheduled tasks) → remove files; `%ProgramData%\SplitGuard\config.json` is kept.
 
 ## .github/workflows/build-release.yml
 
-`on: push (main, tags v*), pull_request`. Job `build` on `windows-latest`: checkout, `actions/setup-dotnet` v4 (8.0.x), `./build.ps1`, upload artifact `dist/*.zip`. Job `release` (needs build, `if: startsWith(github.ref,'refs/tags/v')`): download artifact, `softprops/action-gh-release@v2` with the zips.
+`on: push (main, tags v*), pull_request`. Job `build` on `windows-latest`: checkout, `actions/setup-dotnet` v4 (8.0.x), ensure Inno Setup (choco fallback if the runner image ever drops it), `./build.ps1`, upload `dist/SplitGuard-Setup-*.exe`. Job `release` (needs build, push events): resolve the tag from `VERSION` (or the pushed `v*` tag); if that tag doesn't exist yet, `softprops/action-gh-release@v2` publishes it with the installer as the sole asset. Bump `VERSION` + push to main = release.
 
 ## Reference gotchas
 

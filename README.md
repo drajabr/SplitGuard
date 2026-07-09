@@ -4,7 +4,7 @@ Split DNS for WireGuard on Windows, in one small native app.
 
 Connect one or more WireGuard tunnels and decide, per peer, which DNS server resolves which domains — for example `*.corp.example` through your office tunnel's DNS and `*.lab.internal` through your homelab's — while everything else keeps using your normal system DNS, untouched. Optionally pin one tunnel's DNS as your device-wide resolver, with automatic failover if that tunnel drops.
 
-> **Status: release candidate.** Feature-complete; builds and packages via `build.cmd`. Tag `v0.1.0` to cut the first GitHub release. Verify tunnel + NRPT behavior on a real endpoint with admin rights. See [ROADMAP.md](ROADMAP.md).
+> **Status: release candidate.** Feature-complete; releases are cut automatically when the `VERSION` file is bumped on main. Verify tunnel + NRPT behavior on a real endpoint with admin rights. See [ROADMAP.md](ROADMAP.md).
 
 ## Why
 
@@ -24,7 +24,7 @@ WireGuard's `DNS =` setting is all-or-nothing: it takes over DNS for the whole m
 
 ## Install
 
-**Installer (recommended):** download `SplitGuard-Setup-x64-<version>.exe` from the Releases page. It installs to `Program Files\SplitGuard`, adds a Start Menu shortcut, and the uninstaller removes every trace (NRPT rules, scheduled tasks). **Portable:** grab the zip instead, extract anywhere, run `SplitGuard.exe`.
+Download `SplitGuard-Setup-<version>.exe` from the Releases page (x64 only for now). It installs to `Program Files\SplitGuard`, adds a Start Menu shortcut, and the uninstaller removes every trace (NRPT rules, scheduled tasks).
 
 Everything the app does is system-level (DNS policy, the network driver), so it always runs elevated — but you only see a UAC prompt the first time. On that first elevated run it registers a "run with highest privileges" scheduled task; later launches go through that task and start with no prompt (toggle under tray → Settings → "Skip UAC prompt on launch").
 
@@ -42,7 +42,7 @@ The tool writes rules into the Windows Name Resolution Policy Table (NRPT) — t
 
 ## Build from source
 
-Requires the .NET 8 SDK only:
+Requires the .NET 8 SDK and Inno Setup 6:
 
 ```
 .\build.cmd
@@ -50,7 +50,7 @@ Requires the .NET 8 SDK only:
 
 (`build.cmd` is a thin wrapper that runs `build.ps1` with `-ExecutionPolicy Bypass`, so it works even when PowerShell script execution is disabled — the Windows default.)
 
-Output: `dist/SplitGuard-win-x64.zip`. The official signed `wireguard.dll` is fetched automatically at build time.
+Output: `dist/SplitGuard-Setup-<version>.exe` — the installer is the one and only build artifact. The version comes from the repo-root `VERSION` file (bumping it and pushing to main cuts a tagged GitHub release automatically). The official signed `wireguard.dll` is fetched at build time.
 
 ## Caveats
 

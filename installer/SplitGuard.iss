@@ -1,17 +1,9 @@
-; SplitGuard installer (Inno Setup 6). Compiled by build.ps1 -Installer, which passes
-; AppVersion and Arch; sensible defaults below allow compiling the script directly too.
+; SplitGuard installer (Inno Setup 6). Compiled by build.ps1, which passes AppVersion
+; from the repo-root VERSION file; the default below allows compiling directly too.
+; x64 only for now (strict: no x64-on-ARM emulation — the WireGuardNT driver is native-only).
 
 #ifndef AppVersion
-  #define AppVersion "0.1.0"
-#endif
-#ifndef Arch
-  #define Arch "x64"
-#endif
-; Strict per-arch gating: no x64-on-ARM emulation — the WireGuardNT driver is native-only.
-#if Arch == "arm64"
-  #define ArchAllowed "arm64"
-#else
-  #define ArchAllowed "x64os"
+  #define AppVersion "0.0.0"
 #endif
 
 [Setup]
@@ -25,10 +17,10 @@ DefaultGroupName=SplitGuard
 DisableProgramGroupPage=yes
 ; Everything the app does (WireGuardNT driver, NRPT, scheduled tasks) is machine-level.
 PrivilegesRequired=admin
-ArchitecturesAllowed={#ArchAllowed}
-ArchitecturesInstallIn64BitMode={#ArchAllowed}
+ArchitecturesAllowed=x64os
+ArchitecturesInstallIn64BitMode=x64os
 OutputDir=..\dist
-OutputBaseFilename=SplitGuard-Setup-{#Arch}-{#AppVersion}
+OutputBaseFilename=SplitGuard-Setup-{#AppVersion}
 SetupIconFile=..\src\SplitGuard\Assets\app.ico
 UninstallDisplayIcon={app}\SplitGuard.exe
 Compression=lzma2
@@ -40,8 +32,8 @@ CloseApplications=no
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "..\dist\win-{#Arch}\SplitGuard.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\dist\win-{#Arch}\wireguard.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\dist\win-x64\SplitGuard.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\dist\win-x64\wireguard.dll"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\SplitGuard"; Filename: "{app}\SplitGuard.exe"

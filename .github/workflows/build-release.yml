@@ -10,23 +10,28 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-    strategy:
-      matrix:
-        arch: [x64, arm64]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
-      - name: Build
-        run: ./build.ps1 -Arch ${{ matrix.arch }}
+      # The windows-latest image ships Inno Setup; install it if that ever changes.
+      - name: Ensure Inno Setup
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup -y --no-progress
+          }
+      - name: Build installer
+        run: ./build.ps1
       - uses: actions/upload-artifact@v4
         with:
-          name: SplitGuard-win-${{ matrix.arch }}
-          path: dist/*.zip
+          name: SplitGuard-Setup
+          path: dist/SplitGuard-Setup-*.exe
 
   # Releases are driven by the repo-root VERSION file: bump it and push to main and
   # a tagged release is cut automatically (if that tag doesn't already exist).
+  # The installer is the one and only release artifact.
   release:
     needs: build
     if: github.event_name == 'push'
@@ -60,5 +65,5 @@ jobs:
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
           name: SplitGuard ${{ steps.ver.outputs.tag }}
-          files: artifacts/*.zip
+          files: artifacts/SplitGuard-Setup-*.exe
           generate_release_notes: true
