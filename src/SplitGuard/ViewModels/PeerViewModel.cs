@@ -19,6 +19,7 @@ public partial class PeerViewModel : ObservableObject
         RemoveAllowedIpCommand = new RelayCommand(p => AllowedIps.Remove((string)p!));
         TogglePinCommand = new RelayCommand(() => _tunnel.Host.TogglePin(_tunnel, this));
         RemovePeerCommand = new RelayCommand(() => _tunnel.RemovePeer(this));
+        AllowedIps.CollectionChanged += (_, _) => Raise(nameof(MetricEnabled));
     }
 
     string _publicKey = "";
@@ -83,6 +84,10 @@ public partial class PeerViewModel : ObservableObject
     public string MetricText { get => _metricText; set => Set(ref _metricText, value); }
 
     public int ParsedMetric => int.TryParse(MetricText.Trim(), out var v) ? v : 0;
+
+    // Metric only matters inside a route group — greyed out until this peer's allowed
+    // IPs actually overlap another peer's. Refreshed when this peer's list changes.
+    public bool MetricEnabled => _tunnel.Host.HasRouteGroup(this);
 
     // Strings plus a trailing AddSlot (the inline "+" box).
     public ObservableCollection<object> AllowedIps { get; } = new();

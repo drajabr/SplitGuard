@@ -17,13 +17,19 @@
   <Style Selector="TextBox.error">
     <Setter Property="BorderBrush" Value="{DynamicResource DangerBrush}" />
   </Style>
+  <!-- Inline "+" add box: a square button-like affordance that becomes an input on focus. -->
   <Style Selector="TextBox.addbox">
-    <Setter Property="MinWidth" Value="34" />
+    <Setter Property="MinWidth" Value="{DynamicResource CtrlH}" />
     <Setter Property="Height" Value="{DynamicResource CtrlH}" />
     <Setter Property="Padding" Value="4,3" />
     <Setter Property="HorizontalContentAlignment" Value="Center" />
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderBrush" Value="{DynamicResource FieldBorderBrush}" />
+  </Style>
+  <Style Selector="TextBox.addbox:focus">
+    <Setter Property="MinWidth" Value="120" />
+    <Setter Property="Watermark" Value="" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
   </Style>
 
   <Style Selector="ToolTip">
@@ -140,20 +146,19 @@
   <Style Selector="Border.card.editing">
     <Setter Property="BorderBrush" Value="{DynamicResource AccentDimBrush}" />
   </Style>
-  <!-- Value chips (addresses, allowed IPs, domains): outlined like the input boxes. -->
+  <!-- Value chips (addresses, allowed IPs, domains): outlined like the input boxes.
+       MinHeight (not Height): long values wrap to more lines and the chip grows,
+       keeping the × inside the box, top-right. -->
   <Style Selector="Border.item">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderBrush" Value="{DynamicResource FieldBorderBrush}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="4" />
-    <Setter Property="Padding" Value="8,0" />
-    <Setter Property="Height" Value="{DynamicResource CtrlH}" />
+    <Setter Property="Padding" Value="8,3" />
+    <Setter Property="MinHeight" Value="{DynamicResource CtrlH}" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
-  <Style Selector="Border.item > StackPanel">
-    <Setter Property="VerticalAlignment" Value="Center" />
-  </Style>
-  <Style Selector="Border.item > TextBlock">
+  <Style Selector="Border.item > DockPanel">
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
   <Style Selector="Border.card">

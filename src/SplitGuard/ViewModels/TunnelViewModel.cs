@@ -10,6 +10,8 @@ public interface ITunnelHost
     void RequestDisconnect(TunnelViewModel tunnel);
     void TogglePin(TunnelViewModel tunnel, PeerViewModel peer);
     bool IsDomainInUse(string domain, PeerViewModel except);
+    // Whether this peer's allowed IPs overlap another peer's (metric is moot otherwise).
+    bool HasRouteGroup(PeerViewModel peer);
     // Overlapping peers with equal metrics (a route group can't arbitrate them).
     string? MetricConflict(TunnelViewModel tunnel);
     void EditStarted(TunnelViewModel tunnel);

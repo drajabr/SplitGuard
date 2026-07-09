@@ -101,6 +101,12 @@ public partial class TunnelCard : UserControl
         // clicks (double-tap detection), which made rapid expand/collapse feel dead.
         AddHandler(PointerPressedEvent, OnCardPressed, handledEventsToo: false);
 
+        // Wrapping content (chips, wrap rows) changes height without any collection
+        // event — e.g. a long value wraps to a second line, or the window narrows.
+        // Animate the card to follow instead of snapping (or clipping).
+        DetailPanel.SizeChanged += OnBodyContentSizeChanged;
+        ExpandContent.SizeChanged += OnBodyContentSizeChanged;
+
         // Fade a card in the first time it appears; fade + collapse it on removal.
         ClipToBounds = true;
         Opacity = 0;
@@ -253,6 +259,18 @@ public partial class TunnelCard : UserControl
         if (_vm?.IsEditing == true) TweenBodyToContent();
     }
 
+    // Only reacts while the body is in auto mode: a non-NaN Height means an animation is
+    // already driving it (and re-triggering off its own frames would loop). The first
+    // layout (0 → natural) is skipped — cards appear via the opacity fade, not a grow.
+    void OnBodyContentSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        if (sender is Control { IsVisible: false }) return;
+        if (!double.IsNaN(Body.Height)) return;
+        if (e.PreviousSize.Height < 0.5) return;
+        if (Math.Abs(e.NewSize.Height - e.PreviousSize.Height) < 0.5) return;
+        TweenBodyToContent(e.PreviousSize.Height);
+    }
+
     // Fade + collapse the card, then run the real removal.
     bool PlayRemove(Action complete)
     {
@@ -268,10 +286,10 @@ public partial class TunnelCard : UserControl
     // natural height, then release it back to Auto so later edits resize freely. Target is
     // measured on the next render tick (after the swapped content is laid out), so the
     // first expand lands exactly. Uses an explicit Animation so it always runs.
-    void TweenBodyToContent()
+    void TweenBodyToContent(double? fromOverride = null)
     {
         var gen = ++_animGen;
-        var from = Body.Bounds.Height;
+        var from = fromOverride ?? Body.Bounds.Height;
         Body.Height = from; // hold the current height while the new content realizes
 
         Dispatcher.UIThread.Post(async () =>

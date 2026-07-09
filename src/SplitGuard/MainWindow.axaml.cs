@@ -249,8 +249,10 @@ public partial class MainWindow : Window, IDialogs
 
     void InitChrome()
     {
-        // The floating Add button opens the add-options popover above itself.
-        _addFlyout ??= new Flyout { Placement = PlacementMode.Top };
+        // The floating Add button opens the add-options popover above itself. Right-edge
+        // aligned: the button sits at the window's right border, so a centered popover
+        // would spill outside the window.
+        _addFlyout ??= new Flyout { Placement = PlacementMode.TopEdgeAlignedRight };
         _addFlyout.Content = BuildAddPanel();
         AddButton.Flyout = _addFlyout;
     }

@@ -27,7 +27,7 @@
       <Grid Margin="10,6" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
 
         <TextBlock Grid.Row="0" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Endpoint" IsVisible="{Binding ShowWgFields}" Margin="0,5,12,4" />
-        <Grid Grid.Row="0" Grid.Column="1" ColumnDefinitions="*,Auto,86" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
+        <Grid Grid.Row="0" Grid.Column="1" ColumnDefinitions="*,Auto,56" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
           <TextBox Grid.Column="0" Classes="mono" Text="{Binding EndpointHost}" Watermark="host or ip" />
           <TextBlock Grid.Column="1" Classes="muted" Text=":" VerticalAlignment="Center" Margin="4,0,4,0" />
           <TextBox Grid.Column="2" Classes="mono" Text="{Binding EndpointPort}" Watermark="port" />
@@ -49,16 +49,16 @@
           <ItemsControl.DataTemplates>
             <DataTemplate DataType="sys:String">
               <Border Classes="item" Margin="0,0,6,4">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                  <StackPanel Orientation="Horizontal">
-                    <TextBlock Classes="mono synip" Text="{Binding Converter={x:Static views:Syntax.IpPart}}" />
-                    <TextBlock Classes="mono synnum" Text="{Binding Converter={x:Static views:Syntax.MaskPart}}" />
-                  </StackPanel>
-                  <Button Classes="chipx"
+                <DockPanel>
+                  <Button Classes="chipx" DockPanel.Dock="Right" VerticalAlignment="Top" Margin="6,3,0,0"
                           Command="{Binding $parent[ItemsControl].DataContext.RemoveAllowedIpCommand}" CommandParameter="{Binding}">
                     <TextBlock Classes="glyph" Text="&#xE711;" FontSize="{DynamicResource Fs9}" Opacity="0.6" />
                   </Button>
-                </StackPanel>
+                  <WrapPanel VerticalAlignment="Center">
+                    <TextBlock Classes="mono synip" TextWrapping="Wrap" Text="{Binding Converter={x:Static views:Syntax.IpPart}}" />
+                    <TextBlock Classes="mono synnum" Text="{Binding Converter={x:Static views:Syntax.MaskPart}}" />
+                  </WrapPanel>
+                </DockPanel>
               </Border>
             </DataTemplate>
             <DataTemplate DataType="vm:AddSlot">
@@ -94,22 +94,23 @@
         </TextBox>
 
         <TextBlock Grid.Row="5" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Keepalive" IsVisible="{Binding ShowWgFields}" Margin="0,5,12,4" />
-        <WrapPanel Grid.Row="5" Grid.Column="1" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
-          <TextBox Classes="mono" Width="52" Text="{Binding KeepaliveText}" Watermark="off" Margin="0,0,8,4" />
-          <TextBlock Classes="lbl" Text="Metric" Margin="0,0,8,4"
-                     ToolTip.Tip="Failover rank (0-10) when allowed IPs overlap another peer's — lower wins; peers in the same route group must use distinct values" />
-          <TextBox Classes="mono" Width="46" Text="{Binding MetricText}" Watermark="0" Margin="0,0,0,4" />
-        </WrapPanel>
+        <Grid Grid.Row="5" Grid.Column="1" ColumnDefinitions="*,Auto,2*" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
+          <TextBox Grid.Column="0" Classes="mono" Text="{Binding KeepaliveText}" Watermark="off" />
+          <TextBlock Grid.Column="1" Classes="lbl" Text="Ping" Margin="12,0,8,0"
+                     ToolTip.Tip="In-tunnel IP pinged once per keepalive period. When set, it decides failover health: count consecutive failures = down, count consecutive successes = up. Without it, handshake freshness decides." />
+          <TextBox Grid.Column="2" Classes="mono" Text="{Binding PingHostText}" Watermark="host to ping" />
+        </Grid>
 
-        <TextBlock Grid.Row="6" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Ping" IsVisible="{Binding ShowWgFields}" Margin="0,5,12,4"
-                   ToolTip.Tip="In-tunnel IP pinged once per keepalive period. When set, it decides failover health: count consecutive failures = down, count consecutive successes = up. Without it, handshake freshness decides." />
-        <WrapPanel Grid.Row="6" Grid.Column="1" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
-          <TextBox Classes="mono" Width="130" Text="{Binding PingHostText}" Watermark="host to ping" Margin="0,0,8,4" />
-          <TextBlock Classes="lbl" Text="Timeout" Margin="0,0,8,4" ToolTip.Tip="Seconds to wait for each ping reply (1-60, default 3)" />
-          <TextBox Classes="mono" Width="42" Text="{Binding PingTimeoutText}" Watermark="3" Margin="0,0,8,4" />
-          <TextBlock Classes="lbl" Text="Count" Margin="0,0,8,4" ToolTip.Tip="Consecutive pings that flip this peer down or back up (1-100, default 3)" />
-          <TextBox Classes="mono" Width="42" Text="{Binding PingCountText}" Watermark="3" Margin="0,0,0,4" />
-        </WrapPanel>
+        <TextBlock Grid.Row="6" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Count" IsVisible="{Binding ShowWgFields}" Margin="0,5,12,4"
+                   ToolTip.Tip="Consecutive pings that flip this peer down or back up (1-100, default 3)" />
+        <Grid Grid.Row="6" Grid.Column="1" ColumnDefinitions="*,Auto,*,Auto,*" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
+          <TextBox Grid.Column="0" Classes="mono" Text="{Binding PingCountText}" Watermark="3" />
+          <TextBlock Grid.Column="1" Classes="lbl" Text="Timeout" Margin="12,0,8,0" ToolTip.Tip="Seconds to wait for each ping reply (1-60, default 3)" />
+          <TextBox Grid.Column="2" Classes="mono" Text="{Binding PingTimeoutText}" Watermark="3" />
+          <TextBlock Grid.Column="3" Classes="lbl" Text="Metric" Margin="12,0,8,0"
+                     ToolTip.Tip="Failover rank (0-10) when allowed IPs overlap another peer's — lower wins; peers in the same route group must use distinct values. Enabled only while this peer's allowed IPs actually overlap another's." />
+          <TextBox Grid.Column="4" Classes="mono" Text="{Binding MetricText}" Watermark="0" IsEnabled="{Binding MetricEnabled}" />
+        </Grid>
 
         <TextBlock Grid.Row="7" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Domains" Margin="0,5,12,0" />
         <ItemsControl Grid.Row="7" Grid.Column="1" ItemsSource="{Binding Domains}">
@@ -119,13 +120,13 @@
           <ItemsControl.DataTemplates>
             <DataTemplate DataType="sys:String">
               <Border Classes="item" Margin="0,0,6,4">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                  <TextBlock Classes="mono syndomain" Text="{Binding}" />
-                  <Button Classes="chipx"
+                <DockPanel>
+                  <Button Classes="chipx" DockPanel.Dock="Right" VerticalAlignment="Top" Margin="6,3,0,0"
                           Command="{Binding $parent[ItemsControl].DataContext.RemoveDomainCommand}" CommandParameter="{Binding}">
                     <TextBlock Classes="glyph" Text="&#xE711;" FontSize="{DynamicResource Fs9}" Opacity="0.6" />
                   </Button>
-                </StackPanel>
+                  <TextBlock Classes="mono syndomain" TextWrapping="Wrap" VerticalAlignment="Center" Text="{Binding}" />
+                </DockPanel>
               </Border>
             </DataTemplate>
             <DataTemplate DataType="vm:AddSlot">

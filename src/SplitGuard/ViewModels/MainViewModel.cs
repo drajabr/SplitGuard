@@ -374,6 +374,9 @@ public class MainViewModel : ObservableObject, ITunnelHost
         a.AllowedIpValues.Select(WireGuardConf.CanonicalCidr)
             .Intersect(b.AllowedIpValues.Select(WireGuardConf.CanonicalCidr)).Any();
 
+    public bool HasRouteGroup(PeerViewModel peer) =>
+        WgPeerVms().Any(o => !ReferenceEquals(o, peer) && SharesCidr(o, peer));
+
     // A route group with duplicate metrics can't be arbitrated; blocks connect.
     public string? MetricConflict(TunnelViewModel tunnel)
     {

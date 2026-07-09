@@ -106,16 +106,16 @@
               <ItemsControl.DataTemplates>
                 <DataTemplate DataType="sys:String">
                   <Border Classes="item" Margin="0,0,6,4">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                      <StackPanel Orientation="Horizontal">
-                        <TextBlock Classes="mono synip" Text="{Binding Converter={x:Static views:Syntax.IpPart}}" />
-                        <TextBlock Classes="mono synnum" Text="{Binding Converter={x:Static views:Syntax.MaskPart}}" />
-                      </StackPanel>
-                      <Button Classes="chipx"
+                    <DockPanel>
+                      <Button Classes="chipx" DockPanel.Dock="Right" VerticalAlignment="Top" Margin="6,3,0,0"
                               Command="{Binding $parent[ItemsControl].DataContext.RemoveAddressCommand}" CommandParameter="{Binding}">
                         <TextBlock Classes="glyph" Text="&#xE711;" FontSize="{DynamicResource Fs9}" Opacity="0.6" />
                       </Button>
-                    </StackPanel>
+                      <WrapPanel VerticalAlignment="Center">
+                        <TextBlock Classes="mono synip" TextWrapping="Wrap" Text="{Binding Converter={x:Static views:Syntax.IpPart}}" />
+                        <TextBlock Classes="mono synnum" Text="{Binding Converter={x:Static views:Syntax.MaskPart}}" />
+                      </WrapPanel>
+                    </DockPanel>
                   </Border>
                 </DataTemplate>
                 <DataTemplate DataType="vm:AddSlot">
