@@ -142,8 +142,17 @@ public class TunnelViewModel : ObservableObject
     public string PrivateKeyEdit
     {
         get => _privateKeyEdit;
-        set { if (Set(ref _privateKeyEdit, value)) RefreshDerivedPublicKey(); }
+        set
+        {
+            if (!Set(ref _privateKeyEdit, value)) return;
+            RefreshDerivedPublicKey();
+            Raise(nameof(CanGenerate));
+        }
     }
+
+    // The generate button lives inside the private-key box and only shows while it's
+    // empty — so generating never discards a key and needs no confirmation step.
+    public bool CanGenerate => string.IsNullOrWhiteSpace(PrivateKeyEdit);
 
     bool _isConnected;
     public bool IsConnected
@@ -369,16 +378,6 @@ public class TunnelViewModel : ObservableObject
     public RelayCommand GenerateKeyCommand { get; private set; } = null!;
     public RelayCommand ClearListenPortCommand { get; private set; } = null!;
     public RelayCommand ToggleTextModeCommand { get; private set; } = null!;
-
-    // Two-click confirm for generating a new keypair (it discards the current one).
-    bool _generateArmed;
-    public bool GenerateArmed
-    {
-        get => _generateArmed;
-        set { if (Set(ref _generateArmed, value)) Raise(nameof(GenerateLabel)); }
-    }
-    public string GenerateLabel => GenerateArmed ? "Confirm?" : "Generate";
-    int _genArmVersion;
 
     // Raw-config editing (Ctrl+E): the whole staged tunnel as wg-quick text,
     // with per-peer DNS/Domains as SplitGuard extension keys.
@@ -645,18 +644,10 @@ public class TunnelViewModel : ObservableObject
         NewAddress = "";
     }
 
-    async void GenerateKey()
+    void GenerateKey()
     {
-        if (GenerateArmed)
-        {
-            GenerateArmed = false;
+        if (CanGenerate)
             PrivateKeyEdit = Convert.ToBase64String(Curve25519.GeneratePrivateKey());
-            return;
-        }
-        GenerateArmed = true;
-        var version = ++_genArmVersion;
-        await Task.Delay(3000);
-        if (version == _genArmVersion) GenerateArmed = false;
     }
 
     void RefreshDerivedPublicKey()

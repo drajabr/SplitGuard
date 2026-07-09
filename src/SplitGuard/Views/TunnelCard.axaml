@@ -67,15 +67,7 @@
           <Border Classes="peerblock" Margin="12,8,12,6" IsVisible="{Binding ShowInterfaceSection}">
             <DockPanel Margin="10,6">
               <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
-                <Button Classes="link" Command="{Binding GenerateKeyCommand}"
-                        ToolTip.Tip="Generate a new keypair (click twice to confirm)" FontSize="{DynamicResource Fs115}">
-                  <StackPanel Orientation="Horizontal" Spacing="5">
-                    <TextBlock Classes="glyph" Text="&#xE72C;" FontSize="{DynamicResource Fs12}" />
-                    <TextBlock Text="{Binding GenerateLabel}" VerticalAlignment="Center" />
-                  </StackPanel>
-                </Button>
-                <TextBlock Classes="lbl" Text="Port" Margin="4,0,0,0" />
-                <TextBox Classes="mono" Width="72" Text="{Binding ListenPortText}" Watermark="auto">
+                <TextBox Classes="mono" Width="76" Text="{Binding ListenPortText}" Watermark="port" ToolTip.Tip="Listen port (blank = automatic)">
                   <TextBox.InnerRightContent>
                     <Button Classes="icon" Command="{Binding ClearListenPortCommand}" ToolTip.Tip="Reset to automatic">
                       <TextBlock Classes="glyph" Text="&#xE711;" FontSize="{DynamicResource Fs9}" Opacity="0.6" />
@@ -92,7 +84,14 @@
                     </Button>
                   </TextBox.InnerRightContent>
                 </TextBox>
-                <TextBox Classes="mono" Width="150" Text="{Binding PrivateKeyEdit}" Watermark="private key" Margin="0,0,6,4" />
+                <TextBox Classes="mono" Width="150" Text="{Binding PrivateKeyEdit}" Watermark="private key" Margin="0,0,6,4">
+                  <TextBox.InnerRightContent>
+                    <Button Classes="icon" Command="{Binding GenerateKeyCommand}" IsVisible="{Binding CanGenerate}"
+                            ToolTip.Tip="Generate a keypair">
+                      <TextBlock Classes="glyph" Text="&#xE72C;" FontSize="{DynamicResource Fs12}" Opacity="0.7" />
+                    </Button>
+                  </TextBox.InnerRightContent>
+                </TextBox>
                 <ItemsControl ItemsSource="{Binding Addresses}" VerticalAlignment="Center">
                   <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>

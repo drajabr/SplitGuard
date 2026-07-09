@@ -25,7 +25,8 @@ SetupIconFile=..\src\SplitGuard\Assets\app.ico
 UninstallDisplayIcon={app}\SplitGuard.exe
 Compression=lzma2
 SolidCompression=yes
-WizardStyle=modern
+; "dynamic" follows the Windows light/dark system setting automatically.
+WizardStyle=modern dynamic
 CloseApplications=no
 
 [Tasks]
