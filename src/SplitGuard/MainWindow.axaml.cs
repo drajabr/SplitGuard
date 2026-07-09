@@ -196,6 +196,8 @@ public partial class MainWindow : Window, IDialogs
         var resources = Avalonia.Application.Current!.Resources;
         resources["AccentBrush"] = new SolidColorBrush(color);
         resources["AccentDimBrush"] = new SolidColorBrush(color, 0.4);
+        // Text/glyphs on accent fills — mono's white accent needs dark text, not white.
+        resources["OnAccentBrush"] = new SolidColorBrush(Accents.On(color));
         resources["SystemAccentColor"] = color;
         resources["SystemAccentColorDark1"] = Shade(color, 0.85);
         resources["SystemAccentColorDark2"] = Shade(color, 0.70);

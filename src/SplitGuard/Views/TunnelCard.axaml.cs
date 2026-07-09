@@ -182,11 +182,13 @@ public partial class TunnelCard : UserControl
             // Follow the global accent: drop any local override.
             Resources.Remove("AccentBrush");
             Resources.Remove("AccentDimBrush");
+            Resources.Remove("OnAccentBrush");
             return;
         }
         var color = Accents.Resolve(name, ActualThemeVariant == ThemeVariant.Dark);
         Resources["AccentBrush"] = new SolidColorBrush(color);
         Resources["AccentDimBrush"] = new SolidColorBrush(color, 0.4);
+        Resources["OnAccentBrush"] = new SolidColorBrush(Accents.On(color));
     }
 
     void OnDotPressed(object? sender, PointerPressedEventArgs e)
@@ -271,14 +273,16 @@ public partial class TunnelCard : UserControl
     // Animate the shared region's Height from where it is now to the visible content's
     // natural height, then release it back to Auto so later edits resize freely. Target is
     // measured on the next render tick (after the swapped content is laid out), so the
-    // first expand lands exactly. Uses an explicit Animation so it always runs.
+    // first expand lands exactly. Plain property tween — an Animation with
+    // FillMode.Forward keeps clamping Height even after setting it back to NaN, which
+    // froze the card and clipped content on window resizes.
     void TweenBodyToContent(double? fromOverride = null)
     {
         var gen = ++_animGen;
         var from = fromOverride ?? Body.Bounds.Height;
         Body.Height = from; // hold the current height while the new content realizes
 
-        Dispatcher.UIThread.Post(async () =>
+        Dispatcher.UIThread.Post(() =>
         {
             if (_animGen != gen || _vm is null) return;
             var w = Body.Bounds.Width;
@@ -287,19 +291,9 @@ public partial class TunnelCard : UserControl
             var to = NaturalHeight(content, w);
             if (Math.Abs(to - from) < 0.5) { Body.Height = double.NaN; return; }
 
-            var anim = new Animation
-            {
-                Duration = TimeSpan.FromMilliseconds(AnimMs),
-                Easing = new CubicEaseOut(),
-                FillMode = FillMode.Forward,
-                Children =
-                {
-                    new KeyFrame { Cue = new Cue(0d), Setters = { new Setter(HeightProperty, from) } },
-                    new KeyFrame { Cue = new Cue(1d), Setters = { new Setter(HeightProperty, to) } },
-                },
-            };
-            await anim.RunAsync(Body);
-            if (_animGen == gen) Body.Height = double.NaN; // back to auto
+            Tween(from, to, AnimMs,
+                v => { if (_animGen == gen) Body.Height = v; },
+                () => { if (_animGen == gen) Body.Height = double.NaN; }); // back to auto
         }, DispatcherPriority.Render);
     }
 

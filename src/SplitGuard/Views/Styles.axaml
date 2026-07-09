@@ -101,7 +101,7 @@
   </Style>
   <Style Selector="Button.seg.sel">
     <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
-    <Setter Property="Foreground" Value="White" />
+    <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
     <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
   </Style>
 
@@ -122,7 +122,7 @@
     <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
   </Style>
   <Style Selector="ToggleButton.conn:checked">
-    <Setter Property="Foreground" Value="White" />
+    <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
     <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
   </Style>
 
@@ -134,7 +134,7 @@
   </Style>
   <Style Selector="Button.primary">
     <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
-    <Setter Property="Foreground" Value="White" />
+    <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
   </Style>
 
   <Style Selector="Border.card">

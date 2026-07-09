@@ -16,9 +16,9 @@
           <Button Classes="link danger" Content="Remove peer" Command="{Binding RemovePeerCommand}" IsVisible="{Binding IsEditing}" FontSize="{DynamicResource Fs115}" Margin="4,0,0,0" />
         </StackPanel>
         <WrapPanel VerticalAlignment="Center">
-          <TextBlock Classes="accentfg" FontSize="{DynamicResource Fs115}" FontWeight="Medium" VerticalAlignment="Center" Text="{Binding BlockTitle}" Margin="0,0,8,4" />
-          <TextBox Classes="mono synkey" Width="150" Text="{Binding PublicKey}" Watermark="public key" IsVisible="{Binding ShowKeysRow}" Margin="0,0,6,4" />
-          <TextBox Classes="mono" Width="110" Text="{Binding PresharedKey}" Watermark="preshared" IsVisible="{Binding ShowKeysRow}" Margin="0,0,6,4" />
+          <TextBlock Classes="accentfg" FontSize="{DynamicResource Fs115}" FontWeight="Medium" VerticalAlignment="Center" Text="{Binding BlockTitle}" IsVisible="{Binding IsDnsOnly}" Margin="0,0,8,4" />
+          <TextBox Classes="plainname" MinWidth="56" Text="{Binding Name}" Watermark="Peer" IsVisible="{Binding ShowWgFields}" Margin="0,0,8,4"
+                   Foreground="{DynamicResource AccentBrush}" FontWeight="Medium" FontSize="{DynamicResource Fs115}" />
           <Border Classes="rolebadge" Margin="0,0,6,4" Classes.active="{Binding FailoverRole, Converter={x:Static views:Syntax.IsActive}}"
                   IsVisible="{Binding FailoverRole, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
             <TextBlock FontSize="{DynamicResource Fs11}" Text="{Binding FailoverRole}" />
@@ -33,16 +33,29 @@
       <Grid Margin="10,6" ColumnDefinitions="70,*" RowDefinitions="Auto,Auto,Auto,Auto">
 
         <TextBlock Grid.Row="0" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Endpoint" IsVisible="{Binding ShowWgFields}" Margin="0,5,10,4" />
-        <Grid Grid.Row="0" Grid.Column="1" ColumnDefinitions="*,Auto,56,Auto,44" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
-          <TextBox Grid.Column="0" Classes="mono" Text="{Binding EndpointHost}" Watermark="host or ip" />
-          <TextBlock Grid.Column="1" Classes="muted" Text=":" Margin="4,0" />
-          <TextBox Grid.Column="2" Classes="mono" Text="{Binding EndpointPort}" Watermark="port" />
-          <TextBlock Grid.Column="3" Classes="lbl" Text="Keepalive" Margin="12,0,8,0" />
-          <TextBox Grid.Column="4" Classes="mono" Text="{Binding KeepaliveText}" Watermark="off" />
+        <Grid Grid.Row="0" Grid.Column="1" ColumnDefinitions="4*,4*,3*" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
+          <TextBox Grid.Column="0" Classes="mono" MinWidth="110" Text="{Binding Endpoint}" Watermark="host:port" Margin="0,0,6,0" />
+          <TextBox Grid.Column="1" Classes="mono synkey" MinWidth="110" Text="{Binding PublicKey}" Watermark="public key" Margin="0,0,6,0" />
+          <TextBox Grid.Column="2" Classes="mono" MinWidth="90" Text="{Binding PresharedKey}" Watermark="preshared" />
         </Grid>
 
-        <TextBlock Grid.Row="1" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Allowed IPs" IsVisible="{Binding ShowWgFields}" Margin="0,5,10,4" />
-        <ItemsControl Grid.Row="1" Grid.Column="1" ItemsSource="{Binding AllowedIps}" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
+        <TextBlock Grid.Row="1" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Keepalive" IsVisible="{Binding ShowWgFields}" Margin="0,5,10,4"
+                   ToolTip.Tip="Seconds between keepalive packets (blank = off). The ping host — probed once per period — decides failover health when set; without it, handshake freshness decides." />
+        <Grid Grid.Row="1" Grid.Column="1" ColumnDefinitions="44,Auto,*,Auto,34,Auto,34,Auto,34,Auto" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
+          <TextBox Grid.Column="0" Classes="mono" Text="{Binding KeepaliveText}" Watermark="off" />
+          <TextBlock Grid.Column="1" Classes="lbl" Text="ping" Margin="10,0,6,0" />
+          <TextBox Grid.Column="2" Classes="mono" MinWidth="80" Text="{Binding PingHostText}" Watermark="host to ping" />
+          <TextBlock Grid.Column="3" Classes="lbl" Text="down" Margin="10,0,6,0" ToolTip.Tip="Consecutive ping failures that mark this peer down (1-100, default 3)" />
+          <TextBox Grid.Column="4" Classes="mono" Text="{Binding PingDownText}" Watermark="3" />
+          <TextBlock Grid.Column="5" Classes="lbl" Text="up" Margin="10,0,6,0" ToolTip.Tip="Consecutive ping successes that bring it back up (1-100, default 3)" />
+          <TextBox Grid.Column="6" Classes="mono" Text="{Binding PingUpText}" Watermark="3" />
+          <TextBlock Grid.Column="7" Classes="lbl" Text="timeout" Margin="10,0,6,0" ToolTip.Tip="Seconds to wait for each ping reply (1-60, default 3)" />
+          <TextBox Grid.Column="8" Classes="mono" Text="{Binding PingTimeoutText}" Watermark="3" />
+          <TextBlock Grid.Column="9" Classes="lbl" Text="s" Margin="4,0,0,0" />
+        </Grid>
+
+        <TextBlock Grid.Row="2" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Allowed IPs" IsVisible="{Binding ShowWgFields}" Margin="0,5,10,4" />
+        <ItemsControl Grid.Row="2" Grid.Column="1" ItemsSource="{Binding AllowedIps}" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>
@@ -72,19 +85,6 @@
             </DataTemplate>
           </ItemsControl.DataTemplates>
         </ItemsControl>
-
-        <TextBlock Grid.Row="2" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Ping" IsVisible="{Binding ShowWgFields}" Margin="0,5,10,4"
-                   ToolTip.Tip="In-tunnel IP pinged once per keepalive period. When set, it decides failover health; without it, handshake freshness decides." />
-        <WrapPanel Grid.Row="2" Grid.Column="1" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
-          <TextBox Classes="mono" Width="130" Text="{Binding PingHostText}" Watermark="host to ping" Margin="0,0,8,4" />
-          <TextBlock Classes="lbl" Text="down after" Margin="0,0,6,4" ToolTip.Tip="Consecutive ping failures that mark this peer down (1-100, default 3)" />
-          <TextBox Classes="mono" Width="34" Text="{Binding PingDownText}" Watermark="3" Margin="0,0,8,4" />
-          <TextBlock Classes="lbl" Text="up after" Margin="0,0,6,4" ToolTip.Tip="Consecutive ping successes that bring it back up (1-100, default 3)" />
-          <TextBox Classes="mono" Width="34" Text="{Binding PingUpText}" Watermark="3" Margin="0,0,8,4" />
-          <TextBlock Classes="lbl" Text="timeout" Margin="0,0,6,4" ToolTip.Tip="Seconds to wait for each ping reply (1-60, default 3)" />
-          <TextBox Classes="mono" Width="34" Text="{Binding PingTimeoutText}" Watermark="3" Margin="0,0,4,4" />
-          <TextBlock Classes="lbl" Text="s" Margin="0,0,0,4" />
-        </WrapPanel>
 
         <TextBlock Grid.Row="3" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="DNS" Margin="0,5,10,0" />
         <Grid Grid.Row="3" Grid.Column="1" ColumnDefinitions="Auto,*">

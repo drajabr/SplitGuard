@@ -17,6 +17,7 @@ public class ParsedTunnel
 
 public class ParsedPeer
 {
+    public string? Name { get; set; }
     public string PublicKey { get; set; } = "";
     public string? PresharedKey { get; set; }
     public string Endpoint { get; set; } = "";
@@ -74,6 +75,7 @@ public static class WireGuardConf
             {
                 switch (key)
                 {
+                    case "name": peer.Name = value; break;
                     case "publickey": peer.PublicKey = value; break;
                     case "presharedkey": peer.PresharedKey = value; break;
                     case "endpoint": peer.Endpoint = value; break;

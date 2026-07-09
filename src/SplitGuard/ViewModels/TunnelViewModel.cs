@@ -96,6 +96,7 @@ public class TunnelViewModel : ObservableObject
         {
             var vm = new PeerViewModel(this)
             {
+                Name = p.Name ?? "",
                 PublicKey = p.PublicKey,
                 Endpoint = p.Endpoint,
                 Dns = p.Dns ?? "",
@@ -413,6 +414,7 @@ public class TunnelViewModel : ObservableObject
         {
             sb.AppendLine();
             sb.AppendLine("[Peer]");
+            if (p.Name.Trim().Length > 0) sb.AppendLine($"Name = {p.Name.Trim()}");
             sb.AppendLine($"PublicKey = {p.PublicKey.Trim()}");
             if (!string.IsNullOrWhiteSpace(p.PresharedKey)) sb.AppendLine($"PresharedKey = {p.PresharedKey.Trim()}");
             if (!string.IsNullOrWhiteSpace(p.Endpoint)) sb.AppendLine($"Endpoint = {p.Endpoint.Trim()}");
@@ -440,6 +442,7 @@ public class TunnelViewModel : ObservableObject
         {
             var vm = new PeerViewModel(this)
             {
+                Name = p.Name ?? "",
                 PublicKey = p.PublicKey,
                 PresharedKey = p.PresharedKey ?? "",
                 Endpoint = p.Endpoint,
@@ -574,6 +577,7 @@ public class TunnelViewModel : ObservableObject
             Config.Addresses = AddressValues.ToList();
             Config.Peers = Peers.Select(p => new PeerConfig
             {
+                Name = p.Name.Trim().Length > 0 ? p.Name.Trim() : null,
                 PublicKey = p.PublicKey.Trim(),
                 PresharedKeyProtected = string.IsNullOrWhiteSpace(p.PresharedKey) ? null : RuleStore.Protect(p.PresharedKey.Trim()),
                 Endpoint = p.Endpoint.Trim(),

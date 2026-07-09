@@ -29,6 +29,13 @@ public static class Accents
 
     public static bool IsMono(string name) => name == "mono";
 
+    // Foreground that reads on top of an accent fill: dark text on light accents
+    // (e.g. mono-on-dark resolves to white), white on everything else.
+    public static Color On(Color accent) =>
+        0.299 * accent.R + 0.587 * accent.G + 0.114 * accent.B > 160
+            ? Color.Parse("#1A1A1A")
+            : Colors.White;
+
     // Next hue in the cycle (used when cycling a card's accent).
     public static string Next(string? name)
     {

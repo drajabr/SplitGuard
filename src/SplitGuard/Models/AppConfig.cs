@@ -58,6 +58,8 @@ public class TunnelConfig
 
 public class PeerConfig
 {
+    // Optional friendly name shown in the peer header (cosmetic only).
+    public string? Name { get; set; }
     public string PublicKey { get; set; } = "";
     public string? PresharedKeyProtected { get; set; }
     public string Endpoint { get; set; } = "";

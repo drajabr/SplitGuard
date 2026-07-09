@@ -583,6 +583,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
             Addresses = parsed.Addresses.ToList(),
             Peers = parsed.Peers.Select(p => new PeerConfig
             {
+                Name = p.Name,
                 PublicKey = p.PublicKey,
                 PresharedKeyProtected = p.PresharedKey is null ? null : RuleStore.Protect(p.PresharedKey),
                 Endpoint = p.Endpoint,

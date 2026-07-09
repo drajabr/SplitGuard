@@ -22,6 +22,10 @@ public partial class PeerViewModel : ObservableObject
         AllowedIps.CollectionChanged += (_, _) => Raise(nameof(MetricEnabled));
     }
 
+    // Optional friendly name, editable in the header like the tunnel's own name.
+    string _name = "";
+    public string Name { get => _name; set => Set(ref _name, value); }
+
     string _publicKey = "";
     public string PublicKey { get => _publicKey; set => Set(ref _publicKey, value); }
 
