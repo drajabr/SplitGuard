@@ -80,7 +80,7 @@
       <TextBlock Text="{Binding StatusText}" Classes="oktext" Classes.errtext="{Binding !StatusOk}" />
     </Border>
 
-    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Hidden">
+    <ScrollViewer Name="MainScroll" Focusable="True" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Hidden">
       <StackPanel Margin="14,8,14,12">
         <ItemsControl ItemsSource="{Binding Tunnels}">
           <ItemsControl.ItemTemplate>

@@ -79,7 +79,7 @@ public class TunnelViewModel : ObservableObject
         AddAddressCommand = new RelayCommand(AddAddress);
         RemoveAddressCommand = new RelayCommand(p => Addresses.Remove((string)p!));
         GenerateKeyCommand = new RelayCommand(GenerateKey);
-        RevealPrivateKeyCommand = new RelayCommand(RevealPrivateKey);
+        EditPrivateKeyCommand = new RelayCommand(() => EditingPrivateKey = true);
         ToggleTextModeCommand = new RelayCommand(ToggleTextMode);
     }
 
@@ -143,44 +143,15 @@ public class TunnelViewModel : ObservableObject
     public string PrivateKeyEdit
     {
         get => _privateKeyEdit;
-        set
-        {
-            if (!Set(ref _privateKeyEdit, value)) return;
-            RefreshDerivedPublicKey();
-            Raise(nameof(CanGenerate));
-        }
+        set { if (Set(ref _privateKeyEdit, value)) RefreshDerivedPublicKey(); }
     }
 
-    // The generate button lives inside the private-key box and only shows while it's
-    // empty — so generating never discards a key and needs no confirmation step.
-    public bool CanGenerate => string.IsNullOrWhiteSpace(PrivateKeyEdit);
-
-    // The private key hides behind a square eye button; two clicks within 3 s reveal
-    // the editable field (one accidental click never exposes the secret).
-    bool _privateKeyRevealed;
-    public bool PrivateKeyRevealed
-    {
-        get => _privateKeyRevealed;
-        set => Set(ref _privateKeyRevealed, value);
-    }
-
-    bool _revealArmed;
-    public bool RevealArmed { get => _revealArmed; set => Set(ref _revealArmed, value); }
-    int _revealArmVersion;
-
-    async void RevealPrivateKey()
-    {
-        if (RevealArmed)
-        {
-            RevealArmed = false;
-            PrivateKeyRevealed = true;
-            return;
-        }
-        RevealArmed = true;
-        var version = ++_revealArmVersion;
-        await Task.Delay(3000);
-        if (version == _revealArmVersion) RevealArmed = false;
-    }
+    // The interface key box shows the derived public key (click to copy). The edit
+    // (pencil) button switches it to manual private-key entry — which necessarily
+    // changes the public key — with a generate/refresh button. Each edit session of the
+    // card starts back in public display mode.
+    bool _editingPrivateKey;
+    public bool EditingPrivateKey { get => _editingPrivateKey; set => Set(ref _editingPrivateKey, value); }
 
     bool _isConnected;
     public bool IsConnected
@@ -403,7 +374,7 @@ public class TunnelViewModel : ObservableObject
     public RelayCommand AddAddressCommand { get; private set; } = null!;
     public RelayCommand RemoveAddressCommand { get; private set; } = null!;
     public RelayCommand GenerateKeyCommand { get; private set; } = null!;
-    public RelayCommand RevealPrivateKeyCommand { get; private set; } = null!;
+    public RelayCommand EditPrivateKeyCommand { get; private set; } = null!;
     public RelayCommand ToggleTextModeCommand { get; private set; } = null!;
 
     // Raw-config editing (Ctrl+E): the whole staged tunnel as wg-quick text,
@@ -499,8 +470,7 @@ public class TunnelViewModel : ObservableObject
     void BeginEdit()
     {
         ValidationError = "";
-        PrivateKeyRevealed = false; // every edit session starts with the key concealed
-        RevealArmed = false;
+        EditingPrivateKey = false; // every edit session starts showing the public key
         if (!IsExternal && !IsCustom)
         {
             try { PrivateKeyEdit = RuleStore.Unprotect(Config!.PrivateKeyProtected); }
@@ -657,7 +627,8 @@ public class TunnelViewModel : ObservableObject
         return null;
     }
 
-    void AddPeer() => Peers.Add(new PeerViewModel(this) { IsEditing = true });
+    // A freshly added peer opens expanded so it can be filled in immediately.
+    void AddPeer() => Peers.Add(new PeerViewModel(this) { IsEditing = true, IsExpanded = true });
 
     public void RemovePeer(PeerViewModel peer)
     {
@@ -676,11 +647,9 @@ public class TunnelViewModel : ObservableObject
         NewAddress = "";
     }
 
-    void GenerateKey()
-    {
-        if (CanGenerate)
-            PrivateKeyEdit = Convert.ToBase64String(Curve25519.GeneratePrivateKey());
-    }
+    // Refresh: a new keypair. Only reachable in private-key edit mode, where changing
+    // the key is the explicit intent.
+    void GenerateKey() => PrivateKeyEdit = Convert.ToBase64String(Curve25519.GeneratePrivateKey());
 
     void RefreshDerivedPublicKey()
     {
@@ -715,7 +684,6 @@ public class TunnelViewModel : ObservableObject
             down += s.DownBps;
             if (s.Handshake is not null && (newest is null || s.Handshake > newest)) newest = s.Handshake;
             peer.HandshakeText = Format.Ago(s.Handshake);
-            peer.ShowHandshake = Peers.Count > 1;
             peer.PingText = s.PingOk switch
             {
                 true => $"{s.PingMs:0} ms",

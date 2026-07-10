@@ -93,6 +93,17 @@ public partial class MainWindow : Window, IDialogs
     {
         var vm = DataContext as MainViewModel;
         var ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+
+        // Enter in a single-line field commits and drops focus (clearing the highlight).
+        // Add-boxes bind Enter to their add command and mark it handled, so they never
+        // reach here; multiline (raw-config) fields keep Enter for newlines.
+        if (e.Key == Key.Enter && !e.Handled
+            && FocusManager?.GetFocusedElement() is TextBox { AcceptsReturn: false })
+        {
+            MainScroll.Focus();
+            e.Handled = true;
+            return;
+        }
         if (ctrl && e.Key == Key.N && vm is not null)
         {
             vm.CreateEmptyTunnel();

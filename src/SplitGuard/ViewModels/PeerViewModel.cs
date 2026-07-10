@@ -21,11 +21,14 @@ public partial class PeerViewModel : ObservableObject
         TogglePinCommand = new RelayCommand(() => _tunnel.Host.TogglePin(_tunnel, this));
         RemovePeerCommand = new RelayCommand(() => _tunnel.RemovePeer(this));
         AllowedIps.CollectionChanged += (_, _) => Raise(nameof(MetricEnabled));
+        // DNS-only cards (external/custom) have only this body, so keep it open; real
+        // WireGuard peers start collapsed so a multi-peer tunnel opens as a tidy list.
+        _isExpanded = IsDnsOnly;
     }
 
     // Each peer body collapses to its header line (clicking the header toggles it,
     // like the tunnel card itself).
-    bool _isExpanded = true;
+    bool _isExpanded;
     public bool IsExpanded { get => _isExpanded; set => Set(ref _isExpanded, value); }
 
     // Optional friendly name, editable in the header like the tunnel's own name.
@@ -74,7 +77,15 @@ public partial class PeerViewModel : ObservableObject
     // Optional in-tunnel IP pinged once per keepalive period (25 s when keepalive is off):
     // keeps handshakes fresh and feeds failover health.
     string _pingHostText = "";
-    public string PingHostText { get => _pingHostText; set => Set(ref _pingHostText, value); }
+    public string PingHostText
+    {
+        get => _pingHostText;
+        set { if (Set(ref _pingHostText, value)) { Raise(nameof(HasPingHost)); Raise(nameof(ShowHandshake)); } }
+    }
+
+    // When a ping host is set it decides the peer's status, so the down/up/timeout knobs
+    // are live and the header shows ping instead of the (now redundant) handshake.
+    public bool HasPingHost => PingHostText.Trim().Length > 0;
 
     // Per-ping timeout in seconds; blank = default (3 s). Only meaningful with a ping host.
     string _pingTimeoutText = "";
@@ -166,10 +177,11 @@ public partial class PeerViewModel : ObservableObject
     public bool PinSuspended { get => _pinSuspended; set => Set(ref _pinSuspended, value); }
 
     string _handshakeText = "";
-    public string HandshakeText { get => _handshakeText; set => Set(ref _handshakeText, value); }
+    public string HandshakeText { get => _handshakeText; set { if (Set(ref _handshakeText, value)) Raise(nameof(ShowHandshake)); } }
 
-    bool _showHandshake;
-    public bool ShowHandshake { get => _showHandshake; set => Set(ref _showHandshake, value); }
+    // Handshake is shown only when there's no ping host — with a ping host, the live RTT
+    // reports status and the handshake reading is redundant (and can look frozen).
+    public bool ShowHandshake => !HasPingHost && HandshakeText.Trim().Length > 0;
 
     string _pingText = "";
     public string PingText { get => _pingText; set => Set(ref _pingText, value); }

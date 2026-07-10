@@ -309,25 +309,25 @@ public partial class TunnelCard : UserControl
         UpdateInterfaceLayout();
     }
 
-    // Address chips inline (column 3, sized to content) while the whole line fits;
-    // otherwise they move below spanning the full width and the key boxes stretch.
+    // Address chips inline (column 2, sized to content) while the whole line fits;
+    // otherwise they move below spanning the full width and the key box stretches.
     void UpdateInterfaceLayout()
     {
         if (IfaceGrid.Bounds.Width < 1) return;
         AddrList.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         var addrW = AddrList.DesiredSize.Width;
-        var narrow = IfaceGrid.Bounds.Width < 70 + 260 + addrW + 24; // title + comfortable keys + chips + slack
+        var narrow = IfaceGrid.Bounds.Width < 70 + 160 + addrW + 24; // title + comfortable key box + chips + slack
         if (narrow)
         {
             Grid.SetRow(AddrList, 1);
             Grid.SetColumn(AddrList, 0);
-            Grid.SetColumnSpan(AddrList, 4);
+            Grid.SetColumnSpan(AddrList, 3);
             AddrList.Margin = new Thickness(0, 6, 0, 0);
         }
         else
         {
             Grid.SetRow(AddrList, 0);
-            Grid.SetColumn(AddrList, 3);
+            Grid.SetColumn(AddrList, 2);
             Grid.SetColumnSpan(AddrList, 1);
             AddrList.Margin = new Thickness(2, 0, 0, 0);
         }
