@@ -456,8 +456,9 @@ public partial class TunnelCard : UserControl
                 name.Classes.Add("mono");
                 name.Classes.Add("accentfg");
                 var items = new List<Control> { name };
-                if (!string.IsNullOrEmpty(p.FailoverRole)) items.Add(Label(p.FailoverRole));
+                if (!string.IsNullOrEmpty(p.HandshakeText)) items.Add(Label(p.HandshakeText));
                 if (!string.IsNullOrEmpty(p.PingText)) items.Add(Label(p.PingText));
+                if (!string.IsNullOrEmpty(p.FailoverRole)) items.Add(Label(p.FailoverRole));
                 AddRow(Left(items.ToArray()), string.Join(", ", p.AllowedIpValues), Syntax.IpBrush);
             }
             var domains = string.Join(", ", p.DomainValues);
