@@ -46,7 +46,7 @@ public class App : Application
             _vm.Tunnels.CollectionChanged += OnTunnelsChanged;
             HookTunnels();
             // Keep the no-UAC launcher task registered (and pointing at the current exe).
-            if (_vm.Prefs.SkipUacLaunch)
+            if (_vm.Prefs.SkipUacLaunch && !Services.RuleStore.DemoMode)
                 _ = Task.Run(Services.StartupService.RegisterLaunchTask);
             _ = _vm.InitializeAsync();
         }

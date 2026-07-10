@@ -21,6 +21,15 @@ static class Program
             return;
         }
 
+        // UI review harness: no elevation, no single-instance, canned in-memory config,
+        // no system side effects. For eyeballing layout during development.
+        if (args.Contains("--ui-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            Services.RuleStore.DemoMode = true;
+            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+            return;
+        }
+
         // The exe manifest is asInvoker; everything the app does needs admin, so a
         // non-elevated launch is redirected: run the registered launcher task (elevated,
         // no UAC prompt), else fall back to a normal UAC relaunch. Runs before the

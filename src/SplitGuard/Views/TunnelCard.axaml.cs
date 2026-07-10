@@ -101,7 +101,22 @@ public partial class TunnelCard : UserControl
             new DoubleTransition { Property = OpacityProperty, Duration = TimeSpan.FromMilliseconds(AnimMs), Easing = new CubicEaseOut() },
             new DoubleTransition { Property = HeightProperty, Duration = TimeSpan.FromMilliseconds(AnimMs), Easing = new CubicEaseOut() },
         };
-        AttachedToVisualTree += (_, _) => { if (!_appeared) { _appeared = true; Opacity = 1; } };
+        AttachedToVisualTree += (_, _) =>
+        {
+            if (!_appeared) { _appeared = true; Opacity = 1; }
+            // First-render reconcile: a freshly attached card's auto-sized body can come
+            // up collapsed to its header (the detail measured 0 before the first layout
+            // completed) until something re-drives its height. Snap it to the measured
+            // content height once everything is loaded.
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (_vm is null || !double.IsNaN(Body.Height)) return;
+                var content = _vm.IsEditing ? (Control)ExpandContent : DetailPanel;
+                var to = NaturalHeight(content, Body.Bounds.Width < 1 ? 400 : Body.Bounds.Width);
+                if (to > 0 && Math.Abs(Body.Bounds.Height - to) > 0.5)
+                    TweenBodyToContent();
+            }, DispatcherPriority.Loaded);
+        };
     }
 
     bool _appeared;

@@ -25,7 +25,7 @@
           <TextBlock Classes="accentfg" FontSize="{DynamicResource Fs115}" FontWeight="Medium" VerticalAlignment="Center" Text="{Binding BlockTitle}" IsVisible="{Binding IsDnsOnly}" Margin="0,0,8,4" />
           <TextBox Classes="plainname" MinWidth="80" Text="{Binding Name}" Watermark="Peer" IsVisible="{Binding ShowWgFields}" Margin="0,0,8,4"
                    Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold" FontSize="{DynamicResource Fs17}" VerticalAlignment="Center" />
-          <TextBox Classes="mono" Width="190" Text="{Binding Endpoint}" Watermark="host:port" IsVisible="{Binding ShowWgFields}" Margin="0,0,8,4" VerticalAlignment="Center" />
+          <TextBox Classes="mono" Width="240" Text="{Binding Endpoint}" Watermark="host:port" IsVisible="{Binding ShowWgFields}" Margin="0,0,8,4" VerticalAlignment="Center" />
           <Border Classes="rolebadge" Margin="0,0,6,4" Classes.active="{Binding FailoverRole, Converter={x:Static views:Syntax.IsActive}}"
                   IsVisible="{Binding FailoverRole, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
             <TextBlock FontSize="{DynamicResource Fs11}" Text="{Binding FailoverRole}" />
@@ -38,7 +38,7 @@
 
       <StackPanel IsVisible="{Binding IsExpanded}">
         <Separator />
-        <Grid Margin="10,6,12,6" ColumnDefinitions="70,*" RowDefinitions="Auto,Auto,Auto,Auto">
+        <Grid Margin="10,6,12,6" ColumnDefinitions="80,*" RowDefinitions="Auto,Auto,Auto,Auto">
 
           <TextBlock Grid.Row="0" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Keys" IsVisible="{Binding ShowWgFields}" Margin="0,5,10,4" />
           <Grid Grid.Row="0" Grid.Column="1" ColumnDefinitions="*,*,Auto,34" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">

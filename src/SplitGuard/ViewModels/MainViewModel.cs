@@ -158,9 +158,18 @@ public class MainViewModel : ObservableObject, ITunnelHost
             Tunnels.Add(new TunnelViewModel(this, _config.Custom));
         await RefreshExternalsAsync();
         SortTunnels();
-        await Task.Run(Reconcile);
-        RefreshPins();
-        await Task.Run(RefreshCatchAll);
+        if (!RuleStore.DemoMode)
+        {
+            await Task.Run(Reconcile);
+            RefreshPins();
+            await Task.Run(RefreshCatchAll);
+        }
+        else
+        {
+            // UI review harness: open straight into the expanded edit layout.
+            RefreshPins();
+            Tunnels.FirstOrDefault(t => !t.IsCustom && !t.IsExternal)?.BeginEditCommand.Execute(null);
+        }
     }
 
     // Startup crash recovery: drop tagged rules that no longer correspond to anything live.
