@@ -14,6 +14,13 @@
   <Style Selector="TextBox.mono">
     <Setter Property="FontSize" Value="{DynamicResource Fs12}" />
   </Style>
+  <!-- Tiny numeric boxes (metric, counts, timeout): slim padding so 2-3 digits fit
+       in half the normal width. -->
+  <Style Selector="TextBox.num">
+    <Setter Property="Padding" Value="2,3" />
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+  </Style>
   <Style Selector="TextBox.error">
     <Setter Property="BorderBrush" Value="{DynamicResource DangerBrush}" />
   </Style>

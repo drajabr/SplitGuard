@@ -271,30 +271,30 @@ public partial class TunnelCard : UserControl
     }
 
     // Animate the shared region's Height from where it is now to the visible content's
-    // natural height, then release it back to Auto so later edits resize freely. Target is
-    // measured on the next render tick (after the swapped content is laid out), so the
-    // first expand lands exactly. Plain property tween — an Animation with
-    // FillMode.Forward keeps clamping Height even after setting it back to NaN, which
-    // froze the card and clipped content on window resizes.
+    // natural height, then release it back to Auto so later edits resize freely. The
+    // target is measured synchronously (Measure works without waiting for a layout
+    // pass) — the old deferred-post version could be pre-empted and skip the animation.
+    // Plain property tween — an Animation with FillMode.Forward keeps clamping Height
+    // even after setting it back to NaN, which froze the card and clipped content.
     void TweenBodyToContent(double? fromOverride = null)
     {
+        if (_vm is null) return;
         var gen = ++_animGen;
         var from = fromOverride ?? Body.Bounds.Height;
-        Body.Height = from; // hold the current height while the new content realizes
-
-        Dispatcher.UIThread.Post(() =>
+        var w = Body.Bounds.Width;
+        if (w < 1) w = 400;
+        var content = _vm.IsEditing ? (Control)ExpandContent : DetailPanel;
+        var to = NaturalHeight(content, w);
+        if (to < 1 || from < 1 || Math.Abs(to - from) < 0.5)
         {
-            if (_animGen != gen || _vm is null) return;
-            var w = Body.Bounds.Width;
-            if (w < 1) w = 400;
-            var content = _vm.IsEditing ? (Control)ExpandContent : DetailPanel;
-            var to = NaturalHeight(content, w);
-            if (Math.Abs(to - from) < 0.5) { Body.Height = double.NaN; return; }
+            Body.Height = double.NaN;
+            return;
+        }
 
-            Tween(from, to, AnimMs,
-                v => { if (_animGen == gen) Body.Height = v; },
-                () => { if (_animGen == gen) Body.Height = double.NaN; }); // back to auto
-        }, DispatcherPriority.Render);
+        Body.Height = from;
+        Tween(from, to, AnimMs,
+            v => { if (_animGen == gen) Body.Height = v; },
+            () => { if (_animGen == gen) Body.Height = double.NaN; }); // back to auto
     }
 
     // Syntax-colored collapsed detail as atomic tokens in a WrapPanel: addresses in
