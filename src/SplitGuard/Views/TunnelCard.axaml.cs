@@ -451,7 +451,7 @@ public partial class TunnelCard : UserControl
             if (p.HasStats)
             {
                 var totals = $"↑ {p.TxTotalText}    ↓ {p.RxTotalText}";
-                var rtt = p.HasPingHost ? p.PingText : "";
+                var rtt = p.HasPingHost ? (string.IsNullOrEmpty(p.PingText) ? "·····" : p.PingText) : "";
                 AddRow(Mono(totals, Syntax.IpBrush), rtt, Syntax.IpBrush);
             }
         }

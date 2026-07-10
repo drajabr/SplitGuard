@@ -15,9 +15,9 @@
                   IsVisible="{Binding FailoverRole, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
             <TextBlock FontSize="{DynamicResource Fs11}" Text="{Binding FailoverRole}" />
           </Border>
-          <TextBlock Classes="muted" Text="{Binding HandshakeText}" IsVisible="{Binding ShowHandshake}" />
-          <TextBlock Classes="muted" Text="{Binding PingText}"
-                     IsVisible="{Binding PingText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          <TextBlock Classes="muted" Text="{Binding HandshakeText, Converter={x:Static views:Syntax.OrDots}}" />
+          <TextBlock Classes="muted" Text="{Binding PingText, Converter={x:Static views:Syntax.OrDots}}"
+                     IsVisible="{Binding HasPingHost}" />
         </StackPanel>
         <Grid ColumnDefinitions="Auto,*" VerticalAlignment="Center">
           <TextBlock Grid.Column="0" Classes="accentfg" FontSize="{DynamicResource Fs115}" FontWeight="Medium" VerticalAlignment="Center"

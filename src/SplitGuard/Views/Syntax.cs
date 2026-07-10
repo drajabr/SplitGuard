@@ -35,4 +35,8 @@ public static class Syntax
     public static readonly IValueConverter IsActive = new FuncValueConverter<string?, bool>(s => s == "active");
 
     public static readonly IValueConverter Not = new FuncValueConverter<bool, bool>(b => !b);
+
+    // Keeps a status slot occupied when there's no value yet, instead of collapsing away.
+    public static readonly IValueConverter OrDots = new FuncValueConverter<string?, string>(
+        s => string.IsNullOrEmpty(s) ? "·····" : s!);
 }

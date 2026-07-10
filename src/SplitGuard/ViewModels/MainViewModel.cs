@@ -170,6 +170,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
             // then open the first tunnel's edit layout.
             foreach (var t in Tunnels.Where(t => !t.IsCustom && !t.IsExternal))
             {
+                t.SetConnectedState(true);
                 foreach (var p in t.Peers)
                 {
                     p.HasStats = true;
