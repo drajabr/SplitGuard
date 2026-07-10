@@ -415,11 +415,27 @@ public partial class TunnelCard : UserControl
             return sp;
         }
 
-        // One block per peer: name + status on the left, its allowed IPs on the right;
-        // a second line with DNS on the left and the domains it resolves on the right.
+        // A hairline divider between peer blocks.
+        void AddSeparator()
+        {
+            DetailPanel.Children.Add(new Border
+            {
+                Height = 1,
+                Background = (IBrush?)this.FindResource("HairlineBrush"),
+                Margin = new Avalonia.Thickness(0, 5, 0, 5),
+            });
+        }
+
+        // One block per peer: name on the left, its allowed IPs on the right; a DNS +
+        // domains line; and, when a ping host is set, a full-width status line
+        // (up · last RTT · avg · loss). Peers are separated by a hairline.
+        bool first = true;
         for (int i = 0; i < _vm.Peers.Count; i++)
         {
             var p = _vm.Peers[i];
+            if (!first) AddSeparator();
+            first = false;
+
             if (!_vm.IsExternal && !_vm.IsCustom)
             {
                 var name = new TextBlock
@@ -431,8 +447,6 @@ public partial class TunnelCard : UserControl
                 name.Classes.Add("mono");
                 name.Classes.Add("accentfg");
                 var items = new List<Control> { name };
-                if (!string.IsNullOrEmpty(p.HandshakeText)) items.Add(Label(p.HandshakeText));
-                if (!string.IsNullOrEmpty(p.PingText)) items.Add(Label(p.PingText));
                 if (!string.IsNullOrEmpty(p.FailoverRole)) items.Add(Label(p.FailoverRole));
                 AddRow(Left(items.ToArray()), string.Join(", ", p.AllowedIpValues), Syntax.IpBrush);
             }
@@ -442,6 +456,9 @@ public partial class TunnelCard : UserControl
                 Control? left = p.HasDns ? Left(Label("DNS"), Mono(p.Dns.Trim(), Syntax.IpBrush)) : null;
                 AddRow(left, domains, Syntax.DomainBrush);
             }
+            // Full-width live status line for a ping-monitored peer.
+            if (p.HasPingHost && !string.IsNullOrEmpty(p.PingSummary))
+                AddRow(Mono(p.PingSummary, Syntax.IpBrush), "", Syntax.IpBrush);
         }
 
         if (DetailPanel.Children.Count == 0)

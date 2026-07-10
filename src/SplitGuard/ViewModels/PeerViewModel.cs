@@ -191,6 +191,10 @@ public partial class PeerViewModel : ObservableObject
     string _pingText = "";
     public string PingText { get => _pingText; set => Set(ref _pingText, value); }
 
+    // Full-width status line for the collapsed view: state · last RTT · avg · loss.
+    string _pingSummary = "";
+    public string PingSummary { get => _pingSummary; set => Set(ref _pingSummary, value); }
+
     // "active" / "standby" while this peer's allowed IPs overlap another connected peer's.
     string _failoverRole = "";
     public string FailoverRole { get => _failoverRole; set => Set(ref _failoverRole, value); }

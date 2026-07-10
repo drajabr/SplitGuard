@@ -479,6 +479,8 @@ public class TunnelViewModel : ObservableObject
         }
         _connSnapshot = ConnSnapshot();
         Host.EditStarted(this); // collapses any other expanded card
+        // A single-peer tunnel opens with that peer expanded; multi-peer opens as a list.
+        if (Peers.Count == 1) Peers[0].IsExpanded = true;
         IsEditing = true;
     }
 
@@ -687,6 +689,17 @@ public class TunnelViewModel : ObservableObject
                 _ => "",
             };
             peer.FailoverRole = s.FailoverRole ?? "";
+            // Full-width status line (collapsed view) when a ping host is set:
+            // "up · 23 ms · avg 25 ms · 0% loss".
+            if (peer.HasPingHost)
+            {
+                var parts = new List<string> { s.Healthy ? "up" : "down" };
+                parts.Add(s.PingOk == true ? $"{s.PingMs:0} ms" : "no reply");
+                if (s.AvgPingMs is { } avg) parts.Add($"avg {avg:0} ms");
+                if (s.PingLoss is { } loss) parts.Add($"{loss * 100:0}% loss");
+                peer.PingSummary = string.Join("  ·  ", parts);
+            }
+            else peer.PingSummary = "";
         }
         UpRate = Format.Rate(up);
         DownRate = Format.Rate(down);

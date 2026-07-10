@@ -8,7 +8,8 @@ namespace SplitGuard.Services;
 // Per-peer live signals published every poll tick. FailoverRole: null = not part of an
 // overlap group, otherwise "active" / "standby".
 public record PeerLive(double UpBps, double DownBps, DateTime? Handshake,
-    double? PingMs, bool? PingOk, bool Healthy, string? FailoverRole);
+    double? PingMs, bool? PingOk, bool Healthy, string? FailoverRole,
+    double? AvgPingMs, double? PingLoss);
 
 public record TunnelStats(Dictionary<string, PeerLive> PerPeer);
 
@@ -65,6 +66,10 @@ public class TunnelManager : IDisposable
         public int PingOkStreak;
         public DateTime NextPingDue;
         public bool PingInFlight;
+        // Rolling window of recent probe outcomes for the avg-RTT / loss readout.
+        public readonly Queue<(bool Ok, double Ms)> PingWindow = new();
+        public double? AvgPingMs;
+        public double? PingLoss;
 
         public bool Healthy = true;
         public string? FailoverRole;
@@ -276,7 +281,8 @@ public class TunnelManager : IDisposable
                 var result = tunnel.Peers.ToDictionary(
                     p => p.Key,
                     p => new PeerLive(p.UpBps, p.DownBps, p.LastHandshake,
-                        p.LastPingMs, p.LastPingOk, p.Healthy, p.FailoverRole));
+                        p.LastPingMs, p.LastPingOk, p.Healthy, p.FailoverRole,
+                        p.AvgPingMs, p.PingLoss));
                 StatsUpdated?.Invoke(tunnel.Name, new TunnelStats(result));
             }
         }
@@ -301,36 +307,38 @@ public class TunnelManager : IDisposable
             var timeout = rt.PingTimeoutMs;
             _ = Task.Run(async () =>
             {
+                bool ok = false;
+                double ms = 0;
                 try
                 {
                     using var ping = new Ping();
                     var reply = await ping.SendPingAsync(target, timeout);
-                    if (reply.Status == IPStatus.Success)
-                    {
-                        rt.LastPingMs = reply.RoundtripTime;
-                        rt.LastPingOk = true;
-                        rt.PingFailStreak = 0;
-                        rt.PingOkStreak++;
-                    }
-                    else
-                    {
-                        rt.LastPingMs = null;
-                        rt.LastPingOk = false;
-                        rt.PingFailStreak++;
-                        rt.PingOkStreak = 0;
-                    }
+                    ok = reply.Status == IPStatus.Success;
+                    ms = reply.RoundtripTime;
                 }
-                catch
+                catch { ok = false; }
+
+                if (ok)
+                {
+                    rt.LastPingMs = ms;
+                    rt.LastPingOk = true;
+                    rt.PingFailStreak = 0;
+                    rt.PingOkStreak++;
+                }
+                else
                 {
                     rt.LastPingMs = null;
                     rt.LastPingOk = false;
                     rt.PingFailStreak++;
                     rt.PingOkStreak = 0;
                 }
-                finally
-                {
-                    rt.PingInFlight = false;
-                }
+                // Rolling stats over the last ~20 probes (only this task touches the queue).
+                rt.PingWindow.Enqueue((ok, ms));
+                while (rt.PingWindow.Count > 20) rt.PingWindow.Dequeue();
+                var oks = rt.PingWindow.Where(w => w.Ok).Select(w => w.Ms).ToList();
+                rt.AvgPingMs = oks.Count > 0 ? oks.Average() : null;
+                rt.PingLoss = (double)rt.PingWindow.Count(w => !w.Ok) / rt.PingWindow.Count;
+                rt.PingInFlight = false;
             });
         }
     }
