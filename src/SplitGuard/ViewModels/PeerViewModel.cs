@@ -19,8 +19,15 @@ public partial class PeerViewModel : ObservableObject
         RemoveAllowedIpCommand = new RelayCommand(p => AllowedIps.Remove((string)p!));
         TogglePinCommand = new RelayCommand(() => _tunnel.Host.TogglePin(_tunnel, this));
         RemovePeerCommand = new RelayCommand(() => _tunnel.RemovePeer(this));
+        ToggleExpandCommand = new RelayCommand(() => IsExpanded = !IsExpanded);
         AllowedIps.CollectionChanged += (_, _) => Raise(nameof(MetricEnabled));
     }
+
+    // Each peer body collapses to its header line, like the tunnel card itself.
+    bool _isExpanded = true;
+    public bool IsExpanded { get => _isExpanded; set => Set(ref _isExpanded, value); }
+
+    public RelayCommand ToggleExpandCommand { get; }
 
     // Optional friendly name, editable in the header like the tunnel's own name.
     string _name = "";

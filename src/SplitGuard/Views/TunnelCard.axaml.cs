@@ -139,18 +139,21 @@ public partial class TunnelCard : UserControl
 
     // Simple CubicEaseOut tween driven by a timer — reliable for any target (transforms,
     // scroll offset) without the Animation/RunAsync quirks that crashed on transforms.
+    // Render priority: default (background) ticks starve behind the heavy relayout a
+    // collapse triggers (the VM rebuilds every peer), so the whole duration elapsed
+    // before the first frame — the collapse snapped instead of animating.
     static void Tween(double from, double to, int ms, Action<double> apply, Action? done = null)
     {
         if (Math.Abs(to - from) < 0.5) { apply(to); done?.Invoke(); return; }
         var sw = Stopwatch.StartNew();
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(15) };
-        timer.Tick += (_, _) =>
+        DispatcherTimer? timer = null;
+        timer = new DispatcherTimer(TimeSpan.FromMilliseconds(15), DispatcherPriority.Render, (_, _) =>
         {
             var p = Math.Min(1, sw.Elapsed.TotalMilliseconds / ms);
             var e = 1 - Math.Pow(1 - p, 3);
             apply(from + (to - from) * e);
-            if (p >= 1) { timer.Stop(); done?.Invoke(); }
-        };
+            if (p >= 1) { timer!.Stop(); done?.Invoke(); }
+        });
         timer.Start();
     }
 

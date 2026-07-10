@@ -65,8 +65,8 @@
           <!-- Interface: one full-width line — keys and addresses flow left, generate +
                listen port dock to the upper-right corner. -->
           <Border Classes="peerblock" Margin="12,8,12,6" IsVisible="{Binding ShowInterfaceSection}">
-            <DockPanel Margin="10,6">
-              <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
+            <DockPanel Margin="10,6,12,6">
+              <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                 <TextBox Classes="mono" Width="76" Text="{Binding ListenPortText}" Watermark="port" ToolTip.Tip="Listen port (blank = automatic)">
                   <TextBox.InnerRightContent>
                     <Button Classes="icon" Command="{Binding ClearListenPortCommand}" ToolTip.Tip="Reset to automatic">
@@ -77,14 +77,14 @@
               </StackPanel>
               <Grid ColumnDefinitions="Auto,2*,2*,3*" VerticalAlignment="Center">
                 <TextBlock Grid.Column="0" Classes="accentfg" FontSize="{DynamicResource Fs115}" FontWeight="Medium" VerticalAlignment="Center" Text="Interface" Margin="0,0,8,0" />
-                <TextBox Grid.Column="1" Classes="mono synkey" MinWidth="70" Text="{Binding PublicKeyFull}" IsReadOnly="True" ToolTip.Tip="{Binding PublicKeyFull}" Margin="0,0,6,0">
+                <TextBox Grid.Column="1" Classes="mono synkey" MinWidth="70" VerticalAlignment="Center" Text="{Binding PublicKeyFull}" IsReadOnly="True" ToolTip.Tip="{Binding PublicKeyFull}" Margin="0,0,6,0">
                   <TextBox.InnerRightContent>
                     <Button Classes="icon" Command="{Binding CopyPublicKeyCommand}" ToolTip.Tip="Copy full public key">
                       <TextBlock Classes="glyph" Text="&#xE8C8;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
                     </Button>
                   </TextBox.InnerRightContent>
                 </TextBox>
-                <TextBox Grid.Column="2" Classes="mono" MinWidth="70" Text="{Binding PrivateKeyEdit}" Watermark="private key" Margin="0,0,6,0">
+                <TextBox Grid.Column="2" Classes="mono" MinWidth="70" VerticalAlignment="Center" Text="{Binding PrivateKeyEdit}" Watermark="private key" Margin="0,0,6,0">
                   <TextBox.InnerRightContent>
                     <Button Classes="icon" Command="{Binding GenerateKeyCommand}" IsVisible="{Binding CanGenerate}"
                             ToolTip.Tip="Generate a keypair">
