@@ -4,7 +4,7 @@
         x:Class="SplitGuard.Views.MainWindow"
         Title="SplitGuard"
         Icon="avares://SplitGuard/Assets/app.ico"
-        Width="820" Height="700"
+        Width="520" Height="700"
         MinWidth="520" MinHeight="420"
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaChromeHints="PreferSystemChrome"
@@ -17,28 +17,16 @@
       <DockPanel>
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
           <Button Classes="hdr" Name="ThemeButton" Click="OnThemeClick" ToolTip.Tip="Theme">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <TextBlock Classes="glyph" Text="&#xE771;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
-              <TextBlock Name="ThemeLabel" FontSize="{DynamicResource Fs115}" Opacity="0.75" VerticalAlignment="Center" />
-            </StackPanel>
+            <TextBlock Classes="glyph" Text="&#xE771;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
           </Button>
           <Button Classes="hdr" Name="AccentButton" Click="OnAccentClick" ToolTip.Tip="Accent color">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <Ellipse Width="11" Height="11" Fill="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
-              <TextBlock Name="AccentLabel" FontSize="{DynamicResource Fs115}" Opacity="0.75" VerticalAlignment="Center" />
-            </StackPanel>
+            <Ellipse Width="11" Height="11" Fill="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
           </Button>
           <Button Classes="hdr" Name="FontButton" Click="OnFontClick" ToolTip.Tip="UI font">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <TextBlock Classes="glyph" Text="&#xE8D2;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
-              <TextBlock Name="FontLabel" FontSize="{DynamicResource Fs115}" Opacity="0.75" VerticalAlignment="Center" />
-            </StackPanel>
+            <TextBlock Classes="glyph" Text="&#xE8D2;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
           </Button>
           <Button Classes="hdr" Name="ZoomButton" Click="OnZoomClick" ToolTip.Tip="Zoom">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <TextBlock Classes="glyph" Text="&#xE71E;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
-              <TextBlock Name="ZoomLabel" FontSize="{DynamicResource Fs115}" Opacity="0.75" VerticalAlignment="Center" />
-            </StackPanel>
+            <TextBlock Classes="glyph" Text="&#xE71E;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
           </Button>
         </StackPanel>
         <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
@@ -92,7 +80,7 @@
       <TextBlock Text="{Binding StatusText}" Classes="oktext" Classes.errtext="{Binding !StatusOk}" />
     </Border>
 
-    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Hidden">
       <StackPanel Margin="14,8,14,12">
         <ItemsControl ItemsSource="{Binding Tunnels}">
           <ItemsControl.ItemTemplate>

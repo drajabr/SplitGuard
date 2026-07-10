@@ -48,7 +48,7 @@ public class TunnelViewModel : ObservableObject
         InitCommands();
         Name = external.AdapterName;
         var peer = new PeerViewModel(this) { Dns = external.Dns ?? "" };
-        PeerViewModel.Fill(peer.Domains, external.Domains);
+        PeerViewModel.FillDomains(peer.Domains, external.Domains);
         Peers.Add(peer);
     }
 
@@ -63,7 +63,7 @@ public class TunnelViewModel : ObservableObject
         foreach (var role in custom.Roles)
         {
             var peer = new PeerViewModel(this) { PublicKey = role.Id, Dns = role.Dns ?? "" };
-            PeerViewModel.Fill(peer.Domains, role.Domains);
+            PeerViewModel.FillDomains(peer.Domains, role.Domains);
             Peers.Add(peer);
         }
     }
@@ -79,7 +79,6 @@ public class TunnelViewModel : ObservableObject
         AddAddressCommand = new RelayCommand(AddAddress);
         RemoveAddressCommand = new RelayCommand(p => Addresses.Remove((string)p!));
         GenerateKeyCommand = new RelayCommand(GenerateKey);
-        ClearListenPortCommand = new RelayCommand(() => ListenPortText = "");
         ToggleTextModeCommand = new RelayCommand(ToggleTextMode);
     }
 
@@ -108,7 +107,7 @@ public class TunnelViewModel : ObservableObject
                 MetricText = p.Metric != 0 ? p.Metric.ToString() : "",
             };
             PeerViewModel.Fill(vm.AllowedIps, p.AllowedIps.Select(WireGuardConf.NormalizeCidr));
-            PeerViewModel.Fill(vm.Domains, p.Domains);
+            PeerViewModel.FillDomains(vm.Domains, p.Domains);
             Peers.Add(vm);
         }
         RefreshPublicKey();
@@ -274,9 +273,8 @@ public class TunnelViewModel : ObservableObject
         }
     }
 
-    // Collapsed: show our own listen port (peer endpoints are ambiguous with many peers).
-    public string CollapsedSummary =>
-        ListenPortText.Trim().Length > 0 ? $"listen :{ListenPortText.Trim()}" : "";
+    // Collapsed: our address(es) sit right next to the tunnel name, no label.
+    public string CollapsedSummary => string.Join(", ", AddressValues);
 
     // Collapsed detail tokens (built + syntax-colored in the view).
     public IEnumerable<string> AllDomains => Peers.SelectMany(p => p.DomainValues).Distinct();
@@ -336,7 +334,7 @@ public class TunnelViewModel : ObservableObject
         set { if (Set(ref _deleteArmed, value)) Raise(nameof(DeleteLabel)); }
     }
 
-    public string DeleteLabel => DeleteArmed ? "Delete?" : "Delete";
+    public string DeleteLabel => DeleteArmed ? "Delete tunnel?" : "Delete tunnel";
 
     int _armVersion;
 
@@ -377,7 +375,6 @@ public class TunnelViewModel : ObservableObject
     public RelayCommand AddAddressCommand { get; private set; } = null!;
     public RelayCommand RemoveAddressCommand { get; private set; } = null!;
     public RelayCommand GenerateKeyCommand { get; private set; } = null!;
-    public RelayCommand ClearListenPortCommand { get; private set; } = null!;
     public RelayCommand ToggleTextModeCommand { get; private set; } = null!;
 
     // Raw-config editing (Ctrl+E): the whole staged tunnel as wg-quick text,
@@ -456,7 +453,7 @@ public class TunnelViewModel : ObservableObject
                 IsEditing = true,
             };
             PeerViewModel.Fill(vm.AllowedIps, p.AllowedIps);
-            PeerViewModel.Fill(vm.Domains, p.Domains);
+            PeerViewModel.FillDomains(vm.Domains, p.Domains);
             Peers.Add(vm);
         }
         // A tunnel with no peers can't be represented; keep one empty peer to edit.
@@ -513,7 +510,7 @@ public class TunnelViewModel : ObservableObject
         if (IsExternal)
         {
             Peers[0].Dns = External!.Dns ?? "";
-            PeerViewModel.Fill(Peers[0].Domains, External.Domains);
+            PeerViewModel.FillDomains(Peers[0].Domains, External.Domains);
         }
         else if (IsCustom)
         {
@@ -532,7 +529,7 @@ public class TunnelViewModel : ObservableObject
         foreach (var role in Custom.Roles)
         {
             var peer = new PeerViewModel(this) { PublicKey = role.Id, Dns = role.Dns ?? "" };
-            PeerViewModel.Fill(peer.Domains, role.Domains);
+            PeerViewModel.FillDomains(peer.Domains, role.Domains);
             Peers.Add(peer);
         }
     }

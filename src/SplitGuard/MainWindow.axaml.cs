@@ -146,7 +146,7 @@ public partial class MainWindow : Window, IDialogs
     {
         var (name, family) = FontSteps[_fontIndex];
         FontFamily = new FontFamily(family);
-        FontLabel.Text = name;
+        ToolTip.SetTip(FontButton, $"UI font: {name}");
     }
 
     void ApplyZoom()
@@ -155,7 +155,7 @@ public partial class MainWindow : Window, IDialogs
         var resources = Avalonia.Application.Current!.Resources;
         foreach (var (key, baseValue) in ZoomResources)
             resources[key] = baseValue * scale;
-        ZoomLabel.Text = name;
+        ToolTip.SetTip(ZoomButton, $"Zoom: {name}");
     }
 
     // Surface theme: page + card/chip fills + borders + text contrast.
@@ -173,7 +173,7 @@ public partial class MainWindow : Window, IDialogs
         resources["DimOpacity"] = t.Dim;
         resources["HairlineBrush"] = new SolidColorBrush(Color.FromArgb(t.Hair, 0x80, 0x80, 0x80));
         resources["FieldBorderBrush"] = new SolidColorBrush(Color.FromArgb(t.Field, 0x80, 0x80, 0x80));
-        ThemeLabel.Text = t.Name;
+        ToolTip.SetTip(ThemeButton, $"Theme: {t.Name}");
         ApplyAccent(); // re-resolve so a "mono" accent flips with the theme
     }
 
@@ -215,7 +215,7 @@ public partial class MainWindow : Window, IDialogs
         LogoImage.Source = icons.Logo;
         if (Avalonia.Application.Current is App app)
             app.SetAccentIcons(icons.Idle, icons.Active);
-        AccentLabel.Text = name;
+        ToolTip.SetTip(AccentButton, $"Accent: {name}");
 
         // Save a branded PNG and register it as the toast-notification app icon/name.
         try

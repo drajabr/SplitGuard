@@ -6,39 +6,37 @@
              x:Class="SplitGuard.Views.PeerBlock">
   <Border Classes="peerblock" Margin="12,0,12,6">
     <StackPanel>
-      <!-- Header (always visible): name · endpoint · live badges, with metric and the
-           expand/collapse chevron docked to the upper-right corner. -->
-      <DockPanel Margin="10,5,12,3">
+      <!-- Header (always visible; clicking its empty space toggles the body, like the
+           tunnel card): name · endpoint, live badges + metric on the right. The endpoint
+           is a starred column so it shrinks instead of ever wrapping to a second line. -->
+      <DockPanel Name="HeaderRow" Background="Transparent" Margin="10,5,12,3">
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-          <TextBlock Classes="lbl" Text="Metric" IsVisible="{Binding ShowWgFields}"
-                     ToolTip.Tip="Failover rank (0-10) when allowed IPs overlap another peer's — lower wins; peers in the same route group must use distinct values. Enabled only while an overlap exists." />
-          <TextBox Classes="mono num" Width="26" Text="{Binding MetricText}" Watermark="0" IsEnabled="{Binding MetricEnabled}" IsVisible="{Binding ShowWgFields}" />
-          <Button Classes="link danger" Content="Remove peer" Command="{Binding RemovePeerCommand}" IsVisible="{Binding IsEditing}" FontSize="{DynamicResource Fs115}" Margin="4,0,0,0" />
-          <Button Classes="icon" Command="{Binding ToggleExpandCommand}" ToolTip.Tip="Expand / collapse this peer">
-            <Panel>
-              <TextBlock Classes="glyph" Text="&#xE70E;" FontSize="{DynamicResource Fs11}" Opacity="0.6" IsVisible="{Binding IsExpanded}" />
-              <TextBlock Classes="glyph" Text="&#xE70D;" FontSize="{DynamicResource Fs11}" Opacity="0.6" IsVisible="{Binding !IsExpanded}" />
-            </Panel>
-          </Button>
-        </StackPanel>
-        <WrapPanel VerticalAlignment="Center">
-          <TextBlock Classes="accentfg" FontSize="{DynamicResource Fs115}" FontWeight="Medium" VerticalAlignment="Center" Text="{Binding BlockTitle}" IsVisible="{Binding IsDnsOnly}" Margin="0,0,8,4" />
-          <TextBox Classes="plainname" MinWidth="80" Text="{Binding Name}" Watermark="Peer" IsVisible="{Binding ShowWgFields}" Margin="0,0,8,4"
-                   Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold" FontSize="{DynamicResource Fs17}" VerticalAlignment="Center" />
-          <TextBox Classes="mono" Width="240" Text="{Binding Endpoint}" Watermark="host:port" IsVisible="{Binding ShowWgFields}" Margin="0,0,8,4" VerticalAlignment="Center" />
-          <Border Classes="rolebadge" Margin="0,0,6,4" Classes.active="{Binding FailoverRole, Converter={x:Static views:Syntax.IsActive}}"
+          <Border Classes="rolebadge" Classes.active="{Binding FailoverRole, Converter={x:Static views:Syntax.IsActive}}"
                   IsVisible="{Binding FailoverRole, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
             <TextBlock FontSize="{DynamicResource Fs11}" Text="{Binding FailoverRole}" />
           </Border>
-          <TextBlock Classes="muted" Text="{Binding PingText}" Margin="0,0,6,4"
+          <TextBlock Classes="muted" Text="{Binding PingText}"
                      IsVisible="{Binding PingText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-          <TextBlock Classes="muted" Text="{Binding HandshakeText}" Margin="0,0,0,4" IsVisible="{Binding ShowHandshake}" />
-        </WrapPanel>
+          <TextBlock Classes="muted" Text="{Binding HandshakeText}" IsVisible="{Binding ShowHandshake}" />
+          <TextBlock Classes="lbl" Text="Metric" IsVisible="{Binding ShowWgFields}"
+                     ToolTip.Tip="Failover rank (0-10) when allowed IPs overlap another peer's — lower wins; peers in the same route group must use distinct values. Enabled only while an overlap exists." />
+          <TextBox Classes="mono num" Width="26" Text="{Binding MetricText}" Watermark="0" IsEnabled="{Binding MetricEnabled}" IsVisible="{Binding ShowWgFields}" />
+        </StackPanel>
+        <Grid ColumnDefinitions="Auto,*" VerticalAlignment="Center">
+          <TextBlock Grid.Column="0" Classes="accentfg" FontSize="{DynamicResource Fs115}" FontWeight="Medium" VerticalAlignment="Center"
+                     Text="{Binding BlockTitle}" IsVisible="{Binding IsDnsOnly}" Margin="0,0,8,0" />
+          <TextBox Grid.Column="0" Classes="plainname" MinWidth="70" MaxWidth="170" Text="{Binding Name}" Watermark="Peer"
+                   IsVisible="{Binding ShowWgFields}" Margin="0,0,8,0"
+                   Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold" FontSize="{DynamicResource Fs17}" VerticalAlignment="Center" />
+          <TextBox Grid.Column="1" Classes="mono" MinWidth="90" MaxWidth="280" HorizontalAlignment="Left"
+                   Text="{Binding Endpoint}" Watermark="host:port" IsVisible="{Binding ShowWgFields}"
+                   Margin="0,0,8,0" VerticalAlignment="Center" />
+        </Grid>
       </DockPanel>
 
       <StackPanel IsVisible="{Binding IsExpanded}">
         <Separator />
-        <Grid Margin="10,6,12,6" ColumnDefinitions="80,*" RowDefinitions="Auto,Auto,Auto,Auto">
+        <Grid Margin="10,6,12,0" ColumnDefinitions="80,*" RowDefinitions="Auto,Auto,Auto,Auto">
 
           <TextBlock Grid.Row="0" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Keys" IsVisible="{Binding ShowWgFields}" Margin="0,5,10,4" />
           <Grid Grid.Row="0" Grid.Column="1" ColumnDefinitions="*,*,Auto,34" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
@@ -51,7 +49,7 @@
 
           <TextBlock Grid.Row="1" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Ping" IsVisible="{Binding ShowWgFields}" Margin="0,5,10,4"
                      ToolTip.Tip="In-tunnel IP probed once per keepalive period. When set, it decides failover health; without it, handshake freshness decides." />
-          <Grid Grid.Row="1" Grid.Column="1" ColumnDefinitions="*,Auto,17,Auto,17,Auto,17,Auto" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
+          <Grid Grid.Row="1" Grid.Column="1" ColumnDefinitions="*,Auto,34,Auto,34,Auto,34,Auto" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
             <TextBox Grid.Column="0" Classes="mono" MinWidth="60" Text="{Binding PingHostText}" Watermark="host to ping" />
             <TextBlock Grid.Column="1" Classes="lbl" Text="down" Margin="10,0,4,0" ToolTip.Tip="Consecutive ping failures that mark this peer down (1-100, default 3)" />
             <TextBox Grid.Column="2" Classes="mono num" Text="{Binding PingDownText}" Watermark="3" />
@@ -94,49 +92,57 @@
             </ItemsControl.DataTemplates>
           </ItemsControl>
 
+          <!-- DNS + domains flow as one line: the DNS box is the first wrap item, chips
+               fill the rest of the line and only the overflow wraps below. -->
           <TextBlock Grid.Row="3" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="DNS" Margin="0,5,10,0" />
-          <WrapPanel Grid.Row="3" Grid.Column="1">
-            <TextBox Classes="mono" Width="150" VerticalAlignment="Top" Text="{Binding Dns}" Watermark="optional" Margin="0,0,8,4">
-              <TextBox.InnerRightContent>
-                <Button Classes="icon" Command="{Binding TogglePinCommand}" IsEnabled="{Binding PinEnabled}"
-                        ToolTip.Tip="Pin this server as the device-wide DNS (with automatic fallback)">
-                  <Panel>
-                    <TextBlock Classes="glyph pinicon" Text="&#xE718;" IsVisible="{Binding !IsPinned}" />
-                    <TextBlock Classes="glyph pinicon pinned" Classes.suspended="{Binding PinSuspended}"
-                               Text="&#xE842;" IsVisible="{Binding IsPinned}" />
-                  </Panel>
-                </Button>
-              </TextBox.InnerRightContent>
-            </TextBox>
-            <ItemsControl ItemsSource="{Binding Domains}" VerticalAlignment="Top">
-              <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
-              </ItemsControl.ItemsPanel>
-              <ItemsControl.DataTemplates>
-                <DataTemplate DataType="sys:String">
-                  <Border Classes="item" Margin="0,0,6,4">
-                    <DockPanel>
-                      <Button Classes="chipx" DockPanel.Dock="Right" VerticalAlignment="Center" Margin="6,0,0,0"
-                              Command="{Binding $parent[ItemsControl].DataContext.RemoveDomainCommand}" CommandParameter="{Binding}">
-                        <TextBlock Classes="glyph" Text="&#xE711;" FontSize="{DynamicResource Fs9}" Opacity="0.6" />
-                      </Button>
-                      <TextBlock Classes="mono syndomain" TextWrapping="Wrap" VerticalAlignment="Center" Text="{Binding}" />
-                    </DockPanel>
-                  </Border>
-                </DataTemplate>
-                <DataTemplate DataType="vm:AddSlot">
-                  <TextBox Classes="mono addbox" MinWidth="94" Margin="0,0,6,4" Watermark="Add domain"
-                           Classes.error="{Binding $parent[ItemsControl].DataContext.DomainAddError}"
-                           Text="{Binding $parent[ItemsControl].DataContext.NewDomain}">
-                    <TextBox.KeyBindings>
-                      <KeyBinding Gesture="Enter" Command="{Binding $parent[ItemsControl].DataContext.AddDomainCommand}" />
-                    </TextBox.KeyBindings>
-                  </TextBox>
-                </DataTemplate>
-              </ItemsControl.DataTemplates>
-            </ItemsControl>
-          </WrapPanel>
+          <ItemsControl Grid.Row="3" Grid.Column="1" ItemsSource="{Binding Domains}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.DataTemplates>
+              <DataTemplate DataType="vm:DnsSlot">
+                <TextBox Classes="mono" Width="150" Margin="0,0,8,4"
+                         Text="{Binding $parent[ItemsControl].DataContext.Dns}" Watermark="optional">
+                  <TextBox.InnerRightContent>
+                    <Button Classes="icon" Command="{Binding $parent[ItemsControl].DataContext.TogglePinCommand}"
+                            IsEnabled="{Binding $parent[ItemsControl].DataContext.PinEnabled}"
+                            ToolTip.Tip="Pin this server as the device-wide DNS (with automatic fallback)">
+                      <Panel>
+                        <TextBlock Classes="glyph pinicon" Text="&#xE718;"
+                                   IsVisible="{Binding $parent[ItemsControl].DataContext.IsPinned, Converter={x:Static views:Syntax.Not}}" />
+                        <TextBlock Classes="glyph pinicon pinned" Classes.suspended="{Binding $parent[ItemsControl].DataContext.PinSuspended}"
+                                   Text="&#xE842;" IsVisible="{Binding $parent[ItemsControl].DataContext.IsPinned}" />
+                      </Panel>
+                    </Button>
+                  </TextBox.InnerRightContent>
+                </TextBox>
+              </DataTemplate>
+              <DataTemplate DataType="sys:String">
+                <Border Classes="item" Margin="0,0,6,4">
+                  <DockPanel>
+                    <Button Classes="chipx" DockPanel.Dock="Right" VerticalAlignment="Center" Margin="6,0,0,0"
+                            Command="{Binding $parent[ItemsControl].DataContext.RemoveDomainCommand}" CommandParameter="{Binding}">
+                      <TextBlock Classes="glyph" Text="&#xE711;" FontSize="{DynamicResource Fs9}" Opacity="0.6" />
+                    </Button>
+                    <TextBlock Classes="mono syndomain" TextWrapping="Wrap" VerticalAlignment="Center" Text="{Binding}" />
+                  </DockPanel>
+                </Border>
+              </DataTemplate>
+              <DataTemplate DataType="vm:AddSlot">
+                <TextBox Classes="mono addbox" MinWidth="94" Margin="0,0,6,4" Watermark="Add domain"
+                         Classes.error="{Binding $parent[ItemsControl].DataContext.DomainAddError}"
+                         Text="{Binding $parent[ItemsControl].DataContext.NewDomain}">
+                  <TextBox.KeyBindings>
+                    <KeyBinding Gesture="Enter" Command="{Binding $parent[ItemsControl].DataContext.AddDomainCommand}" />
+                  </TextBox.KeyBindings>
+                </TextBox>
+              </DataTemplate>
+            </ItemsControl.DataTemplates>
+          </ItemsControl>
         </Grid>
+
+        <Button Classes="link danger" Content="Remove peer" Command="{Binding RemovePeerCommand}"
+                HorizontalAlignment="Right" Margin="0,0,12,6" FontSize="{DynamicResource Fs115}" />
       </StackPanel>
     </StackPanel>
   </Border>

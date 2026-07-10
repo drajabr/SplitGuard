@@ -93,6 +93,10 @@ public partial class TunnelCard : UserControl
         DetailPanel.SizeChanged += OnBodyContentSizeChanged;
         ExpandContent.SizeChanged += OnBodyContentSizeChanged;
 
+        // The interface line adapts: address chips sit beside the keys while they fit,
+        // else they drop to a second line as a whole and the keys stretch.
+        IfaceGrid.SizeChanged += (_, _) => UpdateInterfaceLayout();
+
         // Fade a card in the first time it appears; fade + collapse it on removal.
         ClipToBounds = true;
         Opacity = 0;
@@ -145,11 +149,50 @@ public partial class TunnelCard : UserControl
             ApplyCardAccent();
         if (e.PropertyName == nameof(TunnelViewModel.IsEditing) && _vm is not null)
         {
-            ExpandContent.IsVisible = _vm.IsEditing;
-            DetailPanel.IsVisible = !_vm.IsEditing;
-            TweenBodyToContent();
+            SwapBody(_vm.IsEditing);
             if (_vm.IsEditing) ScrollSelfIntoView(); // starts now, in sync with the expand
         }
+    }
+
+    // Crossfade the two body panes while the height tween runs, so content fades
+    // between states instead of popping in and out at full opacity.
+    void SwapBody(bool editing)
+    {
+        var show = editing ? (Control)ExpandContent : DetailPanel;
+        var hide = editing ? (Control)DetailPanel : ExpandContent;
+        var gen = ++_animGen;
+        var from = Body.Bounds.Height;
+        show.Opacity = 0;
+        show.IsVisible = true;
+        var w = Body.Bounds.Width;
+        if (w < 1) w = 400;
+        var to = NaturalHeight(show, w);
+        if (to < 1 || from < 1)
+        {
+            hide.IsVisible = false;
+            hide.Opacity = 1;
+            show.Opacity = 1;
+            Body.Height = double.NaN;
+            return;
+        }
+        Body.Height = from;
+        var span = to - from;
+        Tween(from, to, AnimMs, v =>
+        {
+            if (_animGen != gen) return;
+            Body.Height = v;
+            var p = Math.Abs(span) < 0.5 ? 1 : Math.Clamp((v - from) / span, 0, 1);
+            show.Opacity = p;
+            hide.Opacity = 1 - p;
+        }, () =>
+        {
+            if (_animGen != gen) return;
+            hide.IsVisible = false;
+            hide.Opacity = 1;
+            show.Opacity = 1;
+            Body.Height = double.NaN;
+            _postTween.Restart();
+        });
     }
 
     // Simple CubicEaseOut tween driven by a timer — reliable for any target (transforms,
@@ -263,7 +306,36 @@ public partial class TunnelCard : UserControl
     void OnContentChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         if (_vm?.IsEditing == true) TweenBodyToContent();
+        UpdateInterfaceLayout();
     }
+
+    // Address chips inline (column 3, sized to content) while the whole line fits;
+    // otherwise they move below spanning the full width and the key boxes stretch.
+    void UpdateInterfaceLayout()
+    {
+        if (IfaceGrid.Bounds.Width < 1) return;
+        AddrList.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        var addrW = AddrList.DesiredSize.Width;
+        var narrow = IfaceGrid.Bounds.Width < 70 + 260 + addrW + 24; // title + comfortable keys + chips + slack
+        if (narrow)
+        {
+            Grid.SetRow(AddrList, 1);
+            Grid.SetColumn(AddrList, 0);
+            Grid.SetColumnSpan(AddrList, 4);
+            AddrList.Margin = new Thickness(0, 6, 0, 0);
+        }
+        else
+        {
+            Grid.SetRow(AddrList, 0);
+            Grid.SetColumn(AddrList, 3);
+            Grid.SetColumnSpan(AddrList, 1);
+            AddrList.Margin = new Thickness(2, 0, 0, 0);
+        }
+    }
+
+    // A driven tween measures its target before release; the post-release layout can
+    // differ by a hair, and re-animating that correction reads as an overshoot bounce.
+    readonly Stopwatch _postTween = new();
 
     // Only reacts while the body is in auto mode: a non-NaN Height means an animation is
     // already driving it (and re-triggering off its own frames would loop). The first
@@ -272,6 +344,7 @@ public partial class TunnelCard : UserControl
     {
         if (sender is Control { IsVisible: false }) return;
         if (!double.IsNaN(Body.Height)) return;
+        if (_postTween.IsRunning && _postTween.ElapsedMilliseconds < 150) return;
         if (e.PreviousSize.Height < 0.5) return;
         if (Math.Abs(e.NewSize.Height - e.PreviousSize.Height) < 0.5) return;
         TweenBodyToContent(e.PreviousSize.Height);
@@ -312,7 +385,12 @@ public partial class TunnelCard : UserControl
         Body.Height = from;
         Tween(from, to, AnimMs,
             v => { if (_animGen == gen) Body.Height = v; },
-            () => { if (_animGen == gen) Body.Height = double.NaN; }); // back to auto
+            () =>
+            {
+                if (_animGen != gen) return;
+                Body.Height = double.NaN; // back to auto
+                _postTween.Restart();
+            });
     }
 
     // Syntax-colored collapsed detail as atomic tokens in a WrapPanel: addresses in
@@ -339,8 +417,8 @@ public partial class TunnelCard : UserControl
             return tb;
         }
 
-        // One row: an optional left label + left value, and a right-aligned value.
-        void AddRow(string leftLabel, string left, IBrush leftBrush, string right, IBrush rightBrush)
+        // One row: left content (control), and an optional right-aligned value.
+        void AddRow(Control? leftContent, string right, IBrush rightBrush)
         {
             var row = new DockPanel { Margin = new Avalonia.Thickness(0, 0, 0, 2) };
             if (right.Length > 0)
@@ -351,27 +429,47 @@ public partial class TunnelCard : UserControl
                 DockPanel.SetDock(r, Dock.Right);
                 row.Children.Add(r);
             }
-            if (leftLabel.Length > 0) row.Children.Add(Label(leftLabel));
-            if (left.Length > 0) row.Children.Add(Mono(left, leftBrush));
+            if (leftContent is not null) row.Children.Add(leftContent);
             DetailPanel.Children.Add(row);
         }
 
-        // Line 1: our address(es) on the left, all peers' allowed IPs on the right.
-        var ourIps = string.Join(", ", _vm.AddressValues);
-        var allowed = string.Join(", ", _vm.Peers.SelectMany(p => p.AllowedIpValues).Distinct());
-        if (ourIps.Length > 0 || allowed.Length > 0) AddRow("Address", ourIps, Syntax.IpBrush, allowed, Syntax.IpBrush);
-
-        // Then one line per peer that defines a DNS server and/or domains:
-        //   "DNS" + server on the left, the domains it resolves right-aligned.
-        foreach (var p in _vm.Peers)
+        StackPanel Left(params Control[] items)
         {
+            var sp = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 6 };
+            foreach (var i in items) sp.Children.Add(i);
+            return sp;
+        }
+
+        // One block per peer: name + status on the left, its allowed IPs on the right;
+        // a second line with DNS on the left and the domains it resolves on the right.
+        for (int i = 0; i < _vm.Peers.Count; i++)
+        {
+            var p = _vm.Peers[i];
+            if (!_vm.IsExternal && !_vm.IsCustom)
+            {
+                var name = new TextBlock
+                {
+                    Text = string.IsNullOrWhiteSpace(p.Name)
+                        ? (_vm.Peers.Count > 1 ? $"peer {i + 1}" : "peer")
+                        : p.Name.Trim(),
+                };
+                name.Classes.Add("mono");
+                name.Classes.Add("accentfg");
+                var items = new List<Control> { name };
+                if (!string.IsNullOrEmpty(p.FailoverRole)) items.Add(Label(p.FailoverRole));
+                if (!string.IsNullOrEmpty(p.PingText)) items.Add(Label(p.PingText));
+                AddRow(Left(items.ToArray()), string.Join(", ", p.AllowedIpValues), Syntax.IpBrush);
+            }
             var domains = string.Join(", ", p.DomainValues);
-            if (!p.HasDns && domains.Length == 0) continue;
-            AddRow(p.HasDns ? "DNS" : "", p.HasDns ? p.Dns.Trim() : "", Syntax.IpBrush, domains, Syntax.DomainBrush);
+            if (p.HasDns || domains.Length > 0)
+            {
+                Control? left = p.HasDns ? Left(Label("DNS"), Mono(p.Dns.Trim(), Syntax.IpBrush)) : null;
+                AddRow(left, domains, Syntax.DomainBrush);
+            }
         }
 
         if (DetailPanel.Children.Count == 0)
-            AddRow("", "no split DNS configured", Syntax.IpBrush, "", Syntax.IpBrush);
+            AddRow(Mono("no peers configured", Syntax.IpBrush), "", Syntax.IpBrush);
     }
 
     // Collapsed: a click anywhere on the card expands it. Expanded: only a click on

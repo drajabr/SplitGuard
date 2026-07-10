@@ -33,4 +33,6 @@ public static class Syntax
 
     // Failover role badge: highlights the "active" member of an overlap group.
     public static readonly IValueConverter IsActive = new FuncValueConverter<string?, bool>(s => s == "active");
+
+    public static readonly IValueConverter Not = new FuncValueConverter<bool, bool>(b => !b);
 }

@@ -12,6 +12,7 @@ public partial class PeerViewModel : ObservableObject
     {
         _tunnel = tunnel;
         AllowedIps.Add(new AddSlot());
+        Domains.Add(new DnsSlot());
         Domains.Add(new AddSlot());
         AddDomainCommand = new RelayCommand(AddDomain);
         RemoveDomainCommand = new RelayCommand(p => RemoveDomain((string)p!));
@@ -19,15 +20,13 @@ public partial class PeerViewModel : ObservableObject
         RemoveAllowedIpCommand = new RelayCommand(p => AllowedIps.Remove((string)p!));
         TogglePinCommand = new RelayCommand(() => _tunnel.Host.TogglePin(_tunnel, this));
         RemovePeerCommand = new RelayCommand(() => _tunnel.RemovePeer(this));
-        ToggleExpandCommand = new RelayCommand(() => IsExpanded = !IsExpanded);
         AllowedIps.CollectionChanged += (_, _) => Raise(nameof(MetricEnabled));
     }
 
-    // Each peer body collapses to its header line, like the tunnel card itself.
+    // Each peer body collapses to its header line (clicking the header toggles it,
+    // like the tunnel card itself).
     bool _isExpanded = true;
     public bool IsExpanded { get => _isExpanded; set => Set(ref _isExpanded, value); }
-
-    public RelayCommand ToggleExpandCommand { get; }
 
     // Optional friendly name, editable in the header like the tunnel's own name.
     string _name = "";
@@ -116,6 +115,15 @@ public partial class PeerViewModel : ObservableObject
     public static void Fill(ObservableCollection<object> list, IEnumerable<string> values)
     {
         list.Clear();
+        foreach (var v in values) list.Add(v);
+        list.Add(new AddSlot());
+    }
+
+    // The domains list leads with the inline DNS box so chips flow around it.
+    public static void FillDomains(ObservableCollection<object> list, IEnumerable<string> values)
+    {
+        list.Clear();
+        list.Add(new DnsSlot());
         foreach (var v in values) list.Add(v);
         list.Add(new AddSlot());
     }

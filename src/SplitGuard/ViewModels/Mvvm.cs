@@ -44,6 +44,10 @@ public class RelayCommand : ICommand
 // so it wraps together with the chips instead of overflowing.
 public sealed class AddSlot { }
 
+// Sentinel item rendered as the DNS input at the head of the domains chip list, so
+// domain chips flow beside the DNS box and wrap naturally when the line fills.
+public sealed class DnsSlot { }
+
 public static class Format
 {
     public static string Rate(double bytesPerSecond) => bytesPerSecond switch
