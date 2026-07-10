@@ -680,6 +680,9 @@ public class TunnelViewModel : ObservableObject
             if (!stats.PerPeer.TryGetValue(peer.PublicKey, out var s)) continue;
             up += s.UpBps;
             down += s.DownBps;
+            peer.HasStats = true;
+            peer.TxTotalText = Format.Bytes(s.TotalTx);
+            peer.RxTotalText = Format.Bytes(s.TotalRx);
             if (s.Handshake is not null && (newest is null || s.Handshake > newest)) newest = s.Handshake;
             peer.HandshakeText = Format.Ago(s.Handshake);
             peer.PingText = s.PingOk switch

@@ -154,45 +154,35 @@ public partial class TunnelCard : UserControl
         }
     }
 
-    // Crossfade the two body panes while the height tween runs, so content fades
-    // between states instead of popping in and out at full opacity.
+    // Swap the visible body pane and animate the card height to the new content. Only the
+    // target pane is ever visible, so the growing/shrinking clip reveals it cleanly — no
+    // opacity crossfade (which glitched when the target's measured height changed mid-run).
     void SwapBody(bool editing)
     {
         var show = editing ? (Control)ExpandContent : DetailPanel;
         var hide = editing ? (Control)DetailPanel : ExpandContent;
         var gen = ++_animGen;
         var from = Body.Bounds.Height;
-        show.Opacity = 0;
+        hide.IsVisible = false;
         show.IsVisible = true;
+        show.Opacity = 1;
         var w = Body.Bounds.Width;
         if (w < 1) w = 400;
         var to = NaturalHeight(show, w);
-        if (to < 1 || from < 1)
+        if (to < 1 || from < 1 || Math.Abs(to - from) < 0.5)
         {
-            hide.IsVisible = false;
-            hide.Opacity = 1;
-            show.Opacity = 1;
             Body.Height = double.NaN;
             return;
         }
         Body.Height = from;
-        var span = to - from;
-        Tween(from, to, AnimMs, v =>
-        {
-            if (_animGen != gen) return;
-            Body.Height = v;
-            var p = Math.Abs(span) < 0.5 ? 1 : Math.Clamp((v - from) / span, 0, 1);
-            show.Opacity = p;
-            hide.Opacity = 1 - p;
-        }, () =>
-        {
-            if (_animGen != gen) return;
-            hide.IsVisible = false;
-            hide.Opacity = 1;
-            show.Opacity = 1;
-            Body.Height = double.NaN;
-            _postTween.Restart();
-        });
+        Tween(from, to, AnimMs,
+            v => { if (_animGen == gen) Body.Height = v; },
+            () =>
+            {
+                if (_animGen != gen) return;
+                Body.Height = double.NaN;
+                _postTween.Restart();
+            });
     }
 
     // Simple CubicEaseOut tween driven by a timer — reliable for any target (transforms,
@@ -447,6 +437,7 @@ public partial class TunnelCard : UserControl
                 name.Classes.Add("mono");
                 name.Classes.Add("accentfg");
                 var items = new List<Control> { name };
+                if (!string.IsNullOrEmpty(p.HandshakeText)) items.Add(Label(p.HandshakeText));
                 if (!string.IsNullOrEmpty(p.FailoverRole)) items.Add(Label(p.FailoverRole));
                 AddRow(Left(items.ToArray()), string.Join(", ", p.AllowedIpValues), Syntax.IpBrush);
             }
@@ -456,9 +447,13 @@ public partial class TunnelCard : UserControl
                 Control? left = p.HasDns ? Left(Label("DNS"), Mono(p.Dns.Trim(), Syntax.IpBrush)) : null;
                 AddRow(left, domains, Syntax.DomainBrush);
             }
-            // Full-width live status line for a ping-monitored peer.
-            if (p.HasPingHost && !string.IsNullOrEmpty(p.PingSummary))
-                AddRow(Mono(p.PingSummary, Syntax.IpBrush), "", Syntax.IpBrush);
+            // Live status while connected: total transfer on the left, RTT on the right.
+            if (p.HasStats)
+            {
+                var totals = $"↑ {p.TxTotalText}    ↓ {p.RxTotalText}";
+                var rtt = p.HasPingHost ? p.PingText : "";
+                AddRow(Mono(totals, Syntax.IpBrush), rtt, Syntax.IpBrush);
+            }
         }
 
         if (DetailPanel.Children.Count == 0)

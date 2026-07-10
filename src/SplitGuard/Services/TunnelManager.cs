@@ -9,7 +9,7 @@ namespace SplitGuard.Services;
 // overlap group, otherwise "active" / "standby".
 public record PeerLive(double UpBps, double DownBps, DateTime? Handshake,
     double? PingMs, bool? PingOk, bool Healthy, string? FailoverRole,
-    double? AvgPingMs, double? PingLoss);
+    double? AvgPingMs, double? PingLoss, ulong TotalTx, ulong TotalRx);
 
 public record TunnelStats(Dictionary<string, PeerLive> PerPeer);
 
@@ -59,6 +59,7 @@ public class TunnelManager : IDisposable
         public (ulong Tx, ulong Rx, DateTime At)? Previous;
         public DateTime? LastHandshake;
         public double UpBps, DownBps;
+        public ulong TotalTx, TotalRx;
 
         public double? LastPingMs;
         public bool? LastPingOk;
@@ -267,6 +268,8 @@ public class TunnelManager : IDisposable
                     rt.Previous = (s.TxBytes, s.RxBytes, now);
                     rt.UpBps = up;
                     rt.DownBps = down;
+                    rt.TotalTx = s.TxBytes;
+                    rt.TotalRx = s.RxBytes;
                     rt.LastHandshake = s.LastHandshakeUtc;
                 }
                 SchedulePings(tunnel, now);
@@ -282,7 +285,7 @@ public class TunnelManager : IDisposable
                     p => p.Key,
                     p => new PeerLive(p.UpBps, p.DownBps, p.LastHandshake,
                         p.LastPingMs, p.LastPingOk, p.Healthy, p.FailoverRole,
-                        p.AvgPingMs, p.PingLoss));
+                        p.AvgPingMs, p.PingLoss, p.TotalTx, p.TotalRx));
                 StatsUpdated?.Invoke(tunnel.Name, new TunnelStats(result));
             }
         }

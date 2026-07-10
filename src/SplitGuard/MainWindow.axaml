@@ -65,11 +65,8 @@
               <TextBlock Classes="glyph" Text="&#xE842;" FontSize="{DynamicResource Fs12}"
                          Foreground="{DynamicResource AccentBrush}" IsVisible="{Binding DnsPinned}" />
             </Panel>
-            <TextBlock Text="{Binding DnsStatus}" FontSize="{DynamicResource Fs12}" Opacity="0.85" VerticalAlignment="Center" />
-          </StackPanel>
-          <StackPanel Orientation="Horizontal" Spacing="6">
-            <TextBlock Classes="glyph" Text="&#xE896;" FontSize="{DynamicResource Fs12}" Opacity="0.55" VerticalAlignment="Center" />
-            <TextBlock Text="{Binding TunnelSummary}" FontSize="{DynamicResource Fs12}" Opacity="0.85" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding DnsStatus}" FontSize="{DynamicResource Fs12}" Opacity="0.85" VerticalAlignment="Center"
+                       Classes.accentfg="{Binding DnsPinned}" />
           </StackPanel>
         </StackPanel>
       </DockPanel>

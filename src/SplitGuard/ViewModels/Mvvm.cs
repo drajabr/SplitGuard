@@ -57,6 +57,15 @@ public static class Format
         _ => $"{bytesPerSecond:0} B/s",
     };
 
+    // Cumulative transferred bytes (per-peer Tx/Rx totals).
+    public static string Bytes(ulong b) => b switch
+    {
+        >= 1UL << 30 => $"{b / (double)(1UL << 30):0.##} GB",
+        >= 1UL << 20 => $"{b / (double)(1UL << 20):0.#} MB",
+        >= 1UL << 10 => $"{b / (double)(1UL << 10):0} KB",
+        _ => $"{b} B",
+    };
+
     public static string Ago(DateTime? utc)
     {
         if (utc is null) return "no handshake yet";

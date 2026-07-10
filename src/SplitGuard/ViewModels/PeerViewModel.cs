@@ -195,6 +195,17 @@ public partial class PeerViewModel : ObservableObject
     string _pingSummary = "";
     public string PingSummary { get => _pingSummary; set => Set(ref _pingSummary, value); }
 
+    // Cumulative transfer totals (collapsed status line, left side) and the last-handshake
+    // shown next to the peer name. HasStats gates the status line on a live connection.
+    string _txTotalText = "";
+    public string TxTotalText { get => _txTotalText; set => Set(ref _txTotalText, value); }
+
+    string _rxTotalText = "";
+    public string RxTotalText { get => _rxTotalText; set => Set(ref _rxTotalText, value); }
+
+    bool _hasStats;
+    public bool HasStats { get => _hasStats; set => Set(ref _hasStats, value); }
+
     // "active" / "standby" while this peer's allowed IPs overlap another connected peer's.
     string _failoverRole = "";
     public string FailoverRole { get => _failoverRole; set => Set(ref _failoverRole, value); }

@@ -64,12 +64,12 @@ public class MainViewModel : ObservableObject, ITunnelHost
     (bool Pinned, string Text) DnsState()
     {
         if (_config.PinnedDns is null) return (false, "System DNS");
+        // Device DNS is live only while the pinned peer's tunnel is up; otherwise the pin
+        // is suspended and resolution falls back to the system default.
         foreach (var t in Tunnels)
             foreach (var p in t.Peers.Where(p => p.HasDns))
                 if (_config.PinnedDns.TunnelName == TunnelKey(t) && _config.PinnedDns.PeerPublicKey == PeerKey(t, p))
-                    return t.IsConnected
-                        ? (true, $"Device DNS pinned · {t.Name} · {p.Dns.Trim()}")
-                        : (true, $"Pin suspended ({t.Name} off) · System DNS");
+                    return t.IsConnected ? (true, p.Dns.Trim()) : (false, "System DNS");
         return (false, "System DNS");
     }
 
@@ -166,7 +166,20 @@ public class MainViewModel : ObservableObject, ITunnelHost
         }
         else
         {
-            // UI review harness: open straight into the expanded edit layout.
+            // UI review harness: fake some live stats so the collapsed status lines render,
+            // then open the first tunnel's edit layout.
+            foreach (var t in Tunnels.Where(t => !t.IsCustom && !t.IsExternal))
+            {
+                foreach (var p in t.Peers)
+                {
+                    p.HasStats = true;
+                    p.TxTotalText = "1.24 GB";
+                    p.RxTotalText = "8.7 GB";
+                    p.HandshakeText = "handshake 14s ago";
+                    if (p.HasPingHost) p.PingText = "23 ms";
+                }
+                t.StatsTick++;
+            }
             RefreshPins();
             Tunnels.FirstOrDefault(t => !t.IsCustom && !t.IsExternal)?.BeginEditCommand.Execute(null);
         }
