@@ -28,7 +28,7 @@ public static class Netio
     }
 
     [StructLayout(LayoutKind.Explicit, Size = 104)]
-    struct MibForwardRow
+    internal struct MibForwardRow
     {
         [FieldOffset(0)] public ulong InterfaceLuid;
         [FieldOffset(8)] public uint InterfaceIndex;
@@ -99,6 +99,7 @@ public static class Netio
 
     [DllImport("iphlpapi")] static extern uint GetIpForwardEntry2(ref MibForwardRow row);
     [DllImport("iphlpapi")] static extern uint SetIpForwardEntry2(ref MibForwardRow row);
+    [DllImport("iphlpapi")] static extern uint DeleteIpForwardEntry2(ref MibForwardRow row);
 
     public static void AddAddress(ulong luid, IPAddress ip, byte prefixLength)
     {
@@ -158,13 +159,27 @@ public static class Netio
         return new IPAddress(bytes);
     }
 
+    // Opaque handle to a route created outside a tunnel adapter (on the physical
+    // interface), so the creator can delete it on disconnect — adapter teardown won't.
+    public sealed class HostRoute
+    {
+        MibForwardRow _row;
+        internal HostRoute(MibForwardRow row) => _row = row;
+        public void Delete()
+        {
+            try { DeleteIpForwardEntry2(ref _row); } catch { } // already gone: fine
+        }
+    }
+
     // Host route for the tunnel endpoint via the current best (physical) route, so
-    // full-tunnel configs don't loop tunnel traffic into the tunnel.
-    public static void AddEndpointHostRoute(IPAddress endpoint)
+    // full-tunnel configs don't loop tunnel traffic into the tunnel. Returns a handle the
+    // caller must Delete() on disconnect (the route lives on the physical adapter), or
+    // null if there was no route to pin.
+    public static HostRoute? AddEndpointHostRoute(IPAddress endpoint)
     {
         var dest = SockaddrInet.From(endpoint);
         if (GetBestRoute2(IntPtr.Zero, 0, IntPtr.Zero, ref dest, 0, out var best, out _) != 0)
-            return; // no current route to the endpoint: nothing to pin
+            return null; // no current route to the endpoint: nothing to pin
         InitializeIpForwardEntry(out var row);
         row.InterfaceLuid = best.InterfaceLuid;
         row.InterfaceIndex = best.InterfaceIndex;
@@ -175,5 +190,6 @@ public static class Netio
         var err = CreateIpForwardEntry2(ref row);
         if (err != 0 && err != 5010)
             throw new InvalidOperationException($"Endpoint host route failed (win32 {err}).");
+        return new HostRoute(row);
     }
 }

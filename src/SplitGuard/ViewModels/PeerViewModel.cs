@@ -173,7 +173,6 @@ public partial class PeerViewModel : ObservableObject
     // DNS-only rows: externals and the custom card show just DNS + Domains.
     public bool IsDnsOnly => IsExternal || IsCustom;
     public bool ShowWgFields => !IsDnsOnly;
-    public bool ShowKeysRow => !IsDnsOnly;
     public string BlockTitle => IsCustom ? "DNS rule" : "Peer";
 
     bool _isPinned;
@@ -190,10 +189,6 @@ public partial class PeerViewModel : ObservableObject
 
     string _pingText = "";
     public string PingText { get => _pingText; set => Set(ref _pingText, value); }
-
-    // Full-width status line for the collapsed view: state · last RTT · avg · loss.
-    string _pingSummary = "";
-    public string PingSummary { get => _pingSummary; set => Set(ref _pingSummary, value); }
 
     // Cumulative transfer totals (collapsed status line, left side) and the last-handshake
     // shown next to the peer name. HasStats gates the status line on a live connection.
@@ -241,41 +236,6 @@ public partial class PeerViewModel : ObservableObject
         }
         AllowedIps.Insert(AllowedIps.Count - 1, cidr);
         NewAllowedIp = "";
-    }
-
-    public string? Validate()
-    {
-        if (IsDnsOnly)
-        {
-            if (HasDns && !IPAddress.TryParse(Dns.Trim(), out _)) return $"Invalid DNS server: {Dns}";
-            foreach (var d in DomainValues)
-                if (!IsValidDomain(d)) return $"Invalid domain: {d}";
-            return null;
-        }
-        if (!IsValidKey(PublicKey)) return "Peer public key must be a valid 32-byte base64 key";
-        if (!string.IsNullOrEmpty(PresharedKey) && !IsValidKey(PresharedKey)) return "Preshared key must be a valid 32-byte base64 key";
-        if (!IsValidEndpoint(Endpoint)) return $"Endpoint must be host:port — got '{Endpoint}'";
-        if (!AllowedIpValues.Any()) return "Peer needs at least one allowed IP";
-        foreach (var cidr in AllowedIpValues)
-            if (!Models.WireGuardConf.TryParseCidr(cidr, out _, out _)) return $"Invalid allowed IP: {cidr}";
-        if (HasDns && !IPAddress.TryParse(Dns.Trim(), out _)) return $"Invalid DNS server: {Dns}";
-        if (KeepaliveText.Trim().Length > 0 && !ushort.TryParse(KeepaliveText.Trim(), out _))
-            return $"Keepalive must be seconds (0-65535) — got '{KeepaliveText}'";
-        if (PingHostText.Trim().Length > 0 && !IPAddress.TryParse(PingHostText.Trim(), out _))
-            return $"Ping host must be an IP address — got '{PingHostText}'";
-        if (PingPeriodText.Trim().Length > 0 && ParsedPingPeriod is < 1 or > 3600)
-            return $"Ping period must be 1-3600 seconds — got '{PingPeriodText}'";
-        if (PingTimeoutText.Trim().Length > 0 && ParsedPingTimeout is < 1 or > 60)
-            return $"Ping timeout must be 1-60 seconds — got '{PingTimeoutText}'";
-        if (PingDownText.Trim().Length > 0 && ParsedPingDown is < 1 or > 100)
-            return $"Ping down count must be 1-100 — got '{PingDownText}'";
-        if (PingUpText.Trim().Length > 0 && ParsedPingUp is < 1 or > 100)
-            return $"Ping up count must be 1-100 — got '{PingUpText}'";
-        if (MetricText.Trim().Length > 0 && (!int.TryParse(MetricText.Trim(), out var metric) || metric is < 0 or > 10))
-            return $"Metric must be 0-10 — got '{MetricText}'";
-        foreach (var d in DomainValues)
-            if (!IsValidDomain(d)) return $"Invalid domain: {d}";
-        return null;
     }
 
     public string? DnsRouteWarning()

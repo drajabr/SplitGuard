@@ -227,6 +227,19 @@ public class TunnelViewModel : ObservableObject
     {
         _isEstablished = false;
         _everEstablished = false;
+        // Live readouts are meaningless once the tunnel is down (or reconnecting with
+        // fresh counters); clear them so the collapsed view never shows a frozen
+        // handshake/RTT/totals as if it were current.
+        foreach (var p in Peers)
+        {
+            p.HasStats = false;
+            p.HandshakeText = "";
+            p.PingText = "";
+            p.TxTotalText = "";
+            p.RxTotalText = "";
+            p.FailoverRole = "";
+        }
+        StatsTick++; // rebuild the collapsed detail without the stale status line
     }
 
     // A connection-affecting save reconnects the tunnel: show "Connecting…" again rather
@@ -272,24 +285,8 @@ public class TunnelViewModel : ObservableObject
     // Collapsed: our address(es) sit right next to the tunnel name, no label.
     public string CollapsedSummary => string.Join(", ", AddressValues);
 
-    // Collapsed detail tokens (built + syntax-colored in the view).
-    public IEnumerable<string> AllDomains => Peers.SelectMany(p => p.DomainValues).Distinct();
-
-    public string CollapsedAllowedIps
-    {
-        get
-        {
-            var ips = Peers.SelectMany(p => p.AllowedIpValues).Distinct().ToList();
-            return ips.Count == 0 ? "" : string.Join(", ", ips.Take(3)) + (ips.Count > 3 ? $" +{ips.Count - 3}" : "");
-        }
-    }
-
     // Raised whenever collapsed-view content changes; the view rebuilds its detail row.
-    public void NotifyPresentation()
-    {
-        Raise(nameof(CollapsedSummary));
-        Raise(nameof(CollapsedAllowedIps));
-    }
+    public void NotifyPresentation() => Raise(nameof(CollapsedSummary));
 
     public bool ShowInterfaceSection => !IsExternal && !IsCustom;
     public string AddPeerLabel => IsCustom ? "+ Add DNS rule" : "+ Add peer";
@@ -692,17 +689,6 @@ public class TunnelViewModel : ObservableObject
                 _ => "",
             };
             peer.FailoverRole = s.FailoverRole ?? "";
-            // Full-width status line (collapsed view) when a ping host is set:
-            // "up · 23 ms · avg 25 ms · 0% loss".
-            if (peer.HasPingHost)
-            {
-                var parts = new List<string> { s.Healthy ? "up" : "down" };
-                parts.Add(s.PingOk == true ? $"{s.PingMs:0} ms" : "no reply");
-                if (s.AvgPingMs is { } avg) parts.Add($"avg {avg:0} ms");
-                if (s.PingLoss is { } loss) parts.Add($"{loss * 100:0}% loss");
-                peer.PingSummary = string.Join("  ·  ", parts);
-            }
-            else peer.PingSummary = "";
         }
         UpRate = Format.Rate(up);
         DownRate = Format.Rate(down);

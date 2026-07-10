@@ -51,15 +51,6 @@ public class MainViewModel : ObservableObject, ITunnelHost
 
     // ---- bottom status bar ------------------------------------------------------
 
-    public string TunnelSummary
-    {
-        get
-        {
-            var all = Tunnels.Where(t => !t.IsCustom).ToList();
-            return $"{all.Count(t => t.IsConnected)}/{all.Count} on";
-        }
-    }
-
     // Bottom-bar pin readout: which tunnel's DNS owns the device, and whether it's live.
     (bool Pinned, string Text) DnsState()
     {
@@ -78,7 +69,6 @@ public class MainViewModel : ObservableObject, ITunnelHost
 
     void NotifyStatus()
     {
-        Raise(nameof(TunnelSummary));
         Raise(nameof(DnsStatus));
         Raise(nameof(DnsPinned));
     }

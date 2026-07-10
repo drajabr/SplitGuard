@@ -90,6 +90,9 @@ public class TunnelManager : IDisposable
         // WireGuard config; peers on one adapter can't share an allowed IP, so ownership
         // moves on failover via SetConfiguration.
         public Dictionary<string, string> IntraOwner = new();
+        // Endpoint host routes pinned on the *physical* adapter (full-tunnel only); the
+        // tunnel adapter's teardown doesn't remove them, so Disconnect must.
+        public List<Netio.HostRoute> EndpointRoutes = new();
     }
 
     public TunnelManager()
@@ -192,7 +195,10 @@ public class TunnelManager : IDisposable
             }
             if (fullTunnel)
                 foreach (var ep in endpointIps)
-                    Netio.AddEndpointHostRoute(ep);
+                {
+                    if (Netio.AddEndpointHostRoute(ep) is { } route)
+                        tunnel.EndpointRoutes.Add(route);
+                }
             // Probe routes: pin each unique in-tunnel ping host to its own adapter so the
             // ping tests *this* path even while the peer is standby in a failover group
             // (otherwise the probe follows the active route and says nothing about us).
@@ -214,6 +220,7 @@ public class TunnelManager : IDisposable
         }
         catch
         {
+            foreach (var route in tunnel.EndpointRoutes) route.Delete();
             adapter.Dispose();
             throw;
         }
@@ -231,12 +238,15 @@ public class TunnelManager : IDisposable
             if (!_active.Remove(name, out tunnel)) return;
         }
         tunnel!.Adapter.Dispose(); // destroys adapter, its addresses, and its routes
+        foreach (var route in tunnel.EndpointRoutes) route.Delete(); // pinned on the physical adapter
         try { ReconcileFailover(); } catch { }
     }
 
     void Poll()
     {
         if (Interlocked.Exchange(ref _polling, 1) == 1) return; // skip overlapping ticks
+        // Nothing may escape a timer callback — an unhandled exception there kills the
+        // process. Anything recoverable simply retries next second.
         try
         {
             List<ActiveTunnel> snapshot;
@@ -275,20 +285,19 @@ public class TunnelManager : IDisposable
                 SchedulePings(tunnel, now);
             }
 
-            // Never let an arbitration hiccup escape the timer callback — that would
-            // terminate the process.
-            try { ReconcileFailover(); } catch { }
+            ReconcileFailover();
 
             foreach (var tunnel in snapshot)
             {
-                var result = tunnel.Peers.ToDictionary(
-                    p => p.Key,
-                    p => new PeerLive(p.UpBps, p.DownBps, p.LastHandshake,
+                var result = new Dictionary<string, PeerLive>(tunnel.Peers.Count);
+                foreach (var p in tunnel.Peers) // indexer, not ToDictionary: duplicate keys must not throw
+                    result[p.Key] = new PeerLive(p.UpBps, p.DownBps, p.LastHandshake,
                         p.LastPingMs, p.LastPingOk, p.Healthy, p.FailoverRole,
-                        p.AvgPingMs, p.PingLoss, p.TotalTx, p.TotalRx));
+                        p.AvgPingMs, p.PingLoss, p.TotalTx, p.TotalRx);
                 StatsUpdated?.Invoke(tunnel.Name, new TunnelStats(result));
             }
         }
+        catch { }
         finally
         {
             Interlocked.Exchange(ref _polling, 0);

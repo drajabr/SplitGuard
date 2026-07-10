@@ -24,7 +24,8 @@ public class NrptService
     readonly object _gate = new();
     INrptBackend? _backend;
 
-    INrptBackend Backend => _backend ??= SelectBackend();
+    // The demo harness must leave system DNS policy untouched, whatever code path fires.
+    INrptBackend Backend => _backend ??= RuleStore.DemoMode ? new NullBackend() : SelectBackend();
 
     INrptBackend SelectBackend()
     {
@@ -53,15 +54,6 @@ public class NrptService
         lock (_gate)
         {
             Backend.Add(RuleId(tunnelName, peerPublicKey, domain), new[] { DomainToNamespace(domain) }, new[] { dnsServer });
-            Flush();
-        }
-    }
-
-    public void RemoveDomain(string tunnelName, string peerPublicKey, string domain)
-    {
-        lock (_gate)
-        {
-            Backend.Remove(RuleId(tunnelName, peerPublicKey, domain));
             Flush();
         }
     }
@@ -165,6 +157,13 @@ public class NrptService
         List<NrptRule> GetTagged();
     }
 
+    class NullBackend : INrptBackend
+    {
+        public void Add(string id, string[] namespaces, string[] servers) { }
+        public void Remove(string id) { }
+        public List<NrptRule> GetTagged() => new();
+    }
+
     class CimBackend : INrptBackend
     {
         readonly CimSession _session = CimSession.Create(null);
@@ -266,11 +265,13 @@ public class NrptService
                 CreateNoWindow = true,
             };
             using var process = Process.Start(psi)!;
+            // Drain stderr concurrently: reading the two pipes sequentially deadlocks
+            // when the child fills the un-read one first.
+            var errorTask = process.StandardError.ReadToEndAsync();
             var output = process.StandardOutput.ReadToEnd();
-            var error = process.StandardError.ReadToEnd();
             process.WaitForExit(30000);
             if (process.ExitCode != 0)
-                throw new InvalidOperationException($"NRPT command failed: {error}");
+                throw new InvalidOperationException($"NRPT command failed: {errorTask.Result}");
             return output;
         }
     }
