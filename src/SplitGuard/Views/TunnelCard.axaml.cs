@@ -93,10 +93,6 @@ public partial class TunnelCard : UserControl
         DetailPanel.SizeChanged += OnBodyContentSizeChanged;
         ExpandContent.SizeChanged += OnBodyContentSizeChanged;
 
-        // The interface line adapts: address chips sit beside the keys while they fit,
-        // else they drop to a second line as a whole and the keys stretch.
-        IfaceGrid.SizeChanged += (_, _) => UpdateInterfaceLayout();
-
         // Fade a card in the first time it appears; fade + collapse it on removal.
         ClipToBounds = true;
         Opacity = 0;
@@ -144,6 +140,10 @@ public partial class TunnelCard : UserControl
             SlideIn(_vm.IsTextMode ? EditorHost : FieldsGrid, _vm.IsTextMode ? 36 : -36);
         }
         if (e.PropertyName == nameof(TunnelViewModel.CollapsedSummary))
+            BuildDetail();
+        // Keep the collapsed detail's per-peer handshake/RTT live; skip while editing
+        // (the detail panel is hidden then).
+        if (e.PropertyName == nameof(TunnelViewModel.StatsTick) && _vm is { IsEditing: false })
             BuildDetail();
         if (e.PropertyName == nameof(TunnelViewModel.Accent))
             ApplyCardAccent();
@@ -306,31 +306,6 @@ public partial class TunnelCard : UserControl
     void OnContentChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         if (_vm?.IsEditing == true) TweenBodyToContent();
-        UpdateInterfaceLayout();
-    }
-
-    // Address chips inline (column 2, sized to content) while the whole line fits;
-    // otherwise they move below spanning the full width and the key box stretches.
-    void UpdateInterfaceLayout()
-    {
-        if (IfaceGrid.Bounds.Width < 1) return;
-        AddrList.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        var addrW = AddrList.DesiredSize.Width;
-        var narrow = IfaceGrid.Bounds.Width < 70 + 160 + addrW + 24; // title + comfortable key box + chips + slack
-        if (narrow)
-        {
-            Grid.SetRow(AddrList, 1);
-            Grid.SetColumn(AddrList, 0);
-            Grid.SetColumnSpan(AddrList, 3);
-            AddrList.Margin = new Thickness(0, 6, 0, 0);
-        }
-        else
-        {
-            Grid.SetRow(AddrList, 0);
-            Grid.SetColumn(AddrList, 2);
-            Grid.SetColumnSpan(AddrList, 1);
-            AddrList.Margin = new Thickness(2, 0, 0, 0);
-        }
     }
 
     // A driven tween measures its target before release; the post-release layout can

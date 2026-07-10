@@ -25,7 +25,9 @@ public class TunnelManager : IDisposable
     static readonly TimeSpan HandshakeGrace = TimeSpan.FromSeconds(60);
     const int DefaultPingTimeoutSec = 3;
     const int DefaultPingCount = 3;
-    const ushort DefaultPingPeriod = 25; // used when a ping host is set but keepalive is off
+    // Probe cadence is decoupled from keepalive: a short fixed interval keeps the live
+    // RTT readout fresh and makes count-based failover react in seconds, not minutes.
+    const int PingIntervalSec = 4;
     const uint StandbyMetricBase = 400;  // far above any interface-metric difference
 
     readonly Dictionary<string, ActiveTunnel> _active = new();
@@ -290,10 +292,11 @@ public class TunnelManager : IDisposable
         {
             if (rt.PingHost is null || rt.PingInFlight || now < rt.NextPingDue) continue;
             if (!IPAddress.TryParse(rt.PingHost, out var target)) continue;
-            var period = rt.Keepalive > 0 ? rt.Keepalive : DefaultPingPeriod;
-            rt.NextPingDue = now.AddSeconds(period);
+            // The in-flight guard prevents overlap, so a long timeout simply stretches the
+            // effective interval; a short timeout keeps pinging every PingIntervalSec.
+            rt.NextPingDue = now.AddSeconds(PingIntervalSec);
             rt.PingInFlight = true;
-            var timeout = Math.Min(rt.PingTimeoutMs, period * 1000);
+            var timeout = rt.PingTimeoutMs;
             _ = Task.Run(async () =>
             {
                 try

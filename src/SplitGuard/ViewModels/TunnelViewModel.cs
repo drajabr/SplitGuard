@@ -79,7 +79,6 @@ public class TunnelViewModel : ObservableObject
         AddAddressCommand = new RelayCommand(AddAddress);
         RemoveAddressCommand = new RelayCommand(p => Addresses.Remove((string)p!));
         GenerateKeyCommand = new RelayCommand(GenerateKey);
-        EditPrivateKeyCommand = new RelayCommand(() => EditingPrivateKey = true);
         ToggleTextModeCommand = new RelayCommand(ToggleTextMode);
     }
 
@@ -143,15 +142,12 @@ public class TunnelViewModel : ObservableObject
     public string PrivateKeyEdit
     {
         get => _privateKeyEdit;
-        set { if (Set(ref _privateKeyEdit, value)) RefreshDerivedPublicKey(); }
+        set { if (Set(ref _privateKeyEdit, value)) { RefreshDerivedPublicKey(); Raise(nameof(CanGenerate)); } }
     }
 
-    // The interface key box shows the derived public key (click to copy). The edit
-    // (pencil) button switches it to manual private-key entry — which necessarily
-    // changes the public key — with a generate/refresh button. Each edit session of the
-    // card starts back in public display mode.
-    bool _editingPrivateKey;
-    public bool EditingPrivateKey { get => _editingPrivateKey; set => Set(ref _editingPrivateKey, value); }
+    // The generate button sits inside the private-key box and shows only while it's empty,
+    // so generating never silently discards an existing key.
+    public bool CanGenerate => string.IsNullOrWhiteSpace(PrivateKeyEdit);
 
     bool _isConnected;
     public bool IsConnected
@@ -356,9 +352,6 @@ public class TunnelViewModel : ObservableObject
         if (version == _armVersion) DeleteArmed = false;
     }
 
-    string _headerHandshake = "";
-    public string HeaderHandshake { get => _headerHandshake; set => Set(ref _headerHandshake, value); }
-
     string _upRate = "";
     public string UpRate { get => _upRate; set => Set(ref _upRate, value); }
 
@@ -374,7 +367,6 @@ public class TunnelViewModel : ObservableObject
     public RelayCommand AddAddressCommand { get; private set; } = null!;
     public RelayCommand RemoveAddressCommand { get; private set; } = null!;
     public RelayCommand GenerateKeyCommand { get; private set; } = null!;
-    public RelayCommand EditPrivateKeyCommand { get; private set; } = null!;
     public RelayCommand ToggleTextModeCommand { get; private set; } = null!;
 
     // Raw-config editing (Ctrl+E): the whole staged tunnel as wg-quick text,
@@ -470,7 +462,6 @@ public class TunnelViewModel : ObservableObject
     void BeginEdit()
     {
         ValidationError = "";
-        EditingPrivateKey = false; // every edit session starts showing the public key
         if (!IsExternal && !IsCustom)
         {
             try { PrivateKeyEdit = RuleStore.Unprotect(Config!.PrivateKeyProtected); }
@@ -647,9 +638,10 @@ public class TunnelViewModel : ObservableObject
         NewAddress = "";
     }
 
-    // Refresh: a new keypair. Only reachable in private-key edit mode, where changing
-    // the key is the explicit intent.
-    void GenerateKey() => PrivateKeyEdit = Convert.ToBase64String(Curve25519.GeneratePrivateKey());
+    void GenerateKey()
+    {
+        if (CanGenerate) PrivateKeyEdit = Convert.ToBase64String(Curve25519.GeneratePrivateKey());
+    }
 
     void RefreshDerivedPublicKey()
     {
@@ -694,8 +686,13 @@ public class TunnelViewModel : ObservableObject
         }
         UpRate = Format.Rate(up);
         DownRate = Format.Rate(down);
-        HeaderHandshake = Peers.Count == 1 ? Format.Ago(newest) : "";
         if (IsConnected)
             IsEstablished = newest is not null && DateTime.UtcNow - newest < HandshakeFresh;
+        // Refresh the collapsed-card detail so its per-peer handshake/RTT stay live.
+        StatsTick++;
     }
+
+    // Bumped every stats poll; the card watches it to rebuild the collapsed detail.
+    int _statsTick;
+    public int StatsTick { get => _statsTick; set => Set(ref _statsTick, value); }
 }

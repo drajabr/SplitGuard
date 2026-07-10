@@ -80,7 +80,7 @@ public partial class PeerViewModel : ObservableObject
     public string PingHostText
     {
         get => _pingHostText;
-        set { if (Set(ref _pingHostText, value)) { Raise(nameof(HasPingHost)); Raise(nameof(ShowHandshake)); } }
+        set { if (Set(ref _pingHostText, value)) Raise(nameof(HasPingHost)); }
     }
 
     // When a ping host is set it decides the peer's status, so the down/up/timeout knobs
@@ -179,9 +179,8 @@ public partial class PeerViewModel : ObservableObject
     string _handshakeText = "";
     public string HandshakeText { get => _handshakeText; set { if (Set(ref _handshakeText, value)) Raise(nameof(ShowHandshake)); } }
 
-    // Handshake is shown only when there's no ping host — with a ping host, the live RTT
-    // reports status and the handshake reading is redundant (and can look frozen).
-    public bool ShowHandshake => !HasPingHost && HandshakeText.Trim().Length > 0;
+    // Peer card header shows the last handshake on the right (RTT sits on the left).
+    public bool ShowHandshake => HandshakeText.Trim().Length > 0;
 
     string _pingText = "";
     public string PingText { get => _pingText; set => Set(ref _pingText, value); }
