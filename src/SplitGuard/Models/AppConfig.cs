@@ -74,6 +74,8 @@ public class PeerConfig
     public string? PingHost { get; set; }
     // Per-ping timeout in seconds (1-60); 0 = default (3 s).
     public int PingTimeout { get; set; }
+    // How often to probe, in seconds (1-3600); 0 = default (5 s).
+    public int PingPeriod { get; set; }
     // Consecutive ping failures to flip health down (1-100); 0 = default (3).
     public int PingDownCount { get; set; }
     // Consecutive ping successes to flip health back up (1-100); 0 = default (3).

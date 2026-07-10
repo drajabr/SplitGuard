@@ -87,6 +87,12 @@ public partial class PeerViewModel : ObservableObject
     // are live and the header shows ping instead of the (now redundant) handshake.
     public bool HasPingHost => PingHostText.Trim().Length > 0;
 
+    // How often to probe, in seconds; blank = default (5 s). Only meaningful with a ping host.
+    string _pingPeriodText = "";
+    public string PingPeriodText { get => _pingPeriodText; set => Set(ref _pingPeriodText, value); }
+
+    public int ParsedPingPeriod => int.TryParse(PingPeriodText.Trim(), out var v) ? v : 0;
+
     // Per-ping timeout in seconds; blank = default (3 s). Only meaningful with a ping host.
     string _pingTimeoutText = "";
     public string PingTimeoutText { get => _pingTimeoutText; set => Set(ref _pingTimeoutText, value); }
@@ -242,6 +248,8 @@ public partial class PeerViewModel : ObservableObject
             return $"Keepalive must be seconds (0-65535) — got '{KeepaliveText}'";
         if (PingHostText.Trim().Length > 0 && !IPAddress.TryParse(PingHostText.Trim(), out _))
             return $"Ping host must be an IP address — got '{PingHostText}'";
+        if (PingPeriodText.Trim().Length > 0 && ParsedPingPeriod is < 1 or > 3600)
+            return $"Ping period must be 1-3600 seconds — got '{PingPeriodText}'";
         if (PingTimeoutText.Trim().Length > 0 && ParsedPingTimeout is < 1 or > 60)
             return $"Ping timeout must be 1-60 seconds — got '{PingTimeoutText}'";
         if (PingDownText.Trim().Length > 0 && ParsedPingDown is < 1 or > 100)

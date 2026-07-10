@@ -28,6 +28,7 @@ public class ParsedPeer
     public List<string> Domains { get; } = new();
     public string? PingHost { get; set; }
     public int PingTimeout { get; set; }
+    public int PingPeriod { get; set; }
     public int PingDownCount { get; set; }
     public int PingUpCount { get; set; }
     public int Metric { get; set; }
@@ -85,6 +86,7 @@ public static class WireGuardConf
                     case "domains": peer.Domains.AddRange(SplitList(value)); break;
                     case "pinghost": peer.PingHost = value; break;
                     case "pingtimeout": if (int.TryParse(value, out var pt)) peer.PingTimeout = Math.Clamp(pt, 0, 60); break;
+                    case "pingperiod": if (int.TryParse(value, out var pp)) peer.PingPeriod = Math.Clamp(pp, 0, 3600); break;
                     case "pingdowncount": if (int.TryParse(value, out var pd)) peer.PingDownCount = Math.Clamp(pd, 0, 100); break;
                     case "pingupcount": if (int.TryParse(value, out var pu)) peer.PingUpCount = Math.Clamp(pu, 0, 100); break;
                     case "pingcount": // legacy single count: applies to both directions

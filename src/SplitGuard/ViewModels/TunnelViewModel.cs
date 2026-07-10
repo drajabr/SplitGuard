@@ -101,6 +101,7 @@ public class TunnelViewModel : ObservableObject
                 Dns = p.Dns ?? "",
                 KeepaliveText = p.PersistentKeepalive > 0 ? p.PersistentKeepalive.ToString() : "",
                 PingHostText = p.PingHost ?? "",
+                PingPeriodText = p.PingPeriod > 0 ? p.PingPeriod.ToString() : "",
                 PingTimeoutText = p.PingTimeout > 0 ? p.PingTimeout.ToString() : "",
                 PingDownText = p.PingDownCount > 0 ? p.PingDownCount.ToString() : "",
                 PingUpText = p.PingUpCount > 0 ? p.PingUpCount.ToString() : "",
@@ -412,6 +413,7 @@ public class TunnelViewModel : ObservableObject
             if (p.HasDns) sb.AppendLine($"DNS = {p.Dns.Trim()}");
             if (p.DomainValues.Any()) sb.AppendLine($"Domains = {string.Join(", ", p.DomainValues)}");
             if (p.PingHostText.Trim().Length > 0) sb.AppendLine($"PingHost = {p.PingHostText.Trim()}");
+            if (p.ParsedPingPeriod > 0) sb.AppendLine($"PingPeriod = {p.ParsedPingPeriod}");
             if (p.ParsedPingTimeout > 0) sb.AppendLine($"PingTimeout = {p.ParsedPingTimeout}");
             if (p.ParsedPingDown > 0) sb.AppendLine($"PingDownCount = {p.ParsedPingDown}");
             if (p.ParsedPingUp > 0) sb.AppendLine($"PingUpCount = {p.ParsedPingUp}");
@@ -438,6 +440,7 @@ public class TunnelViewModel : ObservableObject
                 Dns = p.Dns ?? "",
                 KeepaliveText = p.PersistentKeepalive > 0 ? p.PersistentKeepalive.ToString() : "",
                 PingHostText = p.PingHost ?? "",
+                PingPeriodText = p.PingPeriod > 0 ? p.PingPeriod.ToString() : "",
                 PingTimeoutText = p.PingTimeout > 0 ? p.PingTimeout.ToString() : "",
                 PingDownText = p.PingDownCount > 0 ? p.PingDownCount.ToString() : "",
                 PingUpText = p.PingUpCount > 0 ? p.PingUpCount.ToString() : "",
@@ -484,7 +487,7 @@ public class TunnelViewModel : ObservableObject
         Name.Trim(), PrivateKeyEdit.Trim(), ListenPortText.Trim(),
         string.Join(",", AddressValues),
         string.Join(";", Peers.Select(p =>
-            $"{p.PublicKey.Trim()},{p.PresharedKey.Trim()},{p.Endpoint.Trim()},{string.Join("+", p.AllowedIpValues)},{p.ParsedKeepalive},{p.PingHostText.Trim()},{p.ParsedPingTimeout},{p.ParsedPingDown},{p.ParsedPingUp},{p.ParsedMetric}")));
+            $"{p.PublicKey.Trim()},{p.PresharedKey.Trim()},{p.Endpoint.Trim()},{string.Join("+", p.AllowedIpValues)},{p.ParsedKeepalive},{p.PingHostText.Trim()},{p.ParsedPingPeriod},{p.ParsedPingTimeout},{p.ParsedPingDown},{p.ParsedPingUp},{p.ParsedMetric}")));
 
     void CancelEdit()
     {
@@ -576,6 +579,7 @@ public class TunnelViewModel : ObservableObject
                 Domains = p.DomainValues.ToList(),
                 PingHost = p.PingHostText.Trim().Length > 0 ? p.PingHostText.Trim() : null,
                 PingTimeout = Math.Clamp(p.ParsedPingTimeout, 0, 60),
+                PingPeriod = Math.Clamp(p.ParsedPingPeriod, 0, 3600),
                 PingDownCount = Math.Clamp(p.ParsedPingDown, 0, 100),
                 PingUpCount = Math.Clamp(p.ParsedPingUp, 0, 100),
                 Metric = Math.Clamp(p.ParsedMetric, 0, 10),

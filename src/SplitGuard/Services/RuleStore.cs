@@ -98,6 +98,7 @@ public class RuleStore
                             Dns = "10.7.0.1",
                             Domains = { "*.corp.example", "*.lab.internal" },
                             PingHost = "10.7.0.1",
+                            PingPeriod = 5,
                             Metric = 1,
                         },
                         new PeerConfig

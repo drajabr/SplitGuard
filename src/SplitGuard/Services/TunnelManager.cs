@@ -25,9 +25,9 @@ public class TunnelManager : IDisposable
     static readonly TimeSpan HandshakeGrace = TimeSpan.FromSeconds(60);
     const int DefaultPingTimeoutSec = 3;
     const int DefaultPingCount = 3;
-    // Probe cadence is decoupled from keepalive: a short fixed interval keeps the live
-    // RTT readout fresh and makes count-based failover react in seconds, not minutes.
-    const int PingIntervalSec = 4;
+    // Probe cadence is decoupled from keepalive and per-peer configurable; this is the
+    // fallback when the peer leaves it blank.
+    const int DefaultPingPeriodSec = 5;
     const uint StandbyMetricBase = 400;  // far above any interface-metric difference
 
     readonly Dictionary<string, ActiveTunnel> _active = new();
@@ -49,6 +49,7 @@ public class TunnelManager : IDisposable
         public required List<(IPAddress Ip, byte Cidr)> AllowedIps;
         public int Metric;
         public int PingTimeoutMs;
+        public int PingPeriodSec;
         public int PingDownCount;
         public int PingUpCount;
         public string? PingHost;
@@ -128,6 +129,7 @@ public class TunnelManager : IDisposable
                 AllowedIps = allowed,
                 Metric = p.Metric,
                 PingTimeoutMs = (p.PingTimeout is >= 1 and <= 60 ? p.PingTimeout : DefaultPingTimeoutSec) * 1000,
+                PingPeriodSec = p.PingPeriod is >= 1 and <= 3600 ? p.PingPeriod : DefaultPingPeriodSec,
                 PingDownCount = p.PingDownCount is >= 1 and <= 100 ? p.PingDownCount : DefaultPingCount,
                 PingUpCount = p.PingUpCount is >= 1 and <= 100 ? p.PingUpCount : DefaultPingCount,
                 PingHost = string.IsNullOrWhiteSpace(p.PingHost) ? null : p.PingHost.Trim(),
@@ -292,9 +294,9 @@ public class TunnelManager : IDisposable
         {
             if (rt.PingHost is null || rt.PingInFlight || now < rt.NextPingDue) continue;
             if (!IPAddress.TryParse(rt.PingHost, out var target)) continue;
-            // The in-flight guard prevents overlap, so a long timeout simply stretches the
-            // effective interval; a short timeout keeps pinging every PingIntervalSec.
-            rt.NextPingDue = now.AddSeconds(PingIntervalSec);
+            // The in-flight guard prevents overlap, so a timeout longer than the period
+            // simply stretches the effective interval.
+            rt.NextPingDue = now.AddSeconds(rt.PingPeriodSec);
             rt.PingInFlight = true;
             var timeout = rt.PingTimeoutMs;
             _ = Task.Run(async () =>

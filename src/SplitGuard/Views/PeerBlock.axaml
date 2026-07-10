@@ -51,14 +51,16 @@
 
           <TextBlock Grid.Row="2" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Ping" IsVisible="{Binding ShowWgFields}" Margin="0,5,10,4"
                      ToolTip.Tip="In-tunnel IP probed once per keepalive period. When set, it decides failover health; without it, handshake freshness decides." />
-          <Grid Grid.Row="2" Grid.Column="1" ColumnDefinitions="*,Auto,34,Auto,34,Auto,34" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
-            <TextBox Grid.Column="0" Classes="mono" MinWidth="60" Text="{Binding PingHostText}" Watermark="host to ping" />
-            <TextBlock Grid.Column="1" Classes="lbl" Text="down" Margin="10,0,4,0" IsEnabled="{Binding HasPingHost}" ToolTip.Tip="Consecutive ping failures that mark this peer down (1-100, default 3)" />
-            <TextBox Grid.Column="2" Classes="mono num" Text="{Binding PingDownText}" Watermark="3" IsEnabled="{Binding HasPingHost}" />
-            <TextBlock Grid.Column="3" Classes="lbl" Text="up" Margin="10,0,4,0" IsEnabled="{Binding HasPingHost}" ToolTip.Tip="Consecutive ping successes that bring it back up (1-100, default 3)" />
-            <TextBox Grid.Column="4" Classes="mono num" Text="{Binding PingUpText}" Watermark="3" IsEnabled="{Binding HasPingHost}" />
-            <TextBlock Grid.Column="5" Classes="lbl" Text="timeout" Margin="10,0,4,0" IsEnabled="{Binding HasPingHost}" ToolTip.Tip="Seconds to wait for each ping reply (1-60, default 3)" />
-            <TextBox Grid.Column="6" Classes="mono num" Text="{Binding PingTimeoutText}" Watermark="3" IsEnabled="{Binding HasPingHost}" />
+          <Grid Grid.Row="2" Grid.Column="1" ColumnDefinitions="*,Auto,34,Auto,34,Auto,34,Auto,34" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
+            <TextBox Grid.Column="0" Classes="mono" MinWidth="56" Text="{Binding PingHostText}" Watermark="host to ping" />
+            <TextBlock Grid.Column="1" Classes="lbl" Text="every" Margin="10,0,4,0" IsEnabled="{Binding HasPingHost}" ToolTip.Tip="How often to probe, in seconds (1-3600, default 5)" />
+            <TextBox Grid.Column="2" Classes="mono num" Text="{Binding PingPeriodText}" Watermark="5" IsEnabled="{Binding HasPingHost}" />
+            <TextBlock Grid.Column="3" Classes="lbl" Text="down" Margin="10,0,4,0" IsEnabled="{Binding HasPingHost}" ToolTip.Tip="Consecutive ping failures that mark this peer down (1-100, default 3)" />
+            <TextBox Grid.Column="4" Classes="mono num" Text="{Binding PingDownText}" Watermark="3" IsEnabled="{Binding HasPingHost}" />
+            <TextBlock Grid.Column="5" Classes="lbl" Text="up" Margin="10,0,4,0" IsEnabled="{Binding HasPingHost}" ToolTip.Tip="Consecutive ping successes that bring it back up (1-100, default 3)" />
+            <TextBox Grid.Column="6" Classes="mono num" Text="{Binding PingUpText}" Watermark="3" IsEnabled="{Binding HasPingHost}" />
+            <TextBlock Grid.Column="7" Classes="lbl" Text="timeout" Margin="10,0,4,0" IsEnabled="{Binding HasPingHost}" ToolTip.Tip="Seconds to wait for each ping reply (1-60, default 3)" />
+            <TextBox Grid.Column="8" Classes="mono num" Text="{Binding PingTimeoutText}" Watermark="3" IsEnabled="{Binding HasPingHost}" />
           </Grid>
 
           <TextBlock Grid.Row="3" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="IPs" IsVisible="{Binding ShowWgFields}" Margin="0,5,10,4"

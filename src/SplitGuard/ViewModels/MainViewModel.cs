@@ -603,6 +603,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
                 Domains = p.Domains.ToList(),
                 PingHost = p.PingHost,
                 PingTimeout = p.PingTimeout,
+                PingPeriod = p.PingPeriod,
                 PingDownCount = p.PingDownCount,
                 PingUpCount = p.PingUpCount,
                 Metric = Math.Clamp(p.Metric, 0, 10),
