@@ -249,6 +249,8 @@ public class TunnelViewModel : ObservableObject
             p.TxTotalText = "";
             p.RxTotalText = "";
             p.FailoverRole = "";
+            p.FirstHandshake = null;
+            p.UptimeText = "";
         }
         StatsTick++; // rebuild the collapsed detail without the stale status line
     }
@@ -487,8 +489,9 @@ public class TunnelViewModel : ObservableObject
         }
         _connSnapshot = ConnSnapshot();
         Host.EditStarted(this); // collapses any other expanded card
-        // A single-peer tunnel opens with that peer expanded; multi-peer opens as a list.
-        if (Peers.Count == 1) Peers[0].IsExpanded = true;
+        // The card always opens with WG peers collapsed (DNS-only rows have no header
+        // worth collapsing to, so they stay open).
+        foreach (var p in Peers) p.IsExpanded = p.IsDnsOnly;
         IsEditing = true;
     }
 
@@ -691,6 +694,11 @@ public class TunnelViewModel : ObservableObject
             peer.HasStats = true;
             peer.TxTotalText = Format.Bytes(s.TotalTx);
             peer.RxTotalText = Format.Bytes(s.TotalRx);
+            if (s.Handshake is not null)
+            {
+                peer.FirstHandshake ??= s.Handshake;
+                peer.UptimeText = Format.Duration(DateTime.UtcNow - peer.FirstHandshake.Value);
+            }
             if (s.Handshake is not null && (newest is null || s.Handshake > newest)) newest = s.Handshake;
             peer.HandshakeText = Format.Ago(s.Handshake);
             peer.PingText = s.PingOk switch

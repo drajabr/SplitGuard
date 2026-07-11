@@ -167,6 +167,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
                     p.TxTotalText = "1.24 GB";
                     p.RxTotalText = "8.7 GB";
                     p.HandshakeText = "handshake 14s ago";
+                    p.UptimeText = "2h 14m";
                     if (p.HasPingHost) p.PingText = "23 ms";
                 }
                 t.StatsTick++;

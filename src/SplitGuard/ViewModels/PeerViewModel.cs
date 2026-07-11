@@ -219,6 +219,12 @@ public partial class PeerViewModel : ObservableObject
     bool _hasStats;
     public bool HasStats { get => _hasStats; set => Set(ref _hasStats, value); }
 
+    // First handshake observed this connection; drives the uptime readout.
+    public DateTime? FirstHandshake;
+
+    string _uptimeText = "";
+    public string UptimeText { get => _uptimeText; set => Set(ref _uptimeText, value); }
+
     // "active" / "standby" while this peer's allowed IPs overlap another connected peer's.
     string _failoverRole = "";
     public string FailoverRole { get => _failoverRole; set => Set(ref _failoverRole, value); }

@@ -20,7 +20,7 @@
             <TextBlock Classes="glyph" Text="&#xE771;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
           </Button>
           <Button Classes="hdr" Name="AccentButton" Click="OnAccentClick" ToolTip.Tip="Accent color">
-            <Ellipse Width="11" Height="11" Fill="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+            <Rectangle Width="11" Height="11" RadiusX="3" RadiusY="3" Fill="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
           </Button>
           <Button Classes="hdr" Name="FontButton" Click="OnFontClick" ToolTip.Tip="UI font">
             <TextBlock Classes="glyph" Text="&#xE8D2;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />

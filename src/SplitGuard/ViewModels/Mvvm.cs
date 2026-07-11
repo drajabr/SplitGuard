@@ -66,6 +66,16 @@ public static class Format
         _ => $"{b} B",
     };
 
+    // Compact connection-uptime: "45s", "14m", "2h 05m", "3d 4h".
+    public static string Duration(TimeSpan span)
+    {
+        if (span < TimeSpan.Zero) span = TimeSpan.Zero;
+        if (span.TotalMinutes < 1) return $"{(int)span.TotalSeconds}s";
+        if (span.TotalHours < 1) return $"{(int)span.TotalMinutes}m";
+        if (span.TotalDays < 1) return $"{(int)span.TotalHours}h {span.Minutes:00}m";
+        return $"{(int)span.TotalDays}d {span.Hours}h";
+    }
+
     public static string Ago(DateTime? utc)
     {
         if (utc is null) return "no handshake yet";

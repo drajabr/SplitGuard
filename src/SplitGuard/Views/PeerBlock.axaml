@@ -24,39 +24,36 @@
           <TextBox Classes="plainname" MinWidth="60" MaxWidth="220" Text="{Binding Name}" Watermark="Peer"
                    IsVisible="{Binding ShowWgFields}"
                    Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold" FontSize="{DynamicResource Fs17}" VerticalAlignment="Center" />
+          <!-- Failover rank, only while this peer's routes actually overlap another's. -->
+          <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center" IsVisible="{Binding MetricEnabled}">
+            <TextBlock Classes="lbl" Text="metric" ToolTip.Tip="{Binding MetricRankText}" />
+            <TextBox Classes="mono num" Width="34" Text="{Binding MetricText}" Watermark="0"
+                     ToolTip.Tip="{Binding MetricRankText}" />
+          </StackPanel>
         </StackPanel>
       </DockPanel>
 
       <StackPanel IsVisible="{Binding IsExpanded}">
         <Separator />
-        <Grid Margin="14,6,14,0" ColumnDefinitions="76,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
+        <Grid Margin="14,6,14,0" ColumnDefinitions="76,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
 
           <TextBlock Grid.Row="0" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Endpoint" IsVisible="{Binding ShowWgFields}" Margin="0,5,10,4" />
           <Grid Grid.Row="0" Grid.Column="1" ColumnDefinitions="*,Auto,34" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
             <TextBox Grid.Column="0" Classes="mono" MinWidth="90" Text="{Binding Endpoint}" Watermark="host:port" />
-            <TextBlock Grid.Column="1" Classes="lbl" Text="metric" Margin="10,0,6,0"
-                       ToolTip.Tip="{Binding MetricRankText}" />
-            <TextBox Grid.Column="2" Classes="mono num" Text="{Binding MetricText}" Watermark="0"
-                     IsEnabled="{Binding MetricEnabled}" ToolTip.Tip="{Binding MetricRankText}" />
+            <TextBlock Grid.Column="1" Classes="lbl" Text="keepalive" Margin="10,0,6,0"
+                       ToolTip.Tip="PersistentKeepalive — seconds between keepalive packets (blank = off)" />
+            <TextBox Grid.Column="2" Classes="mono num" Text="{Binding KeepaliveText}" Watermark="off" />
           </Grid>
 
-          <TextBlock Grid.Row="1" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Keepalive" IsVisible="{Binding ShowWgFields}" Margin="0,5,10,4" />
-          <Grid Grid.Row="1" Grid.Column="1" ColumnDefinitions="34,*" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
-            <TextBox Grid.Column="0" Classes="mono num" Text="{Binding KeepaliveText}" Watermark="off"
-                     ToolTip.Tip="PersistentKeepalive — seconds between keepalive packets (blank = off)" />
-            <TextBlock Grid.Column="1" Classes="lbl" Margin="10,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
-                       Text="{Binding MetricRankText}" IsVisible="{Binding MetricEnabled}" />
-          </Grid>
-
-          <TextBlock Grid.Row="2" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Public key" IsVisible="{Binding ShowWgFields}" Margin="0,5,10,4" />
-          <Grid Grid.Row="2" Grid.Column="1" ColumnDefinitions="*,*" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
+          <TextBlock Grid.Row="1" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Public key" IsVisible="{Binding ShowWgFields}" Margin="0,5,10,4" />
+          <Grid Grid.Row="1" Grid.Column="1" ColumnDefinitions="*,*" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
             <TextBox Grid.Column="0" Classes="mono synkey" MinWidth="40" Text="{Binding PublicKey}" Watermark="public key" Margin="0,0,6,0" />
             <TextBox Grid.Column="1" Classes="mono" MinWidth="40" Text="{Binding PresharedKey}" Watermark="preshared (optional)" />
           </Grid>
 
-          <TextBlock Grid.Row="3" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Allowed IPs" IsVisible="{Binding ShowWgFields}" Margin="0,5,10,4"
+          <TextBlock Grid.Row="2" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Allowed IPs" IsVisible="{Binding ShowWgFields}" Margin="0,5,10,4"
                      ToolTip.Tip="The ranges routed through this peer" />
-          <ItemsControl Grid.Row="3" Grid.Column="1" ItemsSource="{Binding AllowedIps}" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
+          <ItemsControl Grid.Row="2" Grid.Column="1" ItemsSource="{Binding AllowedIps}" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
@@ -89,9 +86,9 @@
 
           <!-- DNS + domains flow as one line: the DNS box is the first wrap item, chips
                fill the rest of the line and only the overflow wraps below. -->
-          <TextBlock Grid.Row="4" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="DNS" Margin="0,5,10,0"
+          <TextBlock Grid.Row="3" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="DNS" Margin="0,5,10,0"
                      ToolTip.Tip="These domains resolve through this server while the tunnel is up" />
-          <ItemsControl Grid.Row="4" Grid.Column="1" ItemsSource="{Binding Domains}">
+          <ItemsControl Grid.Row="3" Grid.Column="1" ItemsSource="{Binding Domains}">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
@@ -136,9 +133,9 @@
             </ItemsControl.DataTemplates>
           </ItemsControl>
 
-          <TextBlock Grid.Row="5" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Healthcheck" IsVisible="{Binding ShowWgFields}" Margin="0,5,10,4"
+          <TextBlock Grid.Row="4" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Healthcheck" IsVisible="{Binding ShowWgFields}" Margin="0,5,10,4"
                      ToolTip.Tip="In-tunnel IP probed on a fixed period. When set, it decides failover health; without it, handshake freshness decides. The knobs unlock once a valid host is set." />
-          <Grid Grid.Row="5" Grid.Column="1" ColumnDefinitions="*,Auto,34,Auto,34,Auto,34,Auto,34" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
+          <Grid Grid.Row="4" Grid.Column="1" ColumnDefinitions="*,Auto,34,Auto,34,Auto,34,Auto,34" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
             <TextBox Grid.Column="0" Classes="mono" MinWidth="56" Text="{Binding PingHostText}" Watermark="host to ping" />
             <TextBlock Grid.Column="1" Classes="lbl" Text="every" Margin="10,0,4,0" IsEnabled="{Binding HasPingHost}" ToolTip.Tip="How often to probe, in seconds (1-3600, default 5)" />
             <TextBox Grid.Column="2" Classes="mono num" Text="{Binding PingPeriodText}" Watermark="5" IsEnabled="{Binding HasPingHost}" />

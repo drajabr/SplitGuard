@@ -499,12 +499,33 @@ public partial class TunnelCard : UserControl
                 Control? left = p.HasDns ? Left(Label("DNS"), Mono(p.Dns.Trim(), Syntax.IpBrush)) : null;
                 AddRow(left, domains, Syntax.DomainBrush);
             }
-            // Live status while connected: total transfer on the left, RTT on the right.
+            // Live status while connected: uptime since the first handshake on the left,
+            // transfer totals centered, and — when a healthcheck runs — the RTT on the
+            // right. Without one, the totals take the right slot instead.
             if (p.HasStats)
             {
+                var uptime = string.IsNullOrEmpty(p.UptimeText) ? "·····" : $"up {p.UptimeText}";
                 var totals = $"↑ {p.TxTotalText}    ↓ {p.RxTotalText}";
-                var rtt = p.HasPingHost ? (string.IsNullOrEmpty(p.PingText) ? "·····" : p.PingText) : "";
-                AddRow(Mono(totals, Syntax.IpBrush), rtt, Syntax.IpBrush);
+                var statGrid = new Grid { Margin = new Avalonia.Thickness(0, 0, 0, 2) };
+                statGrid.ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto");
+                var left = Mono(uptime, Syntax.IpBrush);
+                Grid.SetColumn(left, 0);
+                statGrid.Children.Add(left);
+                var mid = Mono(totals, Syntax.IpBrush);
+                if (p.HasPingHost)
+                {
+                    mid.TextAlignment = Avalonia.Media.TextAlignment.Center;
+                    Grid.SetColumn(mid, 1);
+                    var rtt = Mono(string.IsNullOrEmpty(p.PingText) ? "·····" : p.PingText, Syntax.IpBrush);
+                    Grid.SetColumn(rtt, 2);
+                    statGrid.Children.Add(rtt);
+                }
+                else
+                {
+                    Grid.SetColumn(mid, 2);
+                }
+                statGrid.Children.Add(mid);
+                DetailPanel.Children.Add(statGrid);
             }
         }
 
