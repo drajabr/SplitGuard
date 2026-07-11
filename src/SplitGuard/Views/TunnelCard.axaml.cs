@@ -60,6 +60,7 @@ public partial class TunnelCard : UserControl
         ConfEditor.SyntaxHighlighting = ConfHighlighting;
         ConfEditor.TextChanged += (_, _) =>
         {
+            RunLint(ConfEditor.Text);
             if (_syncingEditor || _vm is null) return;
             _vm.ConfigText = ConfEditor.Text;
         };
@@ -120,6 +121,44 @@ public partial class TunnelCard : UserControl
     }
 
     bool _appeared;
+
+    // Live lint for the raw editor: parser warnings plus the sanity checks the form
+    // surfaces as route warnings. Purely advisory — Save stays available (the config is
+    // validated for real when the tunnel is turned on).
+    void RunLint(string text)
+    {
+        string result;
+        try
+        {
+            var parsed = Models.WireGuardConf.Parse(text);
+            var problems = new List<string>(parsed.Warnings);
+            if (!PeerViewModel.IsValidKey(parsed.PrivateKey))
+                problems.Add("PrivateKey is not a valid 32-byte base64 key");
+            int i = 0;
+            foreach (var p in parsed.Peers)
+            {
+                i++;
+                var label = p.Name ?? $"peer {i}";
+                if (!PeerViewModel.IsValidKey(p.PublicKey))
+                    problems.Add($"{label}: PublicKey is not a valid 32-byte base64 key");
+                if (p.AllowedIps.Count == 0)
+                    problems.Add($"{label}: no AllowedIPs");
+                if (p.PingHost is not null && System.Net.IPAddress.TryParse(p.PingHost, out var ping)
+                    && !p.AllowedIps.Any(c => Models.WireGuardConf.CidrContains(c, ping)))
+                    problems.Add($"{label}: PingHost {p.PingHost} is outside AllowedIPs — probes wouldn't test the tunnel");
+                if (p.Dns is not null && System.Net.IPAddress.TryParse(p.Dns, out var dns)
+                    && !p.AllowedIps.Any(c => Models.WireGuardConf.CidrContains(c, dns)))
+                    problems.Add($"{label}: DNS {p.Dns} is outside AllowedIPs — queries would leak outside the tunnel");
+            }
+            result = problems.Count == 0 ? "" : "● " + string.Join("\n● ", problems);
+        }
+        catch (Exception ex)
+        {
+            result = $"● parse error: {ex.Message}";
+        }
+        LintText.Text = result;
+        LintBar.IsVisible = result.Length > 0;
+    }
 
     void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {

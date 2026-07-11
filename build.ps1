@@ -18,7 +18,8 @@ $candidates += (Join-Path $env:USERPROFILE ".dotnet\dotnet.exe")
 $dotnetExe = $candidates | Where-Object { (Test-Path $_) -and (Test-Sdk $_) } | Select-Object -First 1
 if (-not $dotnetExe) { throw ".NET 8 SDK not found. Install it from https://dot.net" }
 
-# Inno Setup compiler (checked up front so a missing dependency fails fast).
+# Inno Setup compiler. Optional: without it the app still builds into dist\win-x64;
+# only the installer packaging step is skipped.
 $iscc = (Get-Command ISCC.exe -ErrorAction SilentlyContinue).Source
 if (-not $iscc) {
     $iscc = @(
@@ -27,7 +28,10 @@ if (-not $iscc) {
         "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
     ) | Where-Object { Test-Path $_ } | Select-Object -First 1
 }
-if (-not $iscc) { throw "Inno Setup 6 (ISCC.exe) not found - install it from https://jrsoftware.org/isinfo.php" }
+if (-not $iscc) {
+    Write-Warning "Inno Setup 6 (ISCC.exe) not found - building the app without an installer."
+    Write-Warning "For the setup exe, install Inno Setup 6 from https://jrsoftware.org/isinfo.php"
+}
 
 # Fetch the official signed WireGuardNT driver DLL (never committed to the repo).
 $cache = Join-Path $root ".cache"
@@ -72,8 +76,12 @@ if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed." }
 Copy-Item $wgDll.FullName (Join-Path $out "wireguard.dll")
 Get-ChildItem $out -Filter "*.pdb" | Remove-Item
 
-Write-Host "Compiling installer..."
-& $iscc /Q "/DAppVersion=$version" (Join-Path $root "installer\SplitGuard.iss")
-if ($LASTEXITCODE -ne 0) { throw "Installer compilation failed." }
-
-Write-Host "Done: $(Join-Path $dist "SplitGuard-Setup-$version.exe")"
+if ($iscc) {
+    Write-Host "Compiling installer..."
+    & $iscc /Q "/DAppVersion=$version" (Join-Path $root "installer\SplitGuard.iss")
+    if ($LASTEXITCODE -ne 0) { throw "Installer compilation failed." }
+    Write-Host "Done: $(Join-Path $dist "SplitGuard-Setup-$version.exe")"
+}
+else {
+    Write-Host "Done (no installer): $out\SplitGuard.exe"
+}

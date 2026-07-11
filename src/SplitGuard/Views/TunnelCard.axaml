@@ -51,13 +51,21 @@
 
         <Border Name="EditorHost" Margin="12,8" CornerRadius="4" BorderBrush="{DynamicResource FieldBorderBrush}" BorderThickness="1"
                 IsVisible="{Binding IsTextMode}">
-          <ae:TextEditor Name="ConfEditor" MinHeight="90" Padding="8,6"
-                         FontFamily="Cascadia Mono, Consolas, Courier New, monospace" FontSize="{DynamicResource Fs12}"
-                         Background="Transparent"
-                         Foreground="{DynamicResource TextControlForeground}"
-                         ShowLineNumbers="False"
-                         HorizontalScrollBarVisibility="Auto"
-                         VerticalScrollBarVisibility="Disabled" />
+          <StackPanel>
+            <ae:TextEditor Name="ConfEditor" MinHeight="90" Padding="8,6"
+                           FontFamily="Cascadia Mono, Consolas, Courier New, monospace" FontSize="{DynamicResource Fs12}"
+                           Background="Transparent"
+                           Foreground="{DynamicResource TextControlForeground}"
+                           ShowLineNumbers="False"
+                           HorizontalScrollBarVisibility="Auto"
+                           VerticalScrollBarVisibility="Disabled" />
+            <!-- Live lint: parse + sanity findings for the staged text, updated per keystroke. -->
+            <Border Name="LintBar" BorderBrush="{DynamicResource FieldBorderBrush}" BorderThickness="0,1,0,0"
+                    Padding="8,4" IsVisible="False">
+              <TextBlock Name="LintText" FontSize="{DynamicResource Fs11}" TextWrapping="Wrap"
+                         Foreground="{DynamicResource WarningBrush}" />
+            </Border>
+          </StackPanel>
         </Border>
 
         <StackPanel Name="FieldsGrid" IsVisible="{Binding !IsTextMode}">
