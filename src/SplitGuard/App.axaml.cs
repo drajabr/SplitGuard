@@ -44,11 +44,6 @@ public class App : Application
             };
             SetupTray(desktop, window);
             _vm.Tunnels.CollectionChanged += OnTunnelsChanged;
-            _vm.PropertyChanged += (_, e) =>
-            {
-                if (e.PropertyName is nameof(MainViewModel.DnsStatus) or nameof(MainViewModel.DnsPinned))
-                    Dispatcher.UIThread.Post(UpdateTrayDns);
-            };
             HookTunnels();
             // Keep the no-UAC launcher task registered (and pointing at the current exe).
             if (_vm.Prefs.SkipUacLaunch && !Services.RuleStore.DemoMode)
@@ -133,8 +128,9 @@ public class App : Application
             });
     }
 
-    // "office — 23 ms" · "homelab — connecting…" · "wg-corp — external": the D2 mock's
-    // status-at-a-glance, kept live while the app runs.
+    // "office        23 ms" (tab-aligned to the right column, like an accelerator).
+    // RTT when a healthcheck is running; otherwise the last handshake as "14s";
+    // "connecting…" until established; "external" for official-client adapters.
     static string TrayItemText(TunnelViewModel t)
     {
         string status;
@@ -145,23 +141,17 @@ public class App : Application
         else
         {
             var rtt = t.Peers.Select(p => p.PingText).FirstOrDefault(s => !string.IsNullOrEmpty(s));
-            status = string.IsNullOrEmpty(rtt) ? "connected" : rtt;
+            status = !string.IsNullOrEmpty(rtt) ? rtt : ShortAgo(t.Peers.Select(p => p.HandshakeText)
+                .FirstOrDefault(s => !string.IsNullOrEmpty(s)) ?? "");
         }
-        return $"{t.Name}  —  {status}";
+        return $"{t.Name}\t{status}";
     }
 
-    string DnsItemText() =>
-        _vm is null ? "Device DNS: system"
-        : _vm.DnsPinned ? $"Device DNS: {_vm.DnsStatus}  (pinned)"
-        : "Device DNS: system";
-
-    void UpdateTrayDns()
-    {
-        if (_dnsItem is not null) _dnsItem.Header = DnsItemText();
-    }
+    // "handshake 14s ago" → "14s" for the tray's terse right column.
+    static string ShortAgo(string handshakeText) =>
+        handshakeText.Replace("handshake ", "").Replace(" ago", "").Replace("no handshake yet", "…");
 
     readonly Dictionary<TunnelViewModel, NativeMenuItem> _trayItems = new();
-    NativeMenuItem? _dnsItem;
 
     void RebuildTrayMenu()
     {
@@ -184,12 +174,6 @@ public class App : Application
         }
         if (menu.Items.Count > 0)
             menu.Items.Add(new NativeMenuItemSeparator());
-
-        // Device-DNS line: what owns the system resolver right now. Click opens the window.
-        _dnsItem = new NativeMenuItem(DnsItemText());
-        _dnsItem.Click += (_, _) => ShowMainWindow?.Invoke();
-        menu.Items.Add(_dnsItem);
-        menu.Items.Add(new NativeMenuItemSeparator());
 
         // App settings live here in the tray.
         var settings = new NativeMenuItem("Settings") { Menu = new NativeMenu() };

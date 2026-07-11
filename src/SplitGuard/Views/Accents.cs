@@ -6,11 +6,13 @@ namespace SplitGuard;
 // both resolve a hue name to a color here. "mono" is neutral and tracks the theme.
 public static class Accents
 {
+    // Hues tuned to the design mocks (docs/design/ui-mocks.html): calmer, slightly
+    // desaturated so accents read as chrome, not alarms.
     public static readonly (string Name, string Hex)[] Steps =
     {
-        ("green", "#2FA84F"),
-        ("red",   "#E03B3B"),
-        ("blue",  "#2F7FE4"),
+        ("green", "#3DAF7E"),
+        ("red",   "#D76D64"),
+        ("blue",  "#4A93CF"),
         ("mono",  ""),
     };
 

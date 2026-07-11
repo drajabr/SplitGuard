@@ -8,7 +8,7 @@
     <StackPanel>
       <!-- Header (always visible; clicking its empty space toggles the body, like the
            tunnel card): name on the left, live status on the right. -->
-      <DockPanel Name="HeaderRow" Background="Transparent" Margin="10,5,12,3">
+      <DockPanel Name="HeaderRow" Background="Transparent" Margin="14,5,14,3">
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
           <Border Classes="rolebadge" Classes.active="{Binding FailoverRole, Converter={x:Static views:Syntax.IsActive}}"
                   IsVisible="{Binding FailoverRole, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
@@ -29,22 +29,23 @@
 
       <StackPanel IsVisible="{Binding IsExpanded}">
         <Separator />
-        <Grid Margin="10,6,12,0" ColumnDefinitions="70,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+        <Grid Margin="14,6,14,0" ColumnDefinitions="76,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
 
-          <!-- Stock wg-quick keys first, in stock order; SplitGuard's extensions after
-               the second rule. Anyone coming from the official client finds everything
-               where they expect it, and knows exactly which lines are ours. -->
-          <Grid Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" ColumnDefinitions="Auto,*" IsVisible="{Binding ShowWgFields}" Margin="0,2,0,5">
-            <TextBlock Grid.Column="0" Classes="grplbl" Text="WIREGUARD" Margin="0,0,8,0" />
-            <Border Grid.Column="1" Height="1" Background="{DynamicResource HairlineBrush}" VerticalAlignment="Center" />
+          <TextBlock Grid.Row="0" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Endpoint" IsVisible="{Binding ShowWgFields}" Margin="0,5,10,4" />
+          <Grid Grid.Row="0" Grid.Column="1" ColumnDefinitions="*,Auto,34" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
+            <TextBox Grid.Column="0" Classes="mono" MinWidth="90" Text="{Binding Endpoint}" Watermark="host:port" />
+            <TextBlock Grid.Column="1" Classes="lbl" Text="metric" Margin="10,0,6,0"
+                       ToolTip.Tip="{Binding MetricRankText}" />
+            <TextBox Grid.Column="2" Classes="mono num" Text="{Binding MetricText}" Watermark="0"
+                     IsEnabled="{Binding MetricEnabled}" ToolTip.Tip="{Binding MetricRankText}" />
           </Grid>
 
-          <TextBlock Grid.Row="1" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Endpoint" IsVisible="{Binding ShowWgFields}" Margin="0,5,10,4" />
-          <Grid Grid.Row="1" Grid.Column="1" ColumnDefinitions="*,Auto,34" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
-            <TextBox Grid.Column="0" Classes="mono" MinWidth="90" Text="{Binding Endpoint}" Watermark="host:port" />
-            <TextBlock Grid.Column="1" Classes="lbl" Text="keepalive" Margin="10,0,6,0"
-                       ToolTip.Tip="PersistentKeepalive — seconds between keepalive packets (blank = off)" />
-            <TextBox Grid.Column="2" Classes="mono num" Text="{Binding KeepaliveText}" Watermark="off" />
+          <TextBlock Grid.Row="1" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Keepalive" IsVisible="{Binding ShowWgFields}" Margin="0,5,10,4" />
+          <Grid Grid.Row="1" Grid.Column="1" ColumnDefinitions="34,*" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
+            <TextBox Grid.Column="0" Classes="mono num" Text="{Binding KeepaliveText}" Watermark="off"
+                     ToolTip.Tip="PersistentKeepalive — seconds between keepalive packets (blank = off)" />
+            <TextBlock Grid.Column="1" Classes="lbl" Margin="10,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                       Text="{Binding MetricRankText}" IsVisible="{Binding MetricEnabled}" />
           </Grid>
 
           <TextBlock Grid.Row="2" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Public key" IsVisible="{Binding ShowWgFields}" Margin="0,5,10,4" />
@@ -86,19 +87,11 @@
             </ItemsControl.DataTemplates>
           </ItemsControl>
 
-          <Grid Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" ColumnDefinitions="Auto,*" IsVisible="{Binding ShowWgFields}" Margin="0,6,0,5">
-            <TextBlock Grid.Column="0" Classes="grplbl sg" Text="SPLITGUARD" Margin="0,0,8,0" />
-            <Border Grid.Column="1" Height="1" Background="{DynamicResource HairlineBrush}" VerticalAlignment="Center" />
-          </Grid>
-
           <!-- DNS + domains flow as one line: the DNS box is the first wrap item, chips
                fill the rest of the line and only the overflow wraps below. -->
-          <Panel Grid.Row="5" Grid.Column="0" VerticalAlignment="Top" Margin="0,5,10,0">
-            <TextBlock Classes="lbl" Text="Split DNS" IsVisible="{Binding ShowWgFields}"
-                       ToolTip.Tip="These domains resolve through this server while the tunnel is up" />
-            <TextBlock Classes="lbl" Text="DNS" IsVisible="{Binding IsDnsOnly}" />
-          </Panel>
-          <ItemsControl Grid.Row="5" Grid.Column="1" ItemsSource="{Binding Domains}">
+          <TextBlock Grid.Row="4" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="DNS" Margin="0,5,10,0"
+                     ToolTip.Tip="These domains resolve through this server while the tunnel is up" />
+          <ItemsControl Grid.Row="4" Grid.Column="1" ItemsSource="{Binding Domains}">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
@@ -143,9 +136,9 @@
             </ItemsControl.DataTemplates>
           </ItemsControl>
 
-          <TextBlock Grid.Row="6" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Ping" IsVisible="{Binding ShowWgFields}" Margin="0,5,10,4"
+          <TextBlock Grid.Row="5" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Healthcheck" IsVisible="{Binding ShowWgFields}" Margin="0,5,10,4"
                      ToolTip.Tip="In-tunnel IP probed on a fixed period. When set, it decides failover health; without it, handshake freshness decides. The knobs unlock once a valid host is set." />
-          <Grid Grid.Row="6" Grid.Column="1" ColumnDefinitions="*,Auto,34,Auto,34,Auto,34,Auto,34" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
+          <Grid Grid.Row="5" Grid.Column="1" ColumnDefinitions="*,Auto,34,Auto,34,Auto,34,Auto,34" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
             <TextBox Grid.Column="0" Classes="mono" MinWidth="56" Text="{Binding PingHostText}" Watermark="host to ping" />
             <TextBlock Grid.Column="1" Classes="lbl" Text="every" Margin="10,0,4,0" IsEnabled="{Binding HasPingHost}" ToolTip.Tip="How often to probe, in seconds (1-3600, default 5)" />
             <TextBox Grid.Column="2" Classes="mono num" Text="{Binding PingPeriodText}" Watermark="5" IsEnabled="{Binding HasPingHost}" />
@@ -157,17 +150,10 @@
             <TextBox Grid.Column="8" Classes="mono num" Text="{Binding PingTimeoutText}" Watermark="3" IsEnabled="{Binding HasPingHost}" />
           </Grid>
 
-          <TextBlock Grid.Row="7" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Metric" IsVisible="{Binding ShowWgFields}" Margin="0,5,10,4"
-                     ToolTip.Tip="Failover rank (0-10) when allowed IPs overlap another peer's — lower wins; peers in the same route group must use distinct values." />
-          <Grid Grid.Row="7" Grid.Column="1" ColumnDefinitions="34,*" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
-            <TextBox Grid.Column="0" Classes="mono num" Text="{Binding MetricText}" Watermark="0" IsEnabled="{Binding MetricEnabled}" />
-            <TextBlock Grid.Column="1" Classes="lbl" Margin="10,0,0,0" VerticalAlignment="Center"
-                       Text="{Binding MetricRankText}" TextTrimming="CharacterEllipsis" />
-          </Grid>
         </Grid>
 
         <Button Classes="link danger" Content="Remove peer" Command="{Binding RemovePeerCommand}"
-                HorizontalAlignment="Right" Margin="0,0,12,6" FontSize="{DynamicResource Fs115}" />
+                HorizontalAlignment="Right" Margin="0,0,14,6" FontSize="{DynamicResource Fs115}" />
       </StackPanel>
     </StackPanel>
   </Border>

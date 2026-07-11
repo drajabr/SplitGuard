@@ -115,6 +115,15 @@ public static class WireGuardConf
         return tunnel.Peers.FirstOrDefault(p => p.AllowedIps.Any(c => CidrContains(c, ip))) ?? tunnel.Peers[0];
     }
 
+    // True when container (e.g. 10.7.0.0/24) covers all of inner (e.g. 10.7.0.5/32):
+    // a shorter-or-equal prefix whose network includes the inner network.
+    public static bool CidrContainsCidr(string container, string inner)
+    {
+        if (!TryParseCidr(container, out _, out var outerPrefix)) return false;
+        if (!TryParseCidr(inner, out var innerIp, out var innerPrefix)) return false;
+        return outerPrefix <= innerPrefix && CidrContains(container, innerIp);
+    }
+
     public static bool CidrContains(string cidr, IPAddress ip)
     {
         if (!TryParseCidr(cidr, out var network, out var prefix)) return false;

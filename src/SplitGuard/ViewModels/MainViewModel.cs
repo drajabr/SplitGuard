@@ -380,23 +380,36 @@ public class MainViewModel : ObservableObject, ITunnelHost
     IEnumerable<PeerViewModel> WgPeerVms() =>
         Tunnels.Where(t => !t.IsExternal && !t.IsCustom).SelectMany(t => t.Peers);
 
+    // Two peers form a route group when any of their allowed IPs are the same range OR
+    // one range sits inside the other (a /32 inside another peer's /24 — the subset can
+    // then be ranked against the covering route).
     static bool SharesCidr(PeerViewModel a, PeerViewModel b) =>
-        a.AllowedIpValues.Select(WireGuardConf.CanonicalCidr)
-            .Intersect(b.AllowedIpValues.Select(WireGuardConf.CanonicalCidr)).Any();
+        a.AllowedIpValues.Select(WireGuardConf.CanonicalCidr).Any(ca =>
+            b.AllowedIpValues.Select(WireGuardConf.CanonicalCidr).Any(cb =>
+                WireGuardConf.CidrContainsCidr(ca, cb) || WireGuardConf.CidrContainsCidr(cb, ca)));
 
     public bool HasRouteGroup(PeerViewModel peer) =>
         WgPeerVms().Any(o => !ReferenceEquals(o, peer) && SharesCidr(o, peer));
 
-    // Rank readout for the Metric row: where this peer stands in its route group.
+    // Rank readout for the Metric row: where this peer stands in its route group. A group
+    // forms around each specific range; members are its exact claimants plus any peer
+    // whose broader route covers it. Checks the peer's own ranges first, then ranges it
+    // covers for someone else.
     public (int Position, int Size, string Cidr)? RouteGroupInfo(PeerViewModel peer)
     {
-        foreach (var cidr in peer.AllowedIpValues.Select(WireGuardConf.CanonicalCidr))
+        var mine = peer.AllowedIpValues.Select(WireGuardConf.CanonicalCidr).ToList();
+        var candidates = mine.Concat(
+            WgPeerVms().Where(p => !ReferenceEquals(p, peer))
+                .SelectMany(p => p.AllowedIpValues.Select(WireGuardConf.CanonicalCidr))
+                .Where(c => mine.Any(m => WireGuardConf.CidrContainsCidr(m, c))));
+        foreach (var cidr in candidates.Distinct())
         {
             var members = WgPeerVms()
-                .Where(p => p.AllowedIpValues.Select(WireGuardConf.CanonicalCidr).Contains(cidr))
+                .Where(p => p.AllowedIpValues.Select(WireGuardConf.CanonicalCidr)
+                    .Any(c => c == cidr || WireGuardConf.CidrContainsCidr(c, cidr)))
                 .OrderBy(p => p.ParsedMetric)
                 .ToList();
-            if (members.Count < 2) continue;
+            if (members.Count < 2 || !members.Contains(peer)) continue;
             return (members.IndexOf(peer) + 1, members.Count, cidr);
         }
         return null;

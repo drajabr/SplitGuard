@@ -130,9 +130,9 @@ public static class Netio
     }
 
     // Retarget an existing route's metric in place (failover arbitration between tunnels
-    // sharing the same destination prefix). Missing routes are ignored — the adapter may
-    // already be tearing down.
-    public static void SetRouteMetric(ulong luid, IPAddress destination, byte prefixLength, uint metric)
+    // sharing the same destination prefix). Returns false when the route doesn't exist —
+    // the adapter may be tearing down, or the caller may want to create a shadow route.
+    public static bool SetRouteMetric(ulong luid, IPAddress destination, byte prefixLength, uint metric)
     {
         destination = MaskToNetwork(destination, prefixLength);
         InitializeIpForwardEntry(out var row);
@@ -141,10 +141,24 @@ public static class Netio
         row.DestinationPrefixLength = prefixLength;
         row.NextHop = SockaddrInet.From(destination.AddressFamily == AddressFamily.InterNetwork
             ? IPAddress.Any : IPAddress.IPv6Any);
-        if (GetIpForwardEntry2(ref row) != 0) return;
-        if (row.Metric == metric) return;
+        if (GetIpForwardEntry2(ref row) != 0) return false;
+        if (row.Metric == metric) return true;
         row.Metric = metric;
         SetIpForwardEntry2(ref row);
+        return true;
+    }
+
+    // Remove a route we created (subset-failover shadow routes). Missing routes are ignored.
+    public static void DeleteRoute(ulong luid, IPAddress destination, byte prefixLength)
+    {
+        destination = MaskToNetwork(destination, prefixLength);
+        InitializeIpForwardEntry(out var row);
+        row.InterfaceLuid = luid;
+        row.DestinationPrefix = SockaddrInet.From(destination);
+        row.DestinationPrefixLength = prefixLength;
+        row.NextHop = SockaddrInet.From(destination.AddressFamily == AddressFamily.InterNetwork
+            ? IPAddress.Any : IPAddress.IPv6Any);
+        if (GetIpForwardEntry2(ref row) == 0) DeleteIpForwardEntry2(ref row);
     }
 
     static IPAddress MaskToNetwork(IPAddress ip, byte prefixLength)

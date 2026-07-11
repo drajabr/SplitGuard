@@ -4,7 +4,7 @@
   <Style Selector="TextBox">
     <Setter Property="MinHeight" Value="{DynamicResource CtrlH}" />
     <Setter Property="Padding" Value="8,3" />
-    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="CornerRadius" Value="6" />
     <Setter Property="FontSize" Value="{DynamicResource Fs13}" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
     <Setter Property="Background" Value="Transparent" />
@@ -79,18 +79,6 @@
     <Setter Property="BorderThickness" Value="0" />
     <Setter Property="Padding" Value="4" />
     <Setter Property="MinHeight" Value="0" />
-  </Style>
-  <!-- Group separators inside a peer form: stock wg-quick keys vs SplitGuard extensions. -->
-  <Style Selector="TextBlock.grplbl">
-    <Setter Property="FontSize" Value="{DynamicResource Fs9}" />
-    <Setter Property="FontWeight" Value="Bold" />
-    <Setter Property="LetterSpacing" Value="1.4" />
-    <Setter Property="Opacity" Value="0.45" />
-    <Setter Property="VerticalAlignment" Value="Center" />
-  </Style>
-  <Style Selector="TextBlock.grplbl.sg">
-    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
-    <Setter Property="Opacity" Value="0.8" />
   </Style>
   <Style Selector="Button.chipx">
     <Setter Property="Background" Value="Transparent" />
@@ -209,7 +197,7 @@
   <Style Selector="Border.card">
     <Setter Property="BorderBrush" Value="{DynamicResource HairlineBrush}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="CornerRadius" Value="11" />
     <Setter Property="ClipToBounds" Value="True" />
   </Style>
   <Style Selector="Border.card.editing">
@@ -222,7 +210,7 @@
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderBrush" Value="{DynamicResource FieldBorderBrush}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="CornerRadius" Value="6" />
     <Setter Property="Padding" Value="8,3" />
     <Setter Property="MinHeight" Value="{DynamicResource CtrlH}" />
     <Setter Property="VerticalAlignment" Value="Center" />
@@ -264,7 +252,7 @@
   <Style Selector="Border.peerblock">
     <Setter Property="BorderBrush" Value="{DynamicResource HairlineBrush}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="CornerRadius" Value="8" />
   </Style>
 
   <Style Selector="TextBlock.lbl">

@@ -72,7 +72,7 @@
           <!-- Interface: one full-width line — keys and addresses flow left, generate +
                listen port dock to the upper-right corner. -->
           <Border Classes="peerblock" Margin="12,8,12,6" IsVisible="{Binding ShowInterfaceSection}">
-            <Grid Margin="10,6,12,6" ColumnDefinitions="64,*" RowDefinitions="Auto,Auto">
+            <Grid Margin="14,6,14,6" ColumnDefinitions="76,*" RowDefinitions="Auto,Auto">
               <!-- Private key: masked input with reveal + generate; the derived public key
                    is metadata after it (click to copy), never a second field. -->
               <TextBlock Grid.Row="0" Grid.Column="0" Classes="lbl" VerticalAlignment="Center" Text="Private key" Margin="0,0,10,6" />

@@ -357,6 +357,15 @@ public class TunnelManager : IDisposable
 
     // ---- health + failover arbitration --------------------------------------------
 
+    // True when this route strictly covers the given group key (broader prefix that
+    // contains the key's network).
+    static bool CoversKey((IPAddress Ip, byte Cidr) route, string innerKey)
+    {
+        if (!WireGuardConf.TryParseCidr(innerKey, out var innerIp, out var innerPrefix)) return false;
+        return route.Cidr < innerPrefix
+            && WireGuardConf.CidrContains($"{route.Ip}/{route.Cidr}", innerIp);
+    }
+
     static string CidrKey(IPAddress ip, byte cidr)
     {
         // Mask host bits so equivalent entries group regardless of how they were typed.
@@ -421,6 +430,9 @@ public class TunnelManager : IDisposable
     readonly object _reconcileGate = new();
     readonly Dictionary<string, string> _groupActive = new();          // group cidr → member key
     readonly Dictionary<(ulong Luid, string Cidr), uint> _appliedMetric = new();
+    // Specific-range routes we created on adapters that only cover the range with a
+    // broader route (subset failover) — ours to delete when the group dissolves.
+    readonly HashSet<(ulong Luid, string Cidr)> _shadowRoutes = new();
 
     // Serialized: called concurrently from the poll timer and from Connect/Disconnect
     // background tasks, over shared dictionaries and peer health state.
@@ -448,6 +460,15 @@ public class TunnelManager : IDisposable
                     if (!groups.TryGetValue(key, out var list)) groups[key] = list = new();
                     if (!list.Any(m => ReferenceEquals(m.Peer, p))) list.Add((t, p));
                 }
+            }
+        // Subset routes: a specific range (10.7.0.5/32) also groups with every peer whose
+        // broader route covers it (10.7.0.0/24) — the group key stays the specific range,
+        // and the covering peers become failover candidates for it.
+        foreach (var key in groups.Keys.ToList())
+            foreach (var (t, p) in all)
+            {
+                if (groups[key].Any(m => ReferenceEquals(m.Peer, p))) continue;
+                if (p.AllowedIps.Any(a => CoversKey(a, key))) groups[key].Add((t, p));
             }
         foreach (var key in groups.Where(g => g.Value.Count < 2).Select(g => g.Key).ToList())
             groups.Remove(key);
@@ -482,20 +503,28 @@ public class TunnelManager : IDisposable
 
             // Route metrics: the active member's adapter wins; every other adapter in the
             // group is pushed far back. Adapters keep one route per CIDR regardless of how
-            // many of their peers claim it.
+            // many of their peers claim it. Adapters that only cover the range with a
+            // broader route get a shadow route for it — prefix length beats metric, so a
+            // covering peer can never win against a live specific route without one.
             uint standby = StandbyMetricBase;
             foreach (var adapterMembers in ordered.GroupBy(m => m.Tunnel))
             {
                 var t = adapterMembers.Key;
                 var metric = ReferenceEquals(t, active.Tunnel) ? 0u : standby += 16;
-                ApplyMetric(t, key, metric);
+                var claimants = adapterMembers
+                    .Where(m => m.Peer.AllowedIps.Any(a => CidrKey(a.Ip, a.Cidr) == key))
+                    .ToList();
+                if (claimants.Count > 0) ApplyMetric(t, key, metric);
+                else EnsureShadowRoute(t, key, metric);
 
-                // Within one adapter the CIDR must live on exactly one peer: the group's
-                // active peer if it's here, else the adapter's best healthy member.
+                // Within one adapter the CIDR must live on exactly one peer's WG config:
+                // the group's active peer if it's here (a covering owner simply takes the
+                // range away from its unhealthy claimants — WireGuard's cryptokey routing
+                // then falls through to the broader route), else the best healthy claimant.
                 var owner = ReferenceEquals(t, active.Tunnel)
                     ? active.Peer
-                    : (adapterMembers.FirstOrDefault(m => m.Peer.Healthy).Peer ?? adapterMembers.First().Peer);
-                if (adapterMembers.Count() > 1 &&
+                    : (claimants.FirstOrDefault(m => m.Peer.Healthy).Peer ?? claimants.FirstOrDefault().Peer);
+                if (owner is not null && claimants.Count > 0 && adapterMembers.Count() > 1 &&
                     (!t.IntraOwner.TryGetValue(key, out var cur) || cur != owner.Key))
                 {
                     t.IntraOwner[key] = owner.Key;
@@ -504,28 +533,51 @@ public class TunnelManager : IDisposable
             }
         }
 
-        // Groups that dissolved (disconnect / config change): drop state and restore the
-        // surviving route — if any — to the default metric so it isn't stuck on standby.
+        // Groups that dissolved (disconnect / config change): drop state, delete any
+        // shadow routes we created, and restore the surviving route — if any — to the
+        // default metric so it isn't stuck on standby.
         foreach (var stale in _groupActive.Keys.Where(k => !groups.ContainsKey(k)).ToList())
         {
             _groupActive.Remove(stale);
             foreach (var t in snapshot)
             {
                 _appliedMetric.Remove((t.Adapter.Luid, stale));
-                if (t.Peers.Any(p => p.AllowedIps.Any(a => CidrKey(a.Ip, a.Cidr) == stale)))
+                if (_shadowRoutes.Remove((t.Adapter.Luid, stale))
+                    && WireGuardConf.TryParseCidr(stale, out var sip, out var spfx))
+                    try { Netio.DeleteRoute(t.Adapter.Luid, sip, (byte)spfx); } catch { }
+                else if (t.Peers.Any(p => p.AllowedIps.Any(a => CidrKey(a.Ip, a.Cidr) == stale)))
                     ApplyMetric(t, stale, 0);
             }
         }
-        // Purge applied-metric state for adapters that no longer exist.
+        // Purge per-adapter state for adapters that no longer exist.
         var liveLuids = snapshot.Select(t => t.Adapter.Luid).ToHashSet();
         foreach (var k in _appliedMetric.Keys.Where(k => !liveLuids.Contains(k.Luid)).ToList())
             _appliedMetric.Remove(k);
+        _shadowRoutes.RemoveWhere(k => !liveLuids.Contains(k.Luid));
 
         foreach (var t in wgDirty)
         {
             try { t.Adapter.SetConfiguration(t.PrivateKey, t.ListenPort, BuildWgPeers(t)); }
             catch { }
         }
+    }
+
+    // Create-or-retune the specific route on an adapter whose peer only covers the range
+    // with a broader one. Kept in _shadowRoutes so dissolution can delete it.
+    void EnsureShadowRoute(ActiveTunnel tunnel, string groupCidr, uint metric)
+    {
+        var stateKey = (tunnel.Adapter.Luid, groupCidr);
+        if (_appliedMetric.TryGetValue(stateKey, out var cur) && cur == metric && _shadowRoutes.Contains(stateKey))
+            return;
+        if (!WireGuardConf.TryParseCidr(groupCidr, out var ip, out var prefix)) return;
+        try
+        {
+            if (!Netio.SetRouteMetric(tunnel.Adapter.Luid, ip, (byte)prefix, metric))
+                Netio.AddRoute(tunnel.Adapter.Luid, ip, (byte)prefix, metric: metric);
+            _shadowRoutes.Add(stateKey);
+            _appliedMetric[stateKey] = metric;
+        }
+        catch { } // adapter tearing down: reconcile retries next tick
     }
 
     void ApplyMetric(ActiveTunnel tunnel, string groupCidr, uint metric)
