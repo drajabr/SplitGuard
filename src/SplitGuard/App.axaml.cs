@@ -44,6 +44,11 @@ public class App : Application
             };
             SetupTray(desktop, window);
             _vm.Tunnels.CollectionChanged += OnTunnelsChanged;
+            _vm.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName is nameof(MainViewModel.DnsStatus) or nameof(MainViewModel.DnsPinned))
+                    Dispatcher.UIThread.Post(UpdateTrayDns);
+            };
             HookTunnels();
             // Keep the no-UAC launcher task registered (and pointing at the current exe).
             if (_vm.Prefs.SkipUacLaunch && !Services.RuleStore.DemoMode)
@@ -118,16 +123,55 @@ public class App : Application
     {
         if (e.PropertyName is nameof(TunnelViewModel.IsConnected) or nameof(TunnelViewModel.Name))
             Dispatcher.UIThread.Post(RebuildTrayMenu);
+        // Live status (RTT / connecting / handshake) refreshes in place every stats tick —
+        // the native menu reads current item headers when it opens.
+        else if (e.PropertyName is nameof(TunnelViewModel.StatsTick) or nameof(TunnelViewModel.IsEstablished)
+                 && sender is TunnelViewModel t)
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (_trayItems.TryGetValue(t, out var item)) item.Header = TrayItemText(t);
+            });
     }
+
+    // "office — 23 ms" · "homelab — connecting…" · "wg-corp — external": the D2 mock's
+    // status-at-a-glance, kept live while the app runs.
+    static string TrayItemText(TunnelViewModel t)
+    {
+        string status;
+        if (t.IsExternal) status = t.IsConnected ? "external · up" : "external";
+        else if (t.IsCustom) status = t.IsConnected ? "active" : "off";
+        else if (!t.IsConnected) status = "off";
+        else if (!t.IsEstablished) status = "connecting…";
+        else
+        {
+            var rtt = t.Peers.Select(p => p.PingText).FirstOrDefault(s => !string.IsNullOrEmpty(s));
+            status = string.IsNullOrEmpty(rtt) ? "connected" : rtt;
+        }
+        return $"{t.Name}  —  {status}";
+    }
+
+    string DnsItemText() =>
+        _vm is null ? "Device DNS: system"
+        : _vm.DnsPinned ? $"Device DNS: {_vm.DnsStatus}  (pinned)"
+        : "Device DNS: system";
+
+    void UpdateTrayDns()
+    {
+        if (_dnsItem is not null) _dnsItem.Header = DnsItemText();
+    }
+
+    readonly Dictionary<TunnelViewModel, NativeMenuItem> _trayItems = new();
+    NativeMenuItem? _dnsItem;
 
     void RebuildTrayMenu()
     {
         if (_tray is null || _vm is null) return;
         var menu = new NativeMenu();
+        _trayItems.Clear();
         foreach (var tunnel in _vm.Tunnels)
         {
             if (tunnel.IsCustom) continue; // the custom DNS card isn't a connection
-            var item = new NativeMenuItem(tunnel.Name)
+            var item = new NativeMenuItem(TrayItemText(tunnel))
             {
                 ToggleType = NativeMenuItemToggleType.CheckBox,
                 IsChecked = tunnel.IsConnected,
@@ -136,9 +180,16 @@ public class App : Application
             var captured = tunnel;
             item.Click += (_, _) => captured.IsConnected = !captured.IsConnected;
             menu.Items.Add(item);
+            _trayItems[tunnel] = item;
         }
         if (menu.Items.Count > 0)
             menu.Items.Add(new NativeMenuItemSeparator());
+
+        // Device-DNS line: what owns the system resolver right now. Click opens the window.
+        _dnsItem = new NativeMenuItem(DnsItemText());
+        _dnsItem.Click += (_, _) => ShowMainWindow?.Invoke();
+        menu.Items.Add(_dnsItem);
+        menu.Items.Add(new NativeMenuItemSeparator());
 
         // App settings live here in the tray.
         var settings = new NativeMenuItem("Settings") { Menu = new NativeMenu() };

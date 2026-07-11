@@ -80,6 +80,18 @@
     <Setter Property="Padding" Value="4" />
     <Setter Property="MinHeight" Value="0" />
   </Style>
+  <!-- Group separators inside a peer form: stock wg-quick keys vs SplitGuard extensions. -->
+  <Style Selector="TextBlock.grplbl">
+    <Setter Property="FontSize" Value="{DynamicResource Fs9}" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="LetterSpacing" Value="1.4" />
+    <Setter Property="Opacity" Value="0.45" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TextBlock.grplbl.sg">
+    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="Opacity" Value="0.8" />
+  </Style>
   <Style Selector="Button.chipx">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />

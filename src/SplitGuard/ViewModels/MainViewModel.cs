@@ -387,6 +387,21 @@ public class MainViewModel : ObservableObject, ITunnelHost
     public bool HasRouteGroup(PeerViewModel peer) =>
         WgPeerVms().Any(o => !ReferenceEquals(o, peer) && SharesCidr(o, peer));
 
+    // Rank readout for the Metric row: where this peer stands in its route group.
+    public (int Position, int Size, string Cidr)? RouteGroupInfo(PeerViewModel peer)
+    {
+        foreach (var cidr in peer.AllowedIpValues.Select(WireGuardConf.CanonicalCidr))
+        {
+            var members = WgPeerVms()
+                .Where(p => p.AllowedIpValues.Select(WireGuardConf.CanonicalCidr).Contains(cidr))
+                .OrderBy(p => p.ParsedMetric)
+                .ToList();
+            if (members.Count < 2) continue;
+            return (members.IndexOf(peer) + 1, members.Count, cidr);
+        }
+        return null;
+    }
+
     // A route group with duplicate metrics can't be arbitrated; blocks connect.
     public string? MetricConflict(TunnelViewModel tunnel)
     {

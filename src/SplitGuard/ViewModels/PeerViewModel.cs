@@ -20,7 +20,7 @@ public partial class PeerViewModel : ObservableObject
         RemoveAllowedIpCommand = new RelayCommand(p => AllowedIps.Remove((string)p!));
         TogglePinCommand = new RelayCommand(() => _tunnel.Host.TogglePin(_tunnel, this));
         RemovePeerCommand = new RelayCommand(() => _tunnel.RemovePeer(this));
-        AllowedIps.CollectionChanged += (_, _) => Raise(nameof(MetricEnabled));
+        AllowedIps.CollectionChanged += (_, _) => { Raise(nameof(MetricEnabled)); Raise(nameof(MetricRankText)); };
         // DNS-only cards (external/custom) have only this body, so keep it open; real
         // WireGuard peers start collapsed so a multi-peer tunnel opens as a tidy list.
         _isExpanded = IsDnsOnly;
@@ -114,13 +114,31 @@ public partial class PeerViewModel : ObservableObject
     // Failover rank (0-10) for overlapping allowed IPs: lower wins; peers in the same
     // route group must use distinct values (checked when connecting).
     string _metricText = "";
-    public string MetricText { get => _metricText; set => Set(ref _metricText, value); }
+    public string MetricText
+    {
+        get => _metricText;
+        set { if (Set(ref _metricText, value)) Raise(nameof(MetricRankText)); }
+    }
 
     public int ParsedMetric => int.TryParse(MetricText.Trim(), out var v) ? v : 0;
 
     // Metric only matters inside a route group — greyed out until this peer's allowed
     // IPs actually overlap another peer's. Refreshed when this peer's list changes.
     public bool MetricEnabled => _tunnel.Host.HasRouteGroup(this);
+
+    // The consequence of the number, spelled out: "→ 1st of 2 for 10.7.0.0/24 · lower wins".
+    public string MetricRankText
+    {
+        get
+        {
+            if (IsDnsOnly) return "";
+            if (_tunnel.Host.RouteGroupInfo(this) is not { } g)
+                return "no overlap with another peer — unused";
+            return $"→ {Ordinal(g.Position)} of {g.Size} for {g.Cidr} · lower wins";
+        }
+    }
+
+    static string Ordinal(int n) => n switch { 1 => "1st", 2 => "2nd", 3 => "3rd", _ => $"{n}th" };
 
     // Strings plus a trailing AddSlot (the inline "+" box).
     public ObservableCollection<object> AllowedIps { get; } = new();

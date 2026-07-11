@@ -127,28 +127,41 @@ public partial class TunnelCard : UserControl
     // validated for real when the tunnel is turned on).
     void RunLint(string text)
     {
+        // "line N — " prefix where the offending key/value pair can be located.
+        var lines = text.Split('\n');
+        string At(string key, string? value)
+        {
+            for (int n = 0; n < lines.Length; n++)
+            {
+                if (!lines[n].TrimStart().StartsWith(key, StringComparison.OrdinalIgnoreCase)) continue;
+                if (value is null || lines[n].Contains(value, StringComparison.OrdinalIgnoreCase))
+                    return $"line {n + 1} — ";
+            }
+            return "";
+        }
+
         string result;
         try
         {
             var parsed = Models.WireGuardConf.Parse(text);
             var problems = new List<string>(parsed.Warnings);
             if (!PeerViewModel.IsValidKey(parsed.PrivateKey))
-                problems.Add("PrivateKey is not a valid 32-byte base64 key");
+                problems.Add($"{At("PrivateKey", null)}PrivateKey is not a valid 32-byte base64 key");
             int i = 0;
             foreach (var p in parsed.Peers)
             {
                 i++;
                 var label = p.Name ?? $"peer {i}";
                 if (!PeerViewModel.IsValidKey(p.PublicKey))
-                    problems.Add($"{label}: PublicKey is not a valid 32-byte base64 key");
+                    problems.Add($"{At("PublicKey", p.PublicKey.Length > 0 ? p.PublicKey : null)}{label}: PublicKey is not a valid 32-byte base64 key");
                 if (p.AllowedIps.Count == 0)
                     problems.Add($"{label}: no AllowedIPs");
                 if (p.PingHost is not null && System.Net.IPAddress.TryParse(p.PingHost, out var ping)
                     && !p.AllowedIps.Any(c => Models.WireGuardConf.CidrContains(c, ping)))
-                    problems.Add($"{label}: PingHost {p.PingHost} is outside AllowedIPs — probes wouldn't test the tunnel");
+                    problems.Add($"{At("PingHost", p.PingHost)}{label}: PingHost {p.PingHost} is outside AllowedIPs — probes wouldn't test the tunnel");
                 if (p.Dns is not null && System.Net.IPAddress.TryParse(p.Dns, out var dns)
                     && !p.AllowedIps.Any(c => Models.WireGuardConf.CidrContains(c, dns)))
-                    problems.Add($"{label}: DNS {p.Dns} is outside AllowedIPs — queries would leak outside the tunnel");
+                    problems.Add($"{At("DNS", p.Dns)}{label}: DNS {p.Dns} is outside AllowedIPs — queries would leak outside the tunnel");
             }
             result = problems.Count == 0 ? "" : "● " + string.Join("\n● ", problems);
         }

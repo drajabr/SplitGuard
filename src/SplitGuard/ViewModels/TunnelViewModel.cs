@@ -12,6 +12,9 @@ public interface ITunnelHost
     bool IsDomainInUse(string domain, PeerViewModel except);
     // Whether this peer's allowed IPs overlap another peer's (metric is moot otherwise).
     bool HasRouteGroup(PeerViewModel peer);
+    // The peer's failover standing: (position by metric, group size, shared CIDR), or
+    // null when its allowed IPs overlap nobody.
+    (int Position, int Size, string Cidr)? RouteGroupInfo(PeerViewModel peer);
     // Overlapping peers with equal metrics (a route group can't arbitrate them).
     string? MetricConflict(TunnelViewModel tunnel);
     void EditStarted(TunnelViewModel tunnel);
@@ -118,7 +121,15 @@ public class TunnelViewModel : ObservableObject
     public string Name { get => _name; set => Set(ref _name, value); }
 
     string _publicKeyFull = "";
-    public string PublicKeyFull { get => _publicKeyFull; set => Set(ref _publicKeyFull, value); }
+    public string PublicKeyFull
+    {
+        get => _publicKeyFull;
+        set { if (Set(ref _publicKeyFull, value)) Raise(nameof(PublicKeyShort)); }
+    }
+
+    // Abbreviated derived public key for the identity row's metadata link.
+    public string PublicKeyShort =>
+        PublicKeyFull.Length > 14 ? $"{PublicKeyFull[..8]}…{PublicKeyFull[^4..]}" : PublicKeyFull;
 
     public ObservableCollection<object> Addresses { get; } = new() { new AddSlot() };
     public IEnumerable<string> AddressValues => Addresses.OfType<string>();
