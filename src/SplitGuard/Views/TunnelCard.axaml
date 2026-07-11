@@ -56,7 +56,7 @@
                            FontFamily="Cascadia Mono, Consolas, Courier New, monospace" FontSize="{DynamicResource Fs12}"
                            Background="Transparent"
                            Foreground="{DynamicResource TextControlForeground}"
-                           ShowLineNumbers="True"
+                           ShowLineNumbers="False"
                            HorizontalScrollBarVisibility="Auto"
                            VerticalScrollBarVisibility="Disabled" />
             <!-- Live lint: parse + sanity findings for the staged text, updated per keystroke. -->

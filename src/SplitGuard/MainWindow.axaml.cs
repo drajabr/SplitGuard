@@ -72,40 +72,8 @@ public partial class MainWindow : Window, IDialogs
             e.DragEffects = e.Data.Contains(DataFormats.Files) ? DragDropEffects.Copy : DragDropEffects.None);
         AddHandler(DragDrop.DropEvent, OnDrop);
 
-        // Native Alt+drag: tools like AltDrag can't inject into an elevated window (UIPI
-        // blocks the hooks), so the window handles it itself — Alt+left drag moves,
-        // Alt+right drag resizes from the quadrant under the pointer.
-        AddHandler(PointerPressedEvent, OnAltDrag, RoutingStrategies.Tunnel, handledEventsToo: true);
-
         var v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
         if (v is not null) VersionLabel.Text = $"v{v.Major}.{v.Minor}.{v.Build}";
-    }
-
-    void OnAltDrag(object? sender, PointerPressedEventArgs e)
-    {
-        if (!e.KeyModifiers.HasFlag(KeyModifiers.Alt)) return;
-        var point = e.GetCurrentPoint(this);
-        if (point.Properties.IsLeftButtonPressed)
-        {
-            e.Handled = true;
-            BeginMoveDrag(e);
-        }
-        else if (point.Properties.IsRightButtonPressed)
-        {
-            // Resize from whichever quadrant the pointer is in, like AltDrag does.
-            var pos = point.Position;
-            var horizontal = pos.X < Bounds.Width / 2 ? WindowEdge.West : WindowEdge.East;
-            var vertical = pos.Y < Bounds.Height / 2 ? WindowEdge.North : WindowEdge.South;
-            var edge = (horizontal, vertical) switch
-            {
-                (WindowEdge.West, WindowEdge.North) => WindowEdge.NorthWest,
-                (WindowEdge.East, WindowEdge.North) => WindowEdge.NorthEast,
-                (WindowEdge.West, WindowEdge.South) => WindowEdge.SouthWest,
-                _ => WindowEdge.SouthEast,
-            };
-            e.Handled = true;
-            BeginResizeDrag(edge, e);
-        }
     }
 
     async void OnDrop(object? sender, DragEventArgs e)
@@ -216,6 +184,11 @@ public partial class MainWindow : Window, IDialogs
         resources["DimOpacity"] = t.Dim;
         resources["HairlineBrush"] = new SolidColorBrush(Color.FromArgb(t.Hair, 0x80, 0x80, 0x80));
         resources["FieldBorderBrush"] = new SolidColorBrush(Color.FromArgb(t.Field, 0x80, 0x80, 0x80));
+        // Theme-button swatch: this palette's page tone, so the square previews the theme
+        // it selects (auto resolves to the OS light/dark tone).
+        var swatch = t.Page is not null ? Color.Parse(t.Page)
+            : (ActualThemeVariant == ThemeVariant.Light ? Color.Parse("#F4F3F0") : Color.Parse("#1A1C1F"));
+        resources["ThemeSwatchBrush"] = new SolidColorBrush(swatch);
         ToolTip.SetTip(ThemeButton, $"Theme: {t.Name}");
         ApplyAccent(); // re-resolve so a "mono" accent flips with the theme
     }

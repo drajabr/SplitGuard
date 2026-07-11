@@ -17,10 +17,11 @@
       <DockPanel>
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
           <Button Classes="hdr" Name="ThemeButton" Click="OnThemeClick" ToolTip.Tip="Theme">
-            <TextBlock Classes="glyph" Text="&#xE771;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
+            <Rectangle Width="12" Height="12" RadiusX="3" RadiusY="3" Fill="{DynamicResource ThemeSwatchBrush}"
+                       Stroke="{DynamicResource FieldBorderBrush}" StrokeThickness="1" VerticalAlignment="Center" />
           </Button>
           <Button Classes="hdr" Name="AccentButton" Click="OnAccentClick" ToolTip.Tip="Accent color">
-            <Rectangle Width="11" Height="11" RadiusX="3" RadiusY="3" Fill="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+            <Ellipse Width="11" Height="11" Fill="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
           </Button>
           <Button Classes="hdr" Name="FontButton" Click="OnFontClick" ToolTip.Tip="UI font">
             <TextBlock Classes="glyph" Text="&#xE8D2;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
