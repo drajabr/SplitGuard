@@ -1,0 +1,516 @@
+<meta charset="utf-8">
+<title>SplitGuard v2 — shortlist, stock-parity edition</title>
+<style>
+  :root {
+    --bg: #f4f5f4; --ink: #1b2420; --muted: #5b6864; --frame-bg: #fbfcfb;
+    --panel: #ffffff; --panel2: #f0f2f1; --line: #dbe0dd;
+    --accent: #199460; --on-accent: #ffffff;
+    --ip: #2b6fa8; --domain: #3d7d41; --keyc: #7a56ab;
+    --warn: #b07716; --danger: #b3423a; --dim: #8b948f;
+    --shadow: 0 12px 32px rgba(20,32,26,.12);
+    --good: #199460; --meh: #b07716; --bad: #b3423a;
+  }
+  @media (prefers-color-scheme: dark) { :root {
+    --bg: #101312; --ink: #e4e9e6; --muted: #94a09a; --frame-bg: #1a1e21;
+    --panel: #21262a; --panel2: #292f34; --line: #333a41;
+    --accent: #4cc38a; --on-accent: #0c1410;
+    --ip: #4fa3dd; --domain: #63b168; --keyc: #a37fd6;
+    --warn: #d9a13c; --danger: #d76d64; --dim: #5c6662;
+    --shadow: 0 16px 44px rgba(0,0,0,.5);
+    --good: #4cc38a; --meh: #d9a13c; --bad: #d76d64;
+  } }
+  :root[data-theme="dark"] {
+    --bg: #101312; --ink: #e4e9e6; --muted: #94a09a; --frame-bg: #1a1e21;
+    --panel: #21262a; --panel2: #292f34; --line: #333a41;
+    --accent: #4cc38a; --on-accent: #0c1410;
+    --ip: #4fa3dd; --domain: #63b168; --keyc: #a37fd6;
+    --warn: #d9a13c; --danger: #d76d64; --dim: #5c6662;
+    --shadow: 0 16px 44px rgba(0,0,0,.5);
+    --good: #4cc38a; --meh: #d9a13c; --bad: #d76d64;
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f5f4; --ink: #1b2420; --muted: #5b6864; --frame-bg: #fbfcfb;
+    --panel: #ffffff; --panel2: #f0f2f1; --line: #dbe0dd;
+    --accent: #199460; --on-accent: #ffffff;
+    --ip: #2b6fa8; --domain: #3d7d41; --keyc: #7a56ab;
+    --warn: #b07716; --danger: #b3423a; --dim: #8b948f;
+    --shadow: 0 12px 32px rgba(20,32,26,.12);
+    --good: #199460; --meh: #b07716; --bad: #b3423a;
+  }
+
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); margin: 0; padding: 48px 20px 90px;
+         font: 15px/1.55 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
+  .mono { font-family: "Cascadia Code", ui-monospace, Consolas, monospace; }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  header.intro { max-width: 660px; margin: 0 auto 8px; }
+  .eyebrow { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); font-weight: 600; margin-bottom: 10px; }
+  h1 { font-size: 29px; line-height: 1.2; margin: 0 0 13px; font-weight: 650; text-wrap: balance; }
+  .lede { color: var(--muted); margin: 0; }
+  .lede b { color: var(--ink); font-weight: 600; }
+
+  .band { max-width: 660px; margin: 62px auto 22px; }
+  .band h2 { font-size: 18px; font-weight: 650; margin: 0 0 5px; }
+  .band h2 .tag { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+    background: var(--accent); color: var(--on-accent); border-radius: 99px; padding: 2px 9px; vertical-align: 3px; margin-right: 8px; }
+  .band p { color: var(--muted); margin: 0; font-size: 14px; }
+  .center { display: flex; justify-content: center; gap: 36px; flex-wrap: wrap; align-items: flex-start; }
+
+  .opt { width: 372px; display: flex; flex-direction: column; gap: 10px; }
+  .opt.wide { width: 580px; }
+  .opt-h { display: flex; align-items: baseline; gap: 8px; }
+  .opt-h .id { font: 700 11px/1 "Cascadia Code", ui-monospace, monospace; color: var(--on-accent); background: var(--accent);
+               border-radius: 6px; padding: 4px 7px; }
+  .opt-h .id.alt { background: var(--panel2); color: var(--muted); border: 1px solid var(--line); }
+  .opt-h b { font-size: 14.5px; }
+  .opt p.desc { font-size: 12.5px; color: var(--muted); margin: 0; }
+  .verdict { display: flex; gap: 5px; flex-wrap: wrap; }
+  .v { font-size: 10.5px; border-radius: 99px; padding: 2px 9px; border: 1px solid var(--line); color: var(--muted); background: var(--panel); }
+  .v.g { color: var(--good); border-color: color-mix(in srgb, var(--good) 40%, transparent); }
+  .v.m { color: var(--meh); border-color: color-mix(in srgb, var(--meh) 40%, transparent); }
+  .v.b { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, transparent); }
+
+  .frame { background: var(--frame-bg); border: 1px solid var(--line); border-radius: 11px; box-shadow: var(--shadow); overflow: hidden; font-size: 12px; }
+  .tb { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+  .logo { width: 13px; height: 13px; border-radius: 4px; background: var(--accent); flex: none; }
+  .tb .caps { margin-left: auto; opacity: .5; letter-spacing: 3px; }
+
+  .sw { width: 30px; height: 17px; border-radius: 99px; background: var(--dim); position: relative; flex: none; opacity: .45; }
+  .sw.on { background: var(--accent); opacity: 1; }
+  .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: #fff; }
+  .sw.on::after { left: auto; right: 2px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); flex: none; }
+  .dot.up { background: var(--accent); }
+  .dot.cn { background: var(--warn); }
+  .chip { display: inline-flex; align-items: center; gap: 4px; height: 21px; padding: 0 8px;
+          border: 1px solid var(--line); background: var(--panel2); border-radius: 6px; font-size: 11px; }
+  .chip .x { color: var(--dim); font-size: 8px; }
+  .chip.add { border-style: dashed; color: var(--dim); }
+  .pill { display: inline-flex; align-items: center; height: 22px; border: 1px solid var(--line); background: var(--panel2); border-radius: 5px; padding: 0 7px; font-variant-numeric: tabular-nums; font-size: 11px; }
+  .pill.off { opacity: .4; }
+  .role { font-size: 8.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 1px 6px; border-radius: 99px; }
+  .role.a { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+  .role.s { background: var(--panel2); color: var(--dim); }
+  .btn { padding: 4px 12px; border-radius: 7px; font-size: 11.5px; font-weight: 600; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+  .btn.primary { background: var(--accent); color: var(--on-accent); border-color: transparent; }
+  .ip { color: var(--ip); } .dm { color: var(--domain); }
+
+  .row { display: grid; grid-template-columns: 84px 1fr; gap: 9px; align-items: center; min-height: 30px; }
+  .row + .row { margin-top: 5px; }
+  .row > label { font-size: 11px; color: var(--muted); text-align: right; }
+  .ctl { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .in { flex: 1; display: flex; align-items: center; gap: 7px; height: 27px; padding: 0 9px;
+        border: 1px solid var(--line); background: var(--panel2); border-radius: 6px; font-size: 11px; min-width: 110px; }
+  .in.fit { flex: none; min-width: 0; }
+  .in .aft { margin-left: auto; color: var(--dim); font-size: 10px; display: flex; gap: 7px; }
+  .in.okmark { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+  .meta { font-size: 10.5px; color: var(--dim); white-space: nowrap; }
+  .meta b { color: var(--muted); font-weight: 500; }
+  .stt { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 11px; color: var(--muted); }
+  .stt.off { opacity: .45; }
+
+  /* group separator inside a peer card: stock vs splitguard */
+  .grp { display: flex; align-items: center; gap: 8px; margin: 10px 0 7px; }
+  .grp .gl { font-size: 8.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); font-weight: 700; }
+  .grp .hr { flex: 1; height: 1px; background: var(--line); }
+  .grp .gl.sg { color: var(--accent); }
+
+  /* popover pieces */
+  .prow { display: grid; grid-template-columns: 30px 1fr 62px 10px; gap: 9px; align-items: center; padding: 8px 12px; }
+  .prow .nm { font-weight: 600; font-size: 12.5px; line-height: 1.25; }
+  .prow .st { font-size: 10.5px; color: var(--muted); }
+  .prow .st .ok { color: var(--accent); } .prow .st .cn { color: var(--warn); }
+  .prow .num { text-align: right; font-size: 11px; font-variant-numeric: tabular-nums; }
+  .prow .num small { display: block; font-size: 9.5px; color: var(--dim); }
+  .prow .chev { color: var(--dim); font-size: 8px; }
+  .prow.open { background: var(--panel2); }
+  .punfold { background: var(--panel2); padding: 0 12px 9px 51px; }
+  .urow { display: grid; grid-template-columns: 48px 1fr 76px; gap: 7px; align-items: baseline;
+          padding: 4px 0; border-top: 1px solid var(--line); font-size: 10.5px; color: var(--muted); }
+  .urow:first-child { border-top: none; }
+  .urow .k { color: var(--dim); } .urow .v { color: var(--ink); } .urow .r { text-align: right; font-variant-numeric: tabular-nums; }
+  .pfoot { display: flex; gap: 8px; align-items: center; padding: 8px 12px; border-top: 1px solid var(--line); font-size: 10.5px; color: var(--muted); }
+
+  .menu { padding: 5px; }
+  .mrow { display: flex; align-items: center; gap: 9px; padding: 6px 10px; border-radius: 6px; font-size: 12px; }
+  .mrow .mk { width: 14px; text-align: center; color: var(--accent); }
+  .mrow .sub { margin-left: auto; color: var(--dim); font-size: 10.5px; }
+  .mrow.sep { border-top: 1px solid var(--line); border-radius: 0; margin-top: 4px; padding-top: 8px; }
+  .mrow.hov { background: var(--panel2); }
+
+  .crumb { display: flex; align-items: center; gap: 8px; padding: 11px 16px 9px; }
+  .crumb .back { color: var(--muted); font-size: 12px; }
+  .crumb b { font-size: 14.5px; font-weight: 650; }
+  .crumb .sp { flex: 1; }
+  .mini { font-size: 10px; color: var(--muted); border: 1px solid var(--line); border-radius: 99px; padding: 1px 8px; }
+  .body { padding: 0 16px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 11px 13px; }
+  .card-h { display: flex; align-items: center; gap: 7px; margin-bottom: 9px; }
+  .card-h .t { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); font-weight: 700; }
+  .card-h .nm { font-size: 12.5px; font-weight: 650; }
+  .card-h .sp { flex: 1; }
+  .rank { font-size: 9px; font-weight: 700; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: 99px; padding: 1px 7px; }
+  .rank.two { color: var(--muted); border-color: var(--line); }
+
+  .md { display: grid; grid-template-columns: 132px 1fr; min-height: 250px; }
+  .md .rail { border-right: 1px solid var(--line); padding: 8px; display: flex; flex-direction: column; gap: 3px; }
+  .md .ritem { display: flex; align-items: center; gap: 7px; padding: 7px 9px; border-radius: 6px; font-size: 11.5px; font-weight: 600; }
+  .md .ritem.sel { background: var(--panel2); outline: 1px solid var(--line); }
+  .md .ritem .rk { margin-left: auto; font-size: 9px; color: var(--dim); font-weight: 500; }
+  .md .rsect { font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); padding: 8px 9px 2px; font-weight: 700; }
+  .md .form { padding: 12px 14px; }
+
+  .ide { display: grid; grid-template-columns: 26px 1fr; font-size: 11px; }
+  .ide .g { text-align: right; color: var(--dim); padding: 2px 6px 2px 0; background: var(--panel2); border-right: 1px solid var(--line); user-select: none; }
+  .ide .l { padding: 2px 0 2px 12px; white-space: pre; }
+  .ide .l .sec { color: var(--muted); font-weight: 700; }
+  .ide .l .pk { color: var(--dim); }
+  .ide .l .kv { color: var(--keyc); }
+  .ide .l .err { text-decoration: wavy underline var(--danger) 1px; text-underline-offset: 3px; }
+  .ide .g.errg { color: var(--danger); font-weight: 700; }
+  .idebar { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-top: 1px solid var(--line); font-size: 10.5px; color: var(--muted); }
+  .idebar .lint { color: var(--danger); }
+
+  .acc { padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+  .acard { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); overflow: hidden; }
+  .acard .ah { display: flex; align-items: center; gap: 9px; padding: 9px 12px; }
+  .acard .ah b { font-size: 12.5px; }
+  .acard .ah .st { font-size: 10.5px; color: var(--muted); }
+  .acard .ah .sp { flex: 1; }
+  .acard .ab { border-top: 1px solid var(--line); padding: 10px 12px; background: color-mix(in srgb, var(--panel2) 55%, transparent); }
+
+  .cmp { max-width: 860px; margin: 26px auto 0; overflow-x: auto; }
+  table.c { border-collapse: collapse; width: 100%; font-size: 12px; }
+  table.c th, table.c td { padding: 8px 12px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+  table.c th { font-size: 10px; letter-spacing: .09em; text-transform: uppercase; color: var(--dim); font-weight: 700; }
+  table.c td.o { font-weight: 600; }
+  table.c td.o small { display:block; font-weight: 400; color: var(--dim); font-size: 10.5px; }
+  .sc { font-weight: 700; }
+  .sc.g { color: var(--good); } .sc.m { color: var(--meh); } .sc.b { color: var(--bad); }
+  .pick { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+
+  .reco { max-width: 660px; margin: 60px auto 0; border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+          border-radius: 10px; padding: 18px 22px; background: color-mix(in srgb, var(--accent) 5%, transparent); }
+  .reco h2 { font-size: 15px; margin: 0 0 8px; }
+  .reco p { font-size: 13.5px; color: var(--muted); margin: 0 0 6px; }
+  .reco b { color: var(--ink); }
+  @media (max-width: 640px) { .opt, .opt.wide { width: 100%; } }
+</style>
+
+<div class="wrap">
+  <header class="intro">
+    <div class="eyebrow">SplitGuard · proposal 5 — shortlist, stock-parity edition</div>
+    <h1>Stock WireGuard first. Our extensions after the line.</h1>
+    <p class="lede">Shortlist per your cut: <b>D1 / D2 / D3</b> and <b>E1 / E3 / E5 / E7</b>. Three rules
+    now govern every peer form: <b>① stock fields lead, in stock order</b> — keepalive sits on the
+    Endpoint row where WireGuard puts it; <b>② Metric is an explicit per-peer field</b> whose derived
+    rank shows beside it; <b>③ health check has no toggle</b> — a ping-host box gates everything: valid
+    IP inside the peer's Allowed&nbsp;IPs → the interval knobs light up.</p>
+  </header>
+
+  <!-- ================= THE PEER FORM (canonical) ================= -->
+  <div class="band">
+    <h2><span class="tag">Canon</span>The peer form, settled</h2>
+    <p>This exact block drops into E1, E3, and E7 unchanged. A hairline splits the stock
+    <span class="mono" style="font-size:12px">[Peer]</span> keys from SplitGuard's — anyone coming from
+    wg-quick finds everything where they expect it, and knows precisely which lines are ours.</p>
+  </div>
+  <div class="center">
+    <div class="frame" style="width:560px; padding:14px 16px">
+      <div class="card" style="border:none; padding:0">
+        <div class="card-h"><span class="nm">main</span><span class="rank">active</span><span class="sp"></span><span class="meta">✕ remove</span></div>
+
+        <div class="grp"><span class="gl">WireGuard</span><span class="hr"></span></div>
+        <div class="row"><label>Endpoint</label>
+          <div class="ctl"><div class="in mono">vpn.office.example.com:51820</div>
+          <span class="meta">keepalive</span><span class="pill mono">25 s</span></div></div>
+        <div class="row"><label>Public key</label>
+          <div class="ctl"><div class="in mono">UA07yrTJa7Oj10Js4M04ZUVs…</div>
+          <span class="meta">preshared <b>none</b> ✎</span></div></div>
+        <div class="row"><label>Allowed IPs</label>
+          <div class="ctl"><span class="chip mono ip">10.7.0.0/24 <span class="x">✕</span></span>
+          <span class="chip mono ip">192.168.10.0/24 <span class="x">✕</span></span><span class="chip add">+</span></div></div>
+
+        <div class="grp"><span class="gl sg">SplitGuard</span><span class="hr"></span></div>
+        <div class="row"><label>Split DNS</label>
+          <div class="ctl"><span class="chip mono ip">📌 10.7.0.1</span>
+          <span class="chip mono dm">*.corp.example <span class="x">✕</span></span>
+          <span class="chip mono dm">*.lab.internal <span class="x">✕</span></span><span class="chip add">+</span></div></div>
+        <div class="row"><label>Ping</label>
+          <div class="ctl"><div class="in mono fit okmark" style="width:118px">10.7.0.1 ✓</div>
+          <span class="stt">every<span class="pill mono">5 s</span>timeout<span class="pill mono">3 s</span>·
+          down<span class="pill mono">3</span>up<span class="pill mono">3</span></span></div></div>
+        <div class="row"><label>Metric</label>
+          <div class="ctl"><div class="in mono fit" style="width:44px">1</div>
+          <span class="meta">→ <b style="color:var(--accent)">1st</b> of 2 for <b class="mono">10.7.0.0/24</b> · lower wins</span></div></div>
+      </div>
+
+      <div style="border-top:1px dashed var(--line); margin:13px -16px 0; padding:11px 16px 0">
+        <div class="card-h" style="margin-bottom:8px"><span class="nm" style="color:var(--muted)">backup</span><span class="rank two">standby</span><span class="sp"></span><span class="meta">the gate, closed ↓</span></div>
+        <div class="row"><label>Ping</label>
+          <div class="ctl"><div class="in mono fit" style="width:118px; color:var(--dim)">host to ping…</div>
+          <span class="stt off">every<span class="pill mono off">5 s</span>timeout<span class="pill mono off">3 s</span>·
+          down<span class="pill mono off">3</span>up<span class="pill mono off">3</span></span>
+          <span class="meta">← enabled once a valid IP inside Allowed IPs is set</span></div></div>
+        <div class="row"><label>Metric</label>
+          <div class="ctl"><div class="in mono fit" style="width:44px">2</div>
+          <span class="meta">→ <b>2nd</b> of 2 for <b class="mono">10.7.0.0/24</b></span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= DAILY SURFACES ================= -->
+  <div class="band">
+    <h2><span class="tag">Decision 1</span>Daily surface — D1 · D2 · D3</h2>
+    <p>Your shortlist. D1 and D3 share the exact same rows — D3 is simply D1 hosted in a normal window,
+    so building one nearly builds the other.</p>
+  </div>
+
+  <div class="center">
+    <div class="opt">
+      <div class="opt-h"><span class="id">D1</span><b>Tray popover</b></div>
+      <p class="desc">Switch rows on a fixed 4-column grid; a row unfolds to a 3-column detail table. Closes on focus loss.</p>
+      <div class="frame" style="width:330px">
+        <div class="tb"><div class="logo"></div><b>SplitGuard</b><span style="margin-left:auto">⚙</span></div>
+        <div class="prow open">
+          <span class="sw on"></span>
+          <div><div class="nm">office</div><div class="st"><span class="ok">Connected</span> · handshake 14 s</div></div>
+          <div class="num mono">23 ms<small>↓ 1.2 MB/s</small></div><span class="chev">▾</span>
+        </div>
+        <div class="punfold">
+          <div class="urow"><span class="k">main</span><span class="v">active<span class="role a" style="margin-left:5px">m1</span></span><span class="r mono">23 ms · 0%</span></div>
+          <div class="urow"><span class="k">backup</span><span class="v">standby<span class="role s" style="margin-left:5px">m2</span></span><span class="r mono">41 ms · 2%</span></div>
+          <div class="urow"><span class="k">traffic</span><span class="v" style="color:var(--muted)">since connect</span><span class="r mono">↑1.2 ↓8.7 GB</span></div>
+          <div class="urow"><span class="k">DNS</span><span class="v mono dm">*.corp.example…</span><span class="r mono ip">10.7.0.1</span></div>
+        </div>
+        <div class="prow"><span class="sw on"></span><div><div class="nm">homelab</div><div class="st"><span class="cn">Connecting…</span></div></div><div class="num mono" style="color:var(--dim)">·····</div><span class="chev">▸</span></div>
+        <div class="prow"><span class="sw"></span><div><div class="nm">wg-corp</div><div class="st">official client · DNS rules</div></div><div class="num"></div><span class="chev">▸</span></div>
+        <div class="pfoot"><span>📌</span><span>Device DNS <b class="mono ip">10.7.0.1</b> · rest → system</span></div>
+      </div>
+      <div class="verdict"><span class="v g">instant</span><span class="v g">zero-risk</span><span class="v g">scales</span><span class="v m">tray habit</span></div>
+    </div>
+
+    <div class="opt">
+      <div class="opt-h"><span class="id alt">D2</span><b>Tray menu</b></div>
+      <p class="desc">Official-client shape: plain menu, right-click companion to D1 (both can coexist — left-click popover, right-click menu).</p>
+      <div class="frame menu" style="width:240px">
+        <div class="mrow hov"><span class="mk">✓</span>office <span class="sub mono">23 ms</span></div>
+        <div class="mrow"><span class="mk"></span>homelab <span class="sub" style="color:var(--warn)">connecting</span></div>
+        <div class="mrow"><span class="mk"></span>wg-corp <span class="sub">external</span></div>
+        <div class="mrow sep"><span class="mk">📌</span>Device DNS: 10.7.0.1 <span class="sub">on</span></div>
+        <div class="mrow"><span class="mk"></span>Settings… <span class="sub">Ctrl+,</span></div>
+        <div class="mrow"><span class="mk"></span>Exit</div>
+      </div>
+      <div class="verdict"><span class="v g">cheapest</span><span class="v g">native feel</span><span class="v b">no live detail</span></div>
+    </div>
+
+    <div class="opt">
+      <div class="opt-h"><span class="id alt">D3</span><b>Compact window</b></div>
+      <p class="desc">D1's rows in a normal window for tray-skeptics. Could simply be a "pin open" mode of the popover.</p>
+      <div class="frame" style="width:330px">
+        <div class="tb"><div class="logo"></div><b>SplitGuard</b><div class="caps">– □ ×</div></div>
+        <div class="prow"><span class="sw on"></span><div><div class="nm">office</div><div class="st"><span class="ok">Connected</span> · 2 peers</div></div><div class="num mono">23 ms<small>↓ 1.2 MB/s</small></div><span class="chev">▸</span></div>
+        <div class="prow"><span class="sw on"></span><div><div class="nm">homelab</div><div class="st"><span class="cn">Connecting…</span></div></div><div class="num mono" style="color:var(--dim)">·····</div><span class="chev">▸</span></div>
+        <div class="pfoot"><span>📌</span><span>Device DNS <b class="mono ip">10.7.0.1</b></span><span style="margin-left:auto">⚙ Settings</span></div>
+      </div>
+      <div class="verdict"><span class="v g">familiar</span><span class="v g">shares D1's code</span><span class="v m">taskbar presence</span></div>
+    </div>
+  </div>
+
+  <!-- ================= EDIT SURFACES ================= -->
+  <div class="band">
+    <h2><span class="tag">Decision 2</span>Editing surface — E1 · E3 · E5 · E7</h2>
+    <p>All four host the same canonical peer form. They differ only in navigation.</p>
+  </div>
+
+  <div class="center">
+    <!-- E1 -->
+    <div class="opt wide">
+      <div class="opt-h"><span class="id">E1</span><b>Cards</b></div>
+      <p class="desc">One card per thing, back-arrow navigation, explicit Save. The canonical form, framed generously.</p>
+      <div class="frame">
+        <div class="tb"><div class="logo"></div>SplitGuard settings<div class="caps">– □ ×</div></div>
+        <div class="crumb"><span class="back">← Tunnels /</span><b>office</b><span class="meta">✎</span><span class="sp"></span><span class="mini mono">raw .conf</span></div>
+        <div class="body">
+          <div class="card">
+            <div class="card-h"><span class="t">Interface</span></div>
+            <div class="row"><label>Private key</label>
+              <div class="ctl"><div class="in mono">••••••••••••<span class="aft"><span>👁</span><span>↻</span></span></div>
+              <span class="meta mono">→ public <b>9qnn…T3hs</b> ⧉</span></div></div>
+            <div class="row"><label>Address</label>
+              <div class="ctl"><span class="chip mono ip">10.7.0.2/32 <span class="x">✕</span></span><span class="chip add">+</span>
+              <span class="meta">port <b class="mono">auto</b> ✎</span></div></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><span class="nm">main</span><span class="rank">active</span><span class="sp"></span><span class="meta">✕</span></div>
+            <div class="grp"><span class="gl">WireGuard</span><span class="hr"></span></div>
+            <div class="row"><label>Endpoint</label><div class="ctl"><div class="in mono">vpn.office.example.com:51820</div><span class="meta">keepalive</span><span class="pill mono">25 s</span></div></div>
+            <div class="row"><label>Public key</label><div class="ctl"><div class="in mono">UA07yrTJa7Oj10Js…</div><span class="meta">psk <b>none</b> ✎</span></div></div>
+            <div class="row"><label>Allowed IPs</label><div class="ctl"><span class="chip mono ip">10.7.0.0/24 <span class="x">✕</span></span><span class="chip mono ip">192.168.10.0/24 <span class="x">✕</span></span><span class="chip add">+</span></div></div>
+            <div class="grp"><span class="gl sg">SplitGuard</span><span class="hr"></span></div>
+            <div class="row"><label>Split DNS</label><div class="ctl"><span class="chip mono ip">📌 10.7.0.1</span><span class="chip mono dm">*.corp.example <span class="x">✕</span></span><span class="chip add">+</span></div></div>
+            <div class="row"><label>Ping</label><div class="ctl"><div class="in mono fit okmark" style="width:108px">10.7.0.1 ✓</div>
+              <span class="stt">every<span class="pill mono">5 s</span>timeout<span class="pill mono">3 s</span>down<span class="pill mono">3</span>up<span class="pill mono">3</span></span></div></div>
+            <div class="row"><label>Metric</label><div class="ctl"><div class="in mono fit" style="width:40px">1</div><span class="meta">→ <b style="color:var(--accent)">1st</b> for <b class="mono">10.7.0.0/24</b></span></div></div>
+          </div>
+          <div style="display:flex;gap:8px"><button class="btn" style="color:var(--danger);border:none;background:none">Delete</button><span style="flex:1"></span><button class="btn">+ Peer</button><button class="btn">Cancel</button><button class="btn primary">Save</button></div>
+        </div>
+      </div>
+      <div class="verdict"><span class="v g">friendliest</span><span class="v g">clear boundaries</span><span class="v m">taller page</span></div>
+    </div>
+
+    <!-- E3 -->
+    <div class="opt wide">
+      <div class="opt-h"><span class="id alt">E3</span><b>Master–detail</b></div>
+      <p class="desc">Rail with interface + peers (health dot, metric); the canonical form fills the pane, one peer at a time.</p>
+      <div class="frame">
+        <div class="tb"><div class="logo"></div>SplitGuard settings — office ✎<div class="caps">– □ ×</div></div>
+        <div class="md">
+          <div class="rail">
+            <div class="rsect">Tunnel</div>
+            <div class="ritem"><span class="dot" style="background:var(--keyc)"></span>Interface</div>
+            <div class="rsect">Peers</div>
+            <div class="ritem sel"><span class="dot up"></span>main<span class="rk mono">m1</span></div>
+            <div class="ritem"><span class="dot up"></span>backup<span class="rk mono">m2</span></div>
+            <div class="ritem" style="color:var(--dim)">+ peer</div>
+          </div>
+          <div class="form">
+            <div class="grp" style="margin-top:0"><span class="gl">WireGuard</span><span class="hr"></span></div>
+            <div class="row"><label>Endpoint</label><div class="ctl"><div class="in mono">vpn.office.example.com:51820</div><span class="meta">keepalive</span><span class="pill mono">25 s</span></div></div>
+            <div class="row"><label>Public key</label><div class="ctl"><div class="in mono">UA07yrTJa7Oj10Js…</div><span class="meta">psk <b>none</b> ✎</span></div></div>
+            <div class="row"><label>Allowed IPs</label><div class="ctl"><span class="chip mono ip">10.7.0.0/24 <span class="x">✕</span></span><span class="chip mono ip">192.168.10.0/24 <span class="x">✕</span></span><span class="chip add">+</span></div></div>
+            <div class="grp"><span class="gl sg">SplitGuard</span><span class="hr"></span></div>
+            <div class="row"><label>Split DNS</label><div class="ctl"><span class="chip mono ip">📌 10.7.0.1</span><span class="chip mono dm">*.corp.example <span class="x">✕</span></span><span class="chip add">+</span></div></div>
+            <div class="row"><label>Ping</label><div class="ctl"><div class="in mono fit okmark" style="width:108px">10.7.0.1 ✓</div>
+              <span class="stt">every<span class="pill mono">5 s</span>timeout<span class="pill mono">3 s</span>down<span class="pill mono">3</span>up<span class="pill mono">3</span></span></div></div>
+            <div class="row"><label>Metric</label><div class="ctl"><div class="in mono fit" style="width:40px">1</div><span class="meta">→ <b style="color:var(--accent)">1st</b> for <b class="mono">10.7.0.0/24</b></span></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="verdict"><span class="v g">best for many peers</span><span class="v g">full-width form</span><span class="v m">thin rail at 2 peers</span></div>
+    </div>
+
+    <!-- E5 -->
+    <div class="opt wide">
+      <div class="opt-h"><span class="id alt">E5</span><b>Config-as-code</b></div>
+      <p class="desc">The .conf as a first-class editor with linting. Stock keys naturally lead; SplitGuard keys follow inside each [Peer] — same order as the forms.</p>
+      <div class="frame">
+        <div class="tb"><div class="logo"></div>office.conf<div class="caps">– □ ×</div></div>
+        <div class="ide mono">
+          <span class="g">1</span><span class="l"><span class="sec">[Interface]</span></span>
+          <span class="g">2</span><span class="l"><span class="pk">PrivateKey</span> = <span class="kv">wG9k…Ala=</span></span>
+          <span class="g">3</span><span class="l"><span class="pk">Address</span> = <span class="ip">10.7.0.2/32</span></span>
+          <span class="g">4</span><span class="l"></span>
+          <span class="g">5</span><span class="l"><span class="sec">[Peer]</span>  <span style="color:var(--dim)"># main</span></span>
+          <span class="g">6</span><span class="l"><span class="pk">Endpoint</span> = vpn.office.example.com:51820</span>
+          <span class="g">7</span><span class="l"><span class="pk">PersistentKeepalive</span> = 25</span>
+          <span class="g">8</span><span class="l"><span class="pk">PublicKey</span> = <span class="kv">UA07…ZUVs</span></span>
+          <span class="g">9</span><span class="l"><span class="pk">AllowedIPs</span> = <span class="ip">10.7.0.0/24, 192.168.10.0/24</span></span>
+          <span class="g">10</span><span class="l"><span class="pk">DNS</span> = <span class="ip">10.7.0.1</span>   <span class="pk">Domains</span> = <span class="dm">*.corp.example</span></span>
+          <span class="g errg">11</span><span class="l"><span class="pk">PingHost</span> = <span class="err">10.8.0.1</span>   <span class="pk">PingPeriod</span> = 5</span>
+          <span class="g">12</span><span class="l"><span class="pk">Metric</span> = 1   <span style="color:var(--dim)"># 1st for 10.7.0.0/24</span></span>
+        </div>
+        <div class="idebar"><span class="lint">● line 11 — ping host is outside this peer's AllowedIPs, knobs stay off</span><span style="margin-left:auto">stock keys ✓</span></div>
+      </div>
+      <div class="verdict"><span class="v g">power users</span><span class="v g">diff/paste friendly</span><span class="v m">upgrade of today's Ctrl+E</span></div>
+    </div>
+
+    <!-- E7 -->
+    <div class="opt wide">
+      <div class="opt-h"><span class="id alt">E7</span><b>Accordion (status quo, evolved)</b></div>
+      <p class="desc">Today's single window, cards expanding inline — rebuilt on the canonical form. Cheapest migration; keeps status and edit on one surface.</p>
+      <div class="frame">
+        <div class="tb"><div class="logo"></div><b>SplitGuard</b><div class="caps">– □ ×</div></div>
+        <div class="acc">
+          <div class="acard">
+            <div class="ah"><span class="dot up"></span><b>office</b><span class="st mono">10.7.0.2/32</span><span class="sp"></span><span class="sw on"></span></div>
+            <div class="ab">
+              <div class="row"><label>Private key</label><div class="ctl"><div class="in mono">••••••••<span class="aft"><span>👁</span><span>↻</span></span></div><span class="meta mono">→ 9qnn…T3hs ⧉</span></div></div>
+              <div class="grp"><span class="gl">main · WireGuard</span><span class="hr"></span></div>
+              <div class="row"><label>Endpoint</label><div class="ctl"><div class="in mono">vpn.office.example.com:51820</div><span class="meta">keepalive</span><span class="pill mono">25 s</span></div></div>
+              <div class="row"><label>Allowed IPs</label><div class="ctl"><span class="chip mono ip">10.7.0.0/24 <span class="x">✕</span></span><span class="chip add">+</span></div></div>
+              <div class="grp"><span class="gl sg">main · SplitGuard</span><span class="hr"></span></div>
+              <div class="row"><label>Ping</label><div class="ctl"><div class="in mono fit okmark" style="width:104px">10.7.0.1 ✓</div><span class="stt">every<span class="pill mono">5 s</span>down<span class="pill mono">3</span>up<span class="pill mono">3</span></span></div></div>
+              <div class="row"><label>Metric</label><div class="ctl"><div class="in mono fit" style="width:40px">1</div><span class="meta">→ <b style="color:var(--accent)">1st</b> for 10.7.0.0/24</span></div></div>
+              <div style="display:flex;gap:8px;margin-top:9px"><span style="flex:1"></span><button class="btn">Cancel</button><button class="btn primary">Save</button></div>
+            </div>
+          </div>
+          <div class="acard"><div class="ah"><span class="dot cn"></span><b>homelab</b><span class="st"><span style="color:var(--warn)">Connecting…</span></span><span class="sp"></span><span class="sw on"></span></div></div>
+        </div>
+      </div>
+      <div class="verdict"><span class="v g">cheapest migration</span><span class="v m">status/edit share a surface</span><span class="v m">keeps animation machinery</span></div>
+    </div>
+  </div>
+
+  <!-- ================= COMPARISON ================= -->
+  <div class="band">
+    <h2><span class="tag">Compare</span>The shortlist, scored</h2>
+    <p>Green = strong · amber = workable · red = weak. "Build" = migration effort from today's code.</p>
+  </div>
+
+  <div class="cmp">
+    <table class="c">
+      <tr><th>Daily surface</th><th>Glance speed</th><th>Detail depth</th><th>Build</th><th>Fits 2 tunnels</th><th>Fits 10</th></tr>
+      <tr class="pick"><td class="o">D1 · Tray popover<small>recommended</small></td><td class="sc g">●●●</td><td class="sc g">●●●</td><td class="sc m">●●</td><td class="sc g">●●●</td><td class="sc g">●●●</td></tr>
+      <tr><td class="o">D2 · Tray menu<small>coexists with D1 as right-click</small></td><td class="sc g">●●●</td><td class="sc b">●</td><td class="sc g">●●●</td><td class="sc g">●●●</td><td class="sc m">●●</td></tr>
+      <tr><td class="o">D3 · Compact window<small>= D1 pinned open</small></td><td class="sc m">●●</td><td class="sc g">●●●</td><td class="sc g">●●●</td><td class="sc g">●●●</td><td class="sc m">●●</td></tr>
+    </table>
+  </div>
+
+  <div class="cmp">
+    <table class="c">
+      <tr><th>Edit surface</th><th>Learnability</th><th>Density</th><th>Build</th><th>2 peers</th><th>Many peers</th></tr>
+      <tr class="pick"><td class="o">E1 · Cards<small>recommended start</small></td><td class="sc g">●●●</td><td class="sc m">●●</td><td class="sc g">●●●</td><td class="sc g">●●●</td><td class="sc m">●●</td></tr>
+      <tr><td class="o">E3 · Master–detail<small>upgrade path when peers grow</small></td><td class="sc g">●●●</td><td class="sc g">●●●</td><td class="sc m">●●</td><td class="sc m">●●</td><td class="sc g">●●●</td></tr>
+      <tr><td class="o">E5 · Config-as-code<small>as the Ctrl+E raw mode</small></td><td class="sc b">●</td><td class="sc g">●●●</td><td class="sc g">●●●</td><td class="sc g">●●●</td><td class="sc g">●●●</td></tr>
+      <tr><td class="o">E7 · Accordion<small>fallback: zero new windows</small></td><td class="sc g">●●●</td><td class="sc m">●●</td><td class="sc g">●●●</td><td class="sc g">●●●</td><td class="sc b">●</td></tr>
+    </table>
+  </div>
+
+  <!-- ================= FEATURE PARITY ================= -->
+  <div class="band">
+    <h2><span class="tag">Parity</span>Feature map — nothing gets lost</h2>
+    <p>Every current capability, and where it lives in each layout. <b class="sc g">●</b> = directly on
+    that surface · <b>↗</b> = one hop away (opens the editor / settings page) · — = not that surface's
+    job (by design, never unreachable). Daily surfaces are deliberately read-only: every ↗ lands in
+    whichever editor you pick.</p>
+  </div>
+  <div class="cmp">
+    <table class="c">
+      <tr><th>Feature</th><th>D1 popover</th><th>D2 menu</th><th>D3 window</th><th>E1 cards</th><th>E3 master-detail</th><th>E5 .conf</th><th>E7 accordion</th></tr>
+      <tr><td class="o">Connect / disconnect</td><td class="sc g">● switch</td><td class="sc g">● click</td><td class="sc g">● switch</td><td>↗ D-surface</td><td>↗ D-surface</td><td>↗ D-surface</td><td class="sc g">● power</td></tr>
+      <tr><td class="o">Live RTT · loss · handshake</td><td class="sc g">● row + unfold</td><td class="sc m">RTT only</td><td class="sc g">● row + unfold</td><td>—</td><td class="sc g">● rail dots</td><td>—</td><td class="sc g">● header</td></tr>
+      <tr><td class="o">Transfer totals / rates</td><td class="sc g">● unfold</td><td>—</td><td class="sc g">● unfold</td><td>—</td><td>—</td><td>—</td><td class="sc g">● collapsed</td></tr>
+      <tr><td class="o">Failover active/standby + rank</td><td class="sc g">● unfold</td><td>—</td><td class="sc g">● unfold</td><td class="sc g">● badge + Metric</td><td class="sc g">● rail + Metric</td><td class="sc g">● Metric key</td><td class="sc g">● Metric row</td></tr>
+      <tr><td class="o">Device-DNS pin status</td><td class="sc g">● footer</td><td class="sc g">● item</td><td class="sc g">● footer</td><td class="sc g">● 📌 chip</td><td class="sc g">● 📌 chip</td><td class="sc g">● DNS key</td><td class="sc g">● 📌 chip</td></tr>
+      <tr><td class="o">Tunnel name / rename</td><td>↗</td><td>↗</td><td>↗</td><td class="sc g">● crumb ✎</td><td class="sc g">● title ✎</td><td class="sc g">● # Name</td><td class="sc g">● header</td></tr>
+      <tr><td class="o">Private key · derived public</td><td>↗</td><td>↗</td><td>↗</td><td class="sc g">●</td><td class="sc g">● Interface item</td><td class="sc g">●</td><td class="sc g">●</td></tr>
+      <tr><td class="o">Addresses · listen port</td><td>↗</td><td>↗</td><td>↗</td><td class="sc g">●</td><td class="sc g">● Interface item</td><td class="sc g">●</td><td class="sc g">●</td></tr>
+      <tr><td class="o">Peer add / remove / reorder</td><td>↗</td><td>↗</td><td>↗</td><td class="sc g">●</td><td class="sc g">● rail</td><td class="sc g">● [Peer] blocks</td><td class="sc g">●</td></tr>
+      <tr><td class="o">Endpoint + keepalive · psk · Allowed IPs</td><td>↗</td><td>↗</td><td>↗</td><td class="sc g">● stock group</td><td class="sc g">● stock group</td><td class="sc g">● stock keys</td><td class="sc g">● stock group</td></tr>
+      <tr><td class="o">Split DNS server + domains</td><td class="sc g">view</td><td>↗</td><td class="sc g">view</td><td class="sc g">●</td><td class="sc g">●</td><td class="sc g">● DNS/Domains</td><td class="sc g">●</td></tr>
+      <tr><td class="o">Ping health (gated knobs)</td><td class="sc g">view</td><td>↗</td><td class="sc g">view</td><td class="sc g">●</td><td class="sc g">●</td><td class="sc g">● + lint</td><td class="sc g">●</td></tr>
+      <tr><td class="o">Raw .conf edit</td><td>↗</td><td>↗</td><td>↗</td><td class="sc g">● toggle</td><td class="sc g">● toggle</td><td class="sc g">is the surface</td><td class="sc g">● Ctrl+E</td></tr>
+      <tr><td class="o">Import (drag / paste) · new tunnel</td><td>↗ ⚙</td><td class="sc g">● Settings…</td><td class="sc g">● ⚙ / drop</td><td class="sc g">● list page</td><td class="sc g">● list page</td><td class="sc g">● paste</td><td class="sc g">● drop/Ctrl+N/V</td></tr>
+      <tr><td class="o">Delete tunnel (armed)</td><td>↗</td><td>↗</td><td>↗</td><td class="sc g">●</td><td class="sc g">●</td><td class="sc m">delete file</td><td class="sc g">●</td></tr>
+      <tr><td class="o">External adapters (official client)</td><td class="sc g">● row</td><td class="sc g">● item</td><td class="sc g">● row</td><td class="sc g">● DNS-only card</td><td class="sc g">● DNS-only page</td><td>—</td><td class="sc g">● DNS-only card</td></tr>
+      <tr><td class="o">Custom DNS rules card</td><td class="sc g">● row</td><td class="sc g">● item</td><td class="sc g">● row</td><td class="sc g">● DNS-only card</td><td class="sc g">● DNS-only page</td><td>—</td><td class="sc g">● card</td></tr>
+      <tr><td class="o">Theme · accent · font · zoom · autostart · notifications</td><td>↗ ⚙</td><td>↗ ⚙</td><td class="sc g">● header</td><td class="sc g">● settings page</td><td class="sc g">● settings page</td><td>↗</td><td class="sc g">● header</td></tr>
+      <tr><td class="o">Connected / failover notifications</td><td class="sc g">OS toast</td><td class="sc g">OS toast</td><td class="sc g">OS toast</td><td class="sc g">OS toast</td><td class="sc g">OS toast</td><td class="sc g">OS toast</td><td class="sc g">OS toast</td></tr>
+    </table>
+  </div>
+
+  <!-- ================= RECOMMENDATION ================= -->
+  <div class="reco">
+    <h2>How the shortlist composes</h2>
+    <p><b>D1 + D2 coexist</b> (left-click popover, right-click menu) and <b>D3 is D1 with a pin</b> —
+    so "pick one" is really "build D1, get all three." On editing: start with <b>E1 cards</b> hosting
+    the canonical peer form; ship <b>E5</b> as the upgraded Ctrl+E raw mode (same parser, add the lint
+    gutter); keep <b>E3</b> in the drawer as the natural evolution of E1 if peer counts grow —
+    the form is identical, only a rail is added. <b>E7</b> is the no-new-windows fallback if the
+    settings-window split ever feels wrong in practice.</p>
+    <p>The three form rules — stock-first ordering, explicit Metric with derived rank, ping-gated
+    health knobs — apply identically in all four editors, so this decision can change later without
+    relearning anything.</p>
+  </div>
+</div>
