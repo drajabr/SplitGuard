@@ -169,7 +169,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
                     p.HandshakeText = "handshake 14s ago";
                     p.UptimeText = "2h 14m";
                     if (p.HasPingHost) p.PingText = "23 ms";
-                    // Fake a failover group so the "active routes" line renders in the demo.
+                    // Fake a failover group so the role badge renders in the demo.
                     if (HasRouteGroup(p)) p.FailoverRole = p.ParsedMetric <= 1 ? "active" : "standby";
                 }
                 t.StatsTick++;

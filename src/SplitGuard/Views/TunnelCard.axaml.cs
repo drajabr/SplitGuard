@@ -523,9 +523,15 @@ public partial class TunnelCard : UserControl
             if (!first) AddSeparator();
             first = false;
 
-            // Routes this peer currently owns via failover (active only) are shown on their
-            // own line and taken out of the plain allowed-IPs list so nothing is duplicated.
-            IReadOnlyList<string> activeRoutes = p.FailoverRole == "active" && !_vm.IsExternal && !_vm.IsCustom
+            // Failover routes this peer serves get their own line and come out of the plain
+            // allowed-IPs list so nothing is duplicated. Shown for the active member of any
+            // route group it's in — the live-arbitrated one when connected, else the
+            // metric-preferred one (lowest metric = 1st) so an assigned metric previews it
+            // even before the tunnel is up. Standby members keep their IPs as-is.
+            var wg = !_vm.IsExternal && !_vm.IsCustom;
+            var isActiveMember = wg && (p.FailoverRole == "active"
+                || (string.IsNullOrEmpty(p.FailoverRole) && _vm.Host.RouteGroupInfo(p) is { Position: 1 }));
+            IReadOnlyList<string> activeRoutes = isActiveMember
                 ? _vm.Host.RouteGroupCidrs(p)
                 : System.Array.Empty<string>();
 
