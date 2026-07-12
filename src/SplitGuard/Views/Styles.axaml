@@ -61,8 +61,8 @@
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderBrush" Value="{DynamicResource FieldBorderBrush}" />
   </Style>
+  <!-- On focus the "+" clears and the box grows with what's typed — no fixed jump. -->
   <Style Selector="TextBox.addbox:focus">
-    <Setter Property="MinWidth" Value="120" />
     <Setter Property="Watermark" Value="" />
     <Setter Property="HorizontalContentAlignment" Value="Left" />
   </Style>

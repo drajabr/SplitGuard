@@ -15,6 +15,9 @@ public interface ITunnelHost
     // The peer's failover standing: (position by metric, group size, shared CIDR), or
     // null when its allowed IPs overlap nobody.
     (int Position, int Size, string Cidr)? RouteGroupInfo(PeerViewModel peer);
+    // This peer's own allowed-IP ranges (canonical) that overlap another peer's — the
+    // failover routes it competes for.
+    IReadOnlyList<string> RouteGroupCidrs(PeerViewModel peer);
     // Overlapping peers with equal metrics (a route group can't arbitrate them).
     string? MetricConflict(TunnelViewModel tunnel);
     void EditStarted(TunnelViewModel tunnel);

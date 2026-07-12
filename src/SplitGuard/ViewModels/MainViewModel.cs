@@ -169,6 +169,8 @@ public class MainViewModel : ObservableObject, ITunnelHost
                     p.HandshakeText = "handshake 14s ago";
                     p.UptimeText = "2h 14m";
                     if (p.HasPingHost) p.PingText = "23 ms";
+                    // Fake a failover group so the "active routes" line renders in the demo.
+                    if (HasRouteGroup(p)) p.FailoverRole = p.ParsedMetric <= 1 ? "active" : "standby";
                 }
                 t.StatsTick++;
             }
@@ -391,6 +393,19 @@ public class MainViewModel : ObservableObject, ITunnelHost
 
     public bool HasRouteGroup(PeerViewModel peer) =>
         WgPeerVms().Any(o => !ReferenceEquals(o, peer) && SharesCidr(o, peer));
+
+    // The peer's own ranges (canonical) that overlap another peer's — what it's arbitrated
+    // for. Used to show a connected active peer's live routes separately from its plain
+    // allowed IPs.
+    public IReadOnlyList<string> RouteGroupCidrs(PeerViewModel peer)
+    {
+        var others = WgPeerVms().Where(o => !ReferenceEquals(o, peer))
+            .SelectMany(o => o.AllowedIpValues.Select(WireGuardConf.CanonicalCidr)).ToList();
+        return peer.AllowedIpValues.Select(WireGuardConf.CanonicalCidr)
+            .Where(c => others.Any(o => o == c
+                || WireGuardConf.CidrContainsCidr(o, c) || WireGuardConf.CidrContainsCidr(c, o)))
+            .Distinct().ToList();
+    }
 
     // Rank readout for the Metric row: where this peer stands in its route group. A group
     // forms around each specific range; members are its exact claimants plus any peer

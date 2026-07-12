@@ -52,8 +52,14 @@ public partial class MainWindow : Window, IDialogs
     {
         ("Fs9", 9), ("Fs11", 11), ("Fs115", 11.5), ("Fs12", 12), ("Fs125", 12.5),
         ("Fs13", 13), ("Fs135", 13.5), ("Fs14", 14), ("Fs17", 17),
-        ("CtrlH", 26), ("HeaderH", 44), ("CollapseH", 170),
+        ("CtrlH", 26), ("HeaderH", 38), ("CollapseH", 170),
     };
+
+    // Theme-switch icons (Material Design light_mode / dark_mode / contrast, 24×24) — one
+    // consistent family so auto, light and dark read as siblings.
+    const string SunGeometry = "M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13l2 0c.55 0 1-.45 1-1s-.45-1-1-1l-2 0c-.55 0-1 .45-1 1s.45 1 1 1zm18 0l2 0c.55 0 1-.45 1-1s-.45-1-1-1l-2 0c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z";
+    const string MoonGeometry = "M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z";
+    const string AutoGeometry = "M12 22c5.52 0 10-4.48 10-10S17.52 2 12 2 2 6.48 2 12s4.48 10 10 10zm1-17.93c3.94.49 7 3.85 7 7.93s-3.05 7.44-7 7.93V4.07z";
 
     int _themeIndex;
     int _accentIndex;
@@ -182,8 +188,15 @@ public partial class MainWindow : Window, IDialogs
         resources["DimOpacity"] = t.Dim;
         resources["HairlineBrush"] = new SolidColorBrush(Color.FromArgb(t.Hair, 0x80, 0x80, 0x80));
         resources["FieldBorderBrush"] = new SolidColorBrush(Color.FromArgb(t.Field, 0x80, 0x80, 0x80));
-        // Icon reflects the mode: contrast (auto), sun (light), moon (dark).
-        ThemeGlyph.Text = t.Name switch { "light" => "", "graphite" => "", _ => "" };
+        // Light/dark switch icon: one consistent Material family (sun / moon / contrast).
+        ThemePath.Data = Avalonia.Media.Geometry.Parse(t.Name switch
+        {
+            "light" => SunGeometry,
+            "graphite" => MoonGeometry,
+            _ => AutoGeometry,
+        });
+        ThemePath.Fill = new SolidColorBrush(EffectiveVariant() == ThemeVariant.Light
+            ? Color.Parse("#1B2420") : Color.Parse("#E4E9E6"));
         ToolTip.SetTip(ThemeButton, t.Name == "auto" ? "Theme: follow system" : $"Theme: {t.Name}");
         ApplyAccent(); // re-resolve so a "mono" accent flips with the theme
     }

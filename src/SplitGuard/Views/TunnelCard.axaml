@@ -9,7 +9,7 @@
     <Grid ColumnDefinitions="Auto,*">
       <Border Grid.Column="0" Width="4" Background="{DynamicResource AccentBrush}" />
       <StackPanel Grid.Column="1">
-      <DockPanel Name="HeaderRow" Background="Transparent" Margin="12,8" Height="{DynamicResource HeaderH}">
+      <DockPanel Name="HeaderRow" Background="Transparent" Margin="12,5" Height="{DynamicResource HeaderH}">
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
           <StackPanel Orientation="Horizontal" Spacing="3" IsVisible="{Binding StatsVisible}">
             <TextBlock Classes="glyph accentfg" Text="&#xE74A;" FontSize="{DynamicResource Fs11}" />
@@ -73,8 +73,8 @@
           <DockPanel Margin="14,4,14,6" IsVisible="{Binding ShowInterfaceSection}">
             <TextBox DockPanel.Dock="Right" Classes="mono fit" MinWidth="0" HorizontalAlignment="Right" VerticalAlignment="Top"
                      Text="{Binding ListenPortText}" Watermark="port" ToolTip.Tip="Listen port (blank = automatic)" />
-            <Grid ColumnDefinitions="Auto,*">
-              <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" Margin="0,0,10,0" VerticalAlignment="Top">
+            <Grid Name="IfaceGrid" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
+              <StackPanel Name="KeyGroup" Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="4" Margin="0,0,10,0" VerticalAlignment="Top">
                 <Panel>
                   <!-- Default: the derived public key, click to copy. -->
                   <Button Classes="keyfield" Command="{Binding CopyPublicKeyCommand}" ToolTip.Tip="{Binding PublicKeyFull}"
@@ -102,7 +102,10 @@
                   <TextBlock Classes="glyph" Text="&#xE70F;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
                 </ToggleButton>
               </StackPanel>
-              <ItemsControl Grid.Column="1" ItemsSource="{Binding Addresses}" VerticalAlignment="Top">
+              <!-- Shown only when the addresses can't sit next to the keys (see code-behind). -->
+              <TextBlock Name="AddrLabel" Grid.Row="1" Grid.Column="0" Classes="lbl" Text="Addresses"
+                         Margin="0,5,10,0" VerticalAlignment="Top" IsVisible="False" />
+              <ItemsControl Name="AddrList" Grid.Row="0" Grid.Column="1" ItemsSource="{Binding Addresses}" VerticalAlignment="Top">
                   <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
                   </ItemsControl.ItemsPanel>

@@ -94,6 +94,11 @@ public partial class TunnelCard : UserControl
         DetailPanel.SizeChanged += OnBodyContentSizeChanged;
         ExpandContent.SizeChanged += OnBodyContentSizeChanged;
 
+        // Interface addresses sit next to the keys while they fit; when they'd wrap, the
+        // whole group drops to its own "Addresses" line below.
+        IfaceGrid.SizeChanged += (_, _) => UpdateAddressLayout();
+        AddrList.SizeChanged += (_, _) => UpdateAddressLayout();
+
         // Fade a card in the first time it appears; fade + collapse it on removal.
         ClipToBounds = true;
         Opacity = 0;
@@ -105,6 +110,7 @@ public partial class TunnelCard : UserControl
         AttachedToVisualTree += (_, _) =>
         {
             if (!_appeared) { _appeared = true; Opacity = 1; }
+            Dispatcher.UIThread.Post(UpdateAddressLayout, DispatcherPriority.Loaded);
             // First-render reconcile: a freshly attached card's auto-sized body can come
             // up collapsed to its header (the detail measured 0 before the first layout
             // completed) until something re-drives its height. Snap it to the measured
@@ -413,6 +419,35 @@ public partial class TunnelCard : UserControl
     // Syntax-colored collapsed detail as atomic tokens in a WrapPanel: addresses in
     // IP color, domains in domain color. Each token is a whole TextBlock, so wrapping
     // moves a full address/domain to the next line and never splits one.
+    bool _addrStacked;
+    bool _measuringAddr;
+
+    // Keep the interface addresses beside the keys until they'd wrap, then move the whole
+    // group to a labelled "Addresses" line. Compares their single-line width against the
+    // space left next to the key group.
+    void UpdateAddressLayout()
+    {
+        if (_measuringAddr || _vm is null || !_vm.ShowInterfaceSection) return;
+        var gridW = IfaceGrid.Bounds.Width;
+        if (gridW < 1) return;
+        _measuringAddr = true;
+        try
+        {
+            AddrList.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            var need = AddrList.DesiredSize.Width;
+            var avail = gridW - KeyGroup.Bounds.Width - 8;
+            // Hysteresis so a borderline width can't oscillate between the two layouts.
+            var stacked = _addrStacked ? need > avail + 12 : need > avail;
+            if (stacked == _addrStacked && AddrLabel.IsVisible == stacked) return;
+            _addrStacked = stacked;
+            Grid.SetRow(AddrList, stacked ? 1 : 0);
+            Grid.SetColumn(AddrList, 1);
+            AddrList.Margin = new Avalonia.Thickness(stacked ? 0 : 0, stacked ? 1 : 0, 0, 0);
+            AddrLabel.IsVisible = stacked;
+        }
+        finally { _measuringAddr = false; }
+    }
+
     void BuildDetail()
     {
         DetailPanel.Children.Clear();
@@ -434,20 +469,30 @@ public partial class TunnelCard : UserControl
             return tb;
         }
 
-        // One row: left content (control), and an optional right-aligned value.
+        // One row: left content (control), and an optional right-aligned value that wraps
+        // (right-aligned) to more lines rather than overlapping the left content.
         void AddRow(Control? leftContent, string right, IBrush rightBrush)
         {
-            var row = new DockPanel { Margin = new Avalonia.Thickness(0, 0, 0, 2) };
+            var grid = new Grid
+            {
+                Margin = new Avalonia.Thickness(0, 0, 0, 2),
+                ColumnDefinitions = new ColumnDefinitions("Auto,*"),
+            };
+            if (leftContent is not null) { Grid.SetColumn(leftContent, 0); grid.Children.Add(leftContent); }
             if (right.Length > 0)
             {
-                var r = Mono(right, rightBrush);
-                r.Margin = new Avalonia.Thickness(12, 0, 0, 0);
-                r.TextAlignment = Avalonia.Media.TextAlignment.Right;
-                DockPanel.SetDock(r, Dock.Right);
-                row.Children.Add(r);
+                var r = new TextBlock
+                {
+                    Text = right, Foreground = rightBrush,
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                    TextAlignment = Avalonia.Media.TextAlignment.Right,
+                    Margin = new Avalonia.Thickness(12, 0, 0, 0),
+                };
+                r.Classes.Add("mono");
+                Grid.SetColumn(r, 1);
+                grid.Children.Add(r);
             }
-            if (leftContent is not null) row.Children.Add(leftContent);
-            DetailPanel.Children.Add(row);
+            DetailPanel.Children.Add(grid);
         }
 
         StackPanel Left(params Control[] items)
@@ -478,6 +523,12 @@ public partial class TunnelCard : UserControl
             if (!first) AddSeparator();
             first = false;
 
+            // Routes this peer currently owns via failover (active only) are shown on their
+            // own line and taken out of the plain allowed-IPs list so nothing is duplicated.
+            IReadOnlyList<string> activeRoutes = p.FailoverRole == "active" && !_vm.IsExternal && !_vm.IsCustom
+                ? _vm.Host.RouteGroupCidrs(p)
+                : System.Array.Empty<string>();
+
             if (!_vm.IsExternal && !_vm.IsCustom)
             {
                 var name = new TextBlock
@@ -491,13 +542,23 @@ public partial class TunnelCard : UserControl
                 var items = new List<Control> { name };
                 if (!string.IsNullOrEmpty(p.HandshakeText)) items.Add(Label(p.HandshakeText));
                 if (!string.IsNullOrEmpty(p.FailoverRole)) items.Add(Label(p.FailoverRole));
-                AddRow(Left(items.ToArray()), string.Join(", ", p.AllowedIpValues), Syntax.IpBrush);
+                var ips = p.AllowedIpValues
+                    .Where(ip => !activeRoutes.Contains(Models.WireGuardConf.CanonicalCidr(ip)));
+                AddRow(Left(items.ToArray()), string.Join(", ", ips), Syntax.IpBrush);
             }
             var domains = string.Join(", ", p.DomainValues);
             if (p.HasDns || domains.Length > 0)
             {
                 Control? left = p.HasDns ? Left(Label("DNS"), Mono(p.Dns.Trim(), Syntax.IpBrush)) : null;
                 AddRow(left, domains, Syntax.DomainBrush);
+            }
+            // The failover routes this peer is actively serving right now.
+            if (activeRoutes.Count > 0)
+            {
+                var active = new TextBlock { Text = "active" };
+                active.Classes.Add("mono");
+                active.Classes.Add("accentfg");
+                AddRow(Left(active), string.Join(", ", activeRoutes), Syntax.IpBrush);
             }
             // Live status while connected: uptime since the first handshake on the left,
             // transfer totals centered, and — when a healthcheck runs — the RTT on the
