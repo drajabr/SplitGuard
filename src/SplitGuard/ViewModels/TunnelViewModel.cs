@@ -83,14 +83,13 @@ public class TunnelViewModel : ObservableObject
         RemoveAddressCommand = new RelayCommand(p => Addresses.Remove((string)p!));
         GenerateKeyCommand = new RelayCommand(GenerateKey);
         ToggleTextModeCommand = new RelayCommand(ToggleTextMode);
-        EditPrivateKeyCommand = new RelayCommand(() => EditingPrivateKey = !EditingPrivateKey);
     }
 
-    // The interface shows the derived public key by default; this reveals the private-key
-    // field so it can be pasted or regenerated. Reset each time editing starts.
+    // The interface shows the derived public key by default; the reveal toggle (bound to
+    // this) swaps in the private-key field so it can be pasted or regenerated. Reset each
+    // time editing starts.
     bool _editingPrivateKey;
     public bool EditingPrivateKey { get => _editingPrivateKey; set => Set(ref _editingPrivateKey, value); }
-    public RelayCommand EditPrivateKeyCommand { get; private set; } = null!;
 
     // Created via Ctrl+N and never saved: cancelling deletes it instead of keeping a stub.
     public bool IsDraft { get; set; }
@@ -161,12 +160,8 @@ public class TunnelViewModel : ObservableObject
     public string PrivateKeyEdit
     {
         get => _privateKeyEdit;
-        set { if (Set(ref _privateKeyEdit, value)) { RefreshDerivedPublicKey(); Raise(nameof(CanGenerate)); } }
+        set { if (Set(ref _privateKeyEdit, value)) RefreshDerivedPublicKey(); }
     }
-
-    // The generate button sits inside the private-key box and shows only while it's empty,
-    // so generating never silently discards an existing key.
-    public bool CanGenerate => string.IsNullOrWhiteSpace(PrivateKeyEdit);
 
     bool _isConnected;
     public bool IsConnected
@@ -663,10 +658,9 @@ public class TunnelViewModel : ObservableObject
         NewAddress = "";
     }
 
-    void GenerateKey()
-    {
-        if (CanGenerate) PrivateKeyEdit = Convert.ToBase64String(Curve25519.GeneratePrivateKey());
-    }
+    // Regenerate a fresh keypair. Reachable only from the revealed private-key field, so
+    // replacing an existing key is the explicit intent.
+    void GenerateKey() => PrivateKeyEdit = Convert.ToBase64String(Curve25519.GeneratePrivateKey());
 
     void RefreshDerivedPublicKey()
     {

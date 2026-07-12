@@ -86,6 +86,24 @@
     <Setter Property="Padding" Value="4" />
     <Setter Property="MinHeight" Value="0" />
   </Style>
+  <!-- Icon toggle (e.g. reveal the private key): borderless like Button.icon; the glyph
+       tints to the accent while checked. -->
+  <Style Selector="ToggleButton.icon">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="4" />
+    <Setter Property="MinHeight" Value="0" />
+  </Style>
+  <Style Selector="ToggleButton.icon /template/ ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="ToggleButton.icon:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="ToggleButton.icon:checked /template/ ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+  </Style>
   <Style Selector="Button.chipx">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />

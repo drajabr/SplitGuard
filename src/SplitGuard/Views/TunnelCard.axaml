@@ -74,42 +74,34 @@
             <TextBox DockPanel.Dock="Right" Classes="mono fit" MinWidth="0" HorizontalAlignment="Right" VerticalAlignment="Top"
                      Text="{Binding ListenPortText}" Watermark="port" ToolTip.Tip="Listen port (blank = automatic)" />
             <Grid ColumnDefinitions="Auto,*">
-              <Panel Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Top">
-                <!-- Default: the derived public key, click to copy; key button reveals editing. -->
-                <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding !EditingPrivateKey}">
-                  <Button Classes="keyfield" Command="{Binding CopyPublicKeyCommand}" ToolTip.Tip="{Binding PublicKeyFull}">
+              <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" Margin="0,0,10,0" VerticalAlignment="Top">
+                <Panel>
+                  <!-- Default: the derived public key, click to copy. -->
+                  <Button Classes="keyfield" Command="{Binding CopyPublicKeyCommand}" ToolTip.Tip="{Binding PublicKeyFull}"
+                          IsVisible="{Binding !EditingPrivateKey}">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                       <TextBlock Classes="mono synkey" Text="{Binding PublicKeyShort}" VerticalAlignment="Center" />
                       <TextBlock Classes="glyph" Text="&#xE8C8;" FontSize="{DynamicResource Fs11}" Opacity="0.55" VerticalAlignment="Center" />
                     </StackPanel>
                   </Button>
-                  <Button Classes="icon" Command="{Binding EditPrivateKeyCommand}" ToolTip.Tip="Show / edit the private key">
-                    <TextBlock Classes="glyph" Text="&#xE70F;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
-                  </Button>
-                </StackPanel>
-                <!-- Revealed: masked private key with reveal + generate + done. Fixed to the
-                     public display's width so revealing never widens the row — the (masked)
-                     key clips/scrolls inside instead. -->
-                <TextBox Classes="mono" Width="150" MinWidth="0" ScrollViewer.HorizontalScrollBarVisibility="Hidden"
-                         IsVisible="{Binding EditingPrivateKey}"
-                         Text="{Binding PrivateKeyEdit}" Watermark="private key"
-                         PasswordChar="●" RevealPassword="{Binding #RevealEye.IsChecked}">
-                  <TextBox.InnerRightContent>
-                    <StackPanel Orientation="Horizontal">
-                      <ToggleButton Name="RevealEye" Classes="icon" ToolTip.Tip="Show / hide the key">
-                        <TextBlock Classes="glyph" Text="&#xE7B3;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
-                      </ToggleButton>
-                      <Button Classes="icon" Command="{Binding GenerateKeyCommand}" IsVisible="{Binding CanGenerate}"
-                              ToolTip.Tip="Generate a keypair">
+                  <!-- Revealed: the masked private key with only a regenerate button. Fixed to
+                       the public display's width so revealing never widens the row. -->
+                  <TextBox Classes="mono" Width="150" MinWidth="0" ScrollViewer.HorizontalScrollBarVisibility="Hidden"
+                           IsVisible="{Binding EditingPrivateKey}"
+                           Text="{Binding PrivateKeyEdit}" Watermark="private key" PasswordChar="●">
+                    <TextBox.InnerRightContent>
+                      <Button Classes="icon" Command="{Binding GenerateKeyCommand}"
+                              ToolTip.Tip="Regenerate the keypair">
                         <TextBlock Classes="glyph" Text="&#xE72C;" FontSize="{DynamicResource Fs12}" Opacity="0.7" />
                       </Button>
-                      <Button Classes="icon" Command="{Binding EditPrivateKeyCommand}" ToolTip.Tip="Done — show the public key">
-                        <TextBlock Classes="glyph" Text="&#xE73E;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
-                      </Button>
-                    </StackPanel>
-                  </TextBox.InnerRightContent>
-                </TextBox>
-              </Panel>
+                    </TextBox.InnerRightContent>
+                  </TextBox>
+                </Panel>
+                <!-- Single toggle: reveal the private key to edit/regenerate, or hide it. -->
+                <ToggleButton Classes="icon" IsChecked="{Binding EditingPrivateKey}" ToolTip.Tip="Edit the private key">
+                  <TextBlock Classes="glyph" Text="&#xE70F;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
+                </ToggleButton>
+              </StackPanel>
               <ItemsControl Grid.Column="1" ItemsSource="{Binding Addresses}" VerticalAlignment="Top">
                   <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
