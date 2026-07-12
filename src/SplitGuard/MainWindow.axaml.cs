@@ -184,11 +184,6 @@ public partial class MainWindow : Window, IDialogs
         resources["DimOpacity"] = t.Dim;
         resources["HairlineBrush"] = new SolidColorBrush(Color.FromArgb(t.Hair, 0x80, 0x80, 0x80));
         resources["FieldBorderBrush"] = new SolidColorBrush(Color.FromArgb(t.Field, 0x80, 0x80, 0x80));
-        // Theme-button swatch: this palette's page tone, so the square previews the theme
-        // it selects (auto resolves to the OS light/dark tone).
-        var swatch = t.Page is not null ? Color.Parse(t.Page)
-            : (ActualThemeVariant == ThemeVariant.Light ? Color.Parse("#F4F3F0") : Color.Parse("#1A1C1F"));
-        resources["ThemeSwatchBrush"] = new SolidColorBrush(swatch);
         ToolTip.SetTip(ThemeButton, $"Theme: {t.Name}");
         ApplyAccent(); // re-resolve so a "mono" accent flips with the theme
     }

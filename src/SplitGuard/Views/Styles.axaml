@@ -137,36 +137,38 @@
     <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
   </Style>
 
-  <!-- Connect toggle: a big square power button. Outlined when off, accent-filled when on. -->
+  <!-- Connect toggle: a pill switch. Dim track when off, accent when on; the white knob
+       slides across. -->
   <Style Selector="ToggleButton.conn">
     <Setter Property="Width" Value="40" />
-    <Setter Property="Height" Value="40" />
+    <Setter Property="Height" Value="22" />
     <Setter Property="Padding" Value="0" />
-    <Setter Property="CornerRadius" Value="6" />
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="BorderBrush" Value="{DynamicResource FieldBorderBrush}" />
-    <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="Foreground" Value="{DynamicResource DotBrush}" />
-    <Setter Property="HorizontalContentAlignment" Value="Center" />
-    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Background" Value="{DynamicResource DotBrush}" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="track" Background="{TemplateBinding Background}" CornerRadius="11">
+          <Ellipse Name="knob" Width="16" Height="16" Fill="White"
+                   HorizontalAlignment="Left" VerticalAlignment="Center" Margin="3,0">
+            <Ellipse.Transitions>
+              <Transitions>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.14" Easing="CubicEaseOut" />
+              </Transitions>
+            </Ellipse.Transitions>
+          </Ellipse>
+        </Border>
+      </ControlTemplate>
+    </Setter>
   </Style>
-  <!-- The Fluent theme forces the ContentPresenter's own Foreground/Background in the
-       checked (and hover/pressed) states, so we must override it there — not just on the
-       control — or a white "mono" accent leaves a white glyph on a white fill. -->
-  <Style Selector="ToggleButton.conn:checked /template/ ContentPresenter">
+  <Style Selector="ToggleButton.conn /template/ Border#track">
+    <Setter Property="Opacity" Value="0.45" />
+  </Style>
+  <Style Selector="ToggleButton.conn:checked /template/ Border#track">
     <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
-    <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+    <Setter Property="Opacity" Value="1" />
   </Style>
-  <Style Selector="ToggleButton.conn:checked:pointerover /template/ ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
-    <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
-  </Style>
-  <Style Selector="ToggleButton.conn:checked:pressed /template/ ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
-    <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
-  </Style>
-  <Style Selector="ToggleButton.conn:checked">
-    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+  <Style Selector="ToggleButton.conn:checked /template/ Ellipse#knob">
+    <Setter Property="RenderTransform" Value="translateX(18px)" />
   </Style>
 
   <Style Selector="Button.danger">

@@ -17,8 +17,7 @@
       <DockPanel>
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
           <Button Classes="hdr" Name="ThemeButton" Click="OnThemeClick" ToolTip.Tip="Theme">
-            <Rectangle Width="12" Height="12" RadiusX="3" RadiusY="3" Fill="{DynamicResource ThemeSwatchBrush}"
-                       Stroke="{DynamicResource FieldBorderBrush}" StrokeThickness="1" VerticalAlignment="Center" />
+            <TextBlock Classes="glyph" Text="&#xE790;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
           </Button>
           <Button Classes="hdr" Name="AccentButton" Click="OnAccentClick" ToolTip.Tip="Accent color">
             <Ellipse Width="11" Height="11" Fill="{DynamicResource AccentBrush}" VerticalAlignment="Center" />

@@ -21,9 +21,7 @@
           </StackPanel>
           <StackPanel Name="ConnectBox" Orientation="Horizontal" VerticalAlignment="Center" IsVisible="{Binding ShowConnect}">
             <ToggleButton Classes="conn" IsChecked="{Binding IsConnected}"
-                          ToolTip.Tip="Connect / disconnect (saves &amp; applies while editing)">
-              <TextBlock Classes="glyph" Text="&#xE7E8;" FontSize="{DynamicResource Fs17}" />
-            </ToggleButton>
+                          ToolTip.Tip="Connect / disconnect (saves &amp; applies while editing)" />
           </StackPanel>
         </StackPanel>
         <Grid VerticalAlignment="Center" ColumnDefinitions="Auto,Auto,Auto,*">
