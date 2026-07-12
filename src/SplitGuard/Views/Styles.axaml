@@ -311,24 +311,6 @@
   <Style Selector="TextBlock.pinicon.pinned.suspended">
     <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
   </Style>
-  <!-- Failover role badge on a peer block: outlined chip, accent when active. -->
-  <Style Selector="Border.rolebadge">
-    <Setter Property="BorderBrush" Value="{DynamicResource FieldBorderBrush}" />
-    <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="4" />
-    <Setter Property="Padding" Value="6,1" />
-    <Setter Property="VerticalAlignment" Value="Center" />
-  </Style>
-  <Style Selector="Border.rolebadge > TextBlock">
-    <Setter Property="Opacity" Value="0.7" />
-  </Style>
-  <Style Selector="Border.rolebadge.active">
-    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
-  </Style>
-  <Style Selector="Border.rolebadge.active > TextBlock">
-    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
-    <Setter Property="Opacity" Value="1" />
-  </Style>
   <Style Selector="TextBlock.accent">
     <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
     <Setter Property="FontSize" Value="{DynamicResource Fs115}" />

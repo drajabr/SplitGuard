@@ -547,7 +547,6 @@ public partial class TunnelCard : UserControl
                 name.Classes.Add("accentfg");
                 var items = new List<Control> { name };
                 if (!string.IsNullOrEmpty(p.HandshakeText)) items.Add(Label(p.HandshakeText));
-                if (!string.IsNullOrEmpty(p.FailoverRole)) items.Add(Label(p.FailoverRole));
                 var ips = p.AllowedIpValues
                     .Where(ip => !activeRoutes.Contains(Models.WireGuardConf.CanonicalCidr(ip)));
                 AddRow(Left(items.ToArray()), string.Join(", ", ips), Syntax.IpBrush);

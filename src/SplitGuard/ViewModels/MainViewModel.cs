@@ -169,7 +169,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
                     p.HandshakeText = "handshake 14s ago";
                     p.UptimeText = "2h 14m";
                     if (p.HasPingHost) p.PingText = "23 ms";
-                    // Fake a failover group so the role badge renders in the demo.
+                    // Fake a live failover role so the active-routes line renders in the demo.
                     if (HasRouteGroup(p)) p.FailoverRole = p.ParsedMetric <= 1 ? "active" : "standby";
                 }
                 t.StatsTick++;
@@ -441,6 +441,46 @@ public class MainViewModel : ObservableObject, ITunnelHost
                 return $"Overlapping allowed IPs share metric {p.ParsedMetric} — give each peer in the group a distinct metric";
         }
         return null;
+    }
+
+    bool _reconciling;
+
+    // Overlapping peers must never share a metric — the failover engine couldn't pick a
+    // winner. Runs on every route/metric edit: peers keep a distinct value they already
+    // hold (lower numbers win their slot), a duplicate is bumped to the next free number,
+    // and a peer that has just joined a group with a blank metric gets a sensible default
+    // so the field never sits empty (i.e. colliding at 0) inside a group.
+    public void ReconcileMetrics()
+    {
+        if (_reconciling) return;
+        _reconciling = true;
+        try
+        {
+            var members = WgPeerVms().Where(HasRouteGroup)
+                .OrderBy(p => p.MetricText.Trim().Length == 0) // explicit values first
+                .ThenBy(p => p.ParsedMetric)                   // lower number claims its slot
+                .ToList();
+            var assigned = new List<(PeerViewModel Peer, int Metric)>();
+            foreach (var p in members)
+            {
+                var used = assigned.Where(a => SharesCidr(a.Peer, p)).Select(a => a.Metric).ToHashSet();
+                var v = FreeFrom(used, p.ParsedMetric); // blank → 0 → lowest free default
+                assigned.Add((p, v));
+                var s = v.ToString();
+                if (p.MetricText != s) p.MetricText = s;
+            }
+        }
+        finally { _reconciling = false; }
+    }
+
+    // The peer's own value if it's free, else the next free number at or above it (a typed
+    // duplicate steps up rather than jumping ahead of the peer it clashed with), wrapping
+    // to fill any lower gap before giving up at the 0-10 ceiling.
+    static int FreeFrom(HashSet<int> used, int desired)
+    {
+        for (var v = Math.Clamp(desired, 0, 10); v <= 10; v++) if (!used.Contains(v)) return v;
+        for (var v = 0; v < desired && v <= 10; v++) if (!used.Contains(v)) return v;
+        return 10;
     }
 
     // ---- edit/save/delete ---------------------------------------------------

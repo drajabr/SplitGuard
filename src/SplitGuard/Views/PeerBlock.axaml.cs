@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using SplitGuard.ViewModels;
 
@@ -22,4 +23,8 @@ public partial class PeerBlock : UserControl
             e.Handled = true;
         });
     }
+
+    // Metric committed: resolve any duplicate within the peer's route group.
+    void OnMetricCommitted(object? sender, RoutedEventArgs e) =>
+        (DataContext as PeerViewModel)?.CommitMetric();
 }

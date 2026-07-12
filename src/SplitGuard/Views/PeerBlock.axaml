@@ -10,10 +10,6 @@
            tunnel card): name on the left, live status on the right. -->
       <DockPanel Name="HeaderRow" Background="Transparent" Margin="14,5,14,3">
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-          <Border Classes="rolebadge" Classes.active="{Binding FailoverRole, Converter={x:Static views:Syntax.IsActive}}"
-                  IsVisible="{Binding FailoverRole, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-            <TextBlock FontSize="{DynamicResource Fs11}" Text="{Binding FailoverRole}" />
-          </Border>
           <TextBlock Classes="muted" Text="{Binding HandshakeText, Converter={x:Static views:Syntax.OrDots}}" />
           <TextBlock Classes="muted" Text="{Binding PingText, Converter={x:Static views:Syntax.OrDots}}"
                      IsVisible="{Binding HasPingHost}" />
@@ -28,7 +24,7 @@
           <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center" IsVisible="{Binding MetricEnabled}">
             <TextBlock Classes="lbl" Text="metric" ToolTip.Tip="{Binding MetricRankText}" />
             <TextBox Classes="mono num" Width="34" Text="{Binding MetricText}" Watermark="0"
-                     ToolTip.Tip="{Binding MetricRankText}" />
+                     LostFocus="OnMetricCommitted" ToolTip.Tip="{Binding MetricRankText}" />
           </StackPanel>
         </StackPanel>
       </DockPanel>

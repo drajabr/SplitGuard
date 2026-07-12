@@ -17,7 +17,7 @@ public partial class PeerViewModel : ObservableObject
         AddDomainCommand = new RelayCommand(AddDomain);
         RemoveDomainCommand = new RelayCommand(p => RemoveDomain((string)p!));
         AddAllowedIpCommand = new RelayCommand(AddAllowedIp);
-        RemoveAllowedIpCommand = new RelayCommand(p => AllowedIps.Remove((string)p!));
+        RemoveAllowedIpCommand = new RelayCommand(p => { AllowedIps.Remove((string)p!); _tunnel.Host.ReconcileMetrics(); });
         TogglePinCommand = new RelayCommand(() => _tunnel.Host.TogglePin(_tunnel, this));
         RemovePeerCommand = new RelayCommand(() => _tunnel.RemovePeer(this));
         AllowedIps.CollectionChanged += (_, _) => { Raise(nameof(MetricEnabled)); Raise(nameof(MetricRankText)); };
@@ -260,7 +260,13 @@ public partial class PeerViewModel : ObservableObject
         }
         AllowedIps.Insert(AllowedIps.Count - 1, cidr);
         NewAllowedIp = "";
+        // A new route may put this peer into a group; keep metrics distinct.
+        _tunnel.Host.ReconcileMetrics();
     }
+
+    // Called when the metric field commits (loses focus): a typed duplicate is
+    // auto-resolved to the next free number so a group never has two equal metrics.
+    public void CommitMetric() => _tunnel.Host.ReconcileMetrics();
 
     public string? DnsRouteWarning()
     {

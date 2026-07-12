@@ -20,6 +20,8 @@ public interface ITunnelHost
     IReadOnlyList<string> RouteGroupCidrs(PeerViewModel peer);
     // Overlapping peers with equal metrics (a route group can't arbitrate them).
     string? MetricConflict(TunnelViewModel tunnel);
+    // Force every route group to distinct metrics (auto-resolve duplicates, default blanks).
+    void ReconcileMetrics();
     void EditStarted(TunnelViewModel tunnel);
     void TunnelSaved(TunnelViewModel tunnel, bool connectionChanged);
     void RequestDelete(TunnelViewModel tunnel);
