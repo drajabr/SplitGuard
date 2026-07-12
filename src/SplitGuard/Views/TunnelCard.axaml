@@ -87,8 +87,11 @@
                     <TextBlock Classes="glyph" Text="&#xE70F;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
                   </Button>
                 </StackPanel>
-                <!-- Revealed: masked private key with reveal + generate + done. -->
-                <TextBox Classes="mono" MinWidth="140" IsVisible="{Binding EditingPrivateKey}"
+                <!-- Revealed: masked private key with reveal + generate + done. Fixed to the
+                     public display's width so revealing never widens the row — the (masked)
+                     key clips/scrolls inside instead. -->
+                <TextBox Classes="mono" Width="150" MinWidth="0" ScrollViewer.HorizontalScrollBarVisibility="Hidden"
+                         IsVisible="{Binding EditingPrivateKey}"
                          Text="{Binding PrivateKeyEdit}" Watermark="private key"
                          PasswordChar="●" RevealPassword="{Binding #RevealEye.IsChecked}">
                   <TextBox.InnerRightContent>
