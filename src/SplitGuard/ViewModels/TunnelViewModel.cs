@@ -83,7 +83,14 @@ public class TunnelViewModel : ObservableObject
         RemoveAddressCommand = new RelayCommand(p => Addresses.Remove((string)p!));
         GenerateKeyCommand = new RelayCommand(GenerateKey);
         ToggleTextModeCommand = new RelayCommand(ToggleTextMode);
+        EditPrivateKeyCommand = new RelayCommand(() => EditingPrivateKey = !EditingPrivateKey);
     }
+
+    // The interface shows the derived public key by default; this reveals the private-key
+    // field so it can be pasted or regenerated. Reset each time editing starts.
+    bool _editingPrivateKey;
+    public bool EditingPrivateKey { get => _editingPrivateKey; set => Set(ref _editingPrivateKey, value); }
+    public RelayCommand EditPrivateKeyCommand { get; private set; } = null!;
 
     // Created via Ctrl+N and never saved: cancelling deletes it instead of keeping a stub.
     public bool IsDraft { get; set; }
@@ -475,6 +482,7 @@ public class TunnelViewModel : ObservableObject
     void BeginEdit()
     {
         ValidationError = "";
+        EditingPrivateKey = false; // start showing the derived public key
         if (!IsExternal && !IsCustom)
         {
             try { PrivateKeyEdit = RuleStore.Unprotect(Config!.PrivateKeyProtected); }

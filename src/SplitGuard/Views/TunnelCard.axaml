@@ -67,16 +67,30 @@
         </Border>
 
         <StackPanel Name="FieldsGrid" IsVisible="{Binding !IsTextMode}">
-          <!-- Interface: one full-width line — keys and addresses flow left, generate +
-               listen port dock to the upper-right corner. -->
-          <Border Classes="peerblock" Margin="12,8,12,6" IsVisible="{Binding ShowInterfaceSection}">
-            <Grid Margin="14,6,14,6" ColumnDefinitions="76,*" RowDefinitions="Auto,Auto">
-              <!-- Private key: masked input with reveal + generate; the derived public key
-                   is metadata after it (click to copy), never a second field. -->
-              <TextBlock Grid.Row="0" Grid.Column="0" Classes="lbl" VerticalAlignment="Center" Text="Private key" Margin="0,0,10,6" />
-              <Grid Grid.Row="0" Grid.Column="1" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,6">
-                <TextBox Grid.Column="0" Classes="mono" MinWidth="80" Text="{Binding PrivateKeyEdit}" Watermark="private key"
-                         PasswordChar="●" RevealPassword="{Binding #RevealEye.IsChecked}" Margin="0,0,6,0">
+          <!-- Interface (self-evident top section, no border): the public key shown by
+               default (click to copy), a key button reveals the private key to edit or
+               regenerate, addresses sit next to it, and the listen port docks right. -->
+          <DockPanel Margin="14,4,14,6" IsVisible="{Binding ShowInterfaceSection}">
+            <TextBox DockPanel.Dock="Right" Classes="mono fit" MinWidth="0" HorizontalAlignment="Right" VerticalAlignment="Top"
+                     Text="{Binding ListenPortText}" Watermark="port" ToolTip.Tip="Listen port (blank = automatic)" />
+            <Grid ColumnDefinitions="Auto,*">
+              <Panel Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Top">
+                <!-- Default: the derived public key, click to copy; key button reveals editing. -->
+                <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding !EditingPrivateKey}">
+                  <Button Classes="keyfield" Command="{Binding CopyPublicKeyCommand}" ToolTip.Tip="{Binding PublicKeyFull}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <TextBlock Classes="mono synkey" Text="{Binding PublicKeyShort}" VerticalAlignment="Center" />
+                      <TextBlock Classes="glyph" Text="&#xE8C8;" FontSize="{DynamicResource Fs11}" Opacity="0.55" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </Button>
+                  <Button Classes="icon" Command="{Binding EditPrivateKeyCommand}" ToolTip.Tip="Show / edit the private key">
+                    <TextBlock Classes="glyph" Text="&#xE70F;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
+                  </Button>
+                </StackPanel>
+                <!-- Revealed: masked private key with reveal + generate + done. -->
+                <TextBox Classes="mono" MinWidth="140" IsVisible="{Binding EditingPrivateKey}"
+                         Text="{Binding PrivateKeyEdit}" Watermark="private key"
+                         PasswordChar="●" RevealPassword="{Binding #RevealEye.IsChecked}">
                   <TextBox.InnerRightContent>
                     <StackPanel Orientation="Horizontal">
                       <ToggleButton Name="RevealEye" Classes="icon" ToolTip.Tip="Show / hide the key">
@@ -86,22 +100,14 @@
                               ToolTip.Tip="Generate a keypair">
                         <TextBlock Classes="glyph" Text="&#xE72C;" FontSize="{DynamicResource Fs12}" Opacity="0.7" />
                       </Button>
+                      <Button Classes="icon" Command="{Binding EditPrivateKeyCommand}" ToolTip.Tip="Done — show the public key">
+                        <TextBlock Classes="glyph" Text="&#xE73E;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
+                      </Button>
                     </StackPanel>
                   </TextBox.InnerRightContent>
                 </TextBox>
-                <Button Grid.Column="1" Classes="link" Command="{Binding CopyPublicKeyCommand}" Margin="0,0,6,0"
-                        ToolTip.Tip="{Binding PublicKeyFull}" VerticalAlignment="Center">
-                  <StackPanel Orientation="Horizontal" Spacing="5">
-                    <TextBlock Classes="lbl" Text="→ public" />
-                    <TextBlock Classes="mono synkey" FontSize="{DynamicResource Fs11}" Text="{Binding PublicKeyShort}" />
-                    <TextBlock Classes="glyph" Text="&#xE8C8;" FontSize="{DynamicResource Fs11}" Opacity="0.6" />
-                  </StackPanel>
-                </Button>
-                <TextBox Grid.Column="2" Classes="mono" Width="56" Text="{Binding ListenPortText}" Watermark="port" ToolTip.Tip="Listen port (blank = automatic)" />
-              </Grid>
-              <!-- Addresses on their own line, label aligned with Identity. -->
-              <TextBlock Grid.Row="1" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Addresses" Margin="0,5,10,0" />
-              <ItemsControl Grid.Row="1" Grid.Column="1" ItemsSource="{Binding Addresses}">
+              </Panel>
+              <ItemsControl Grid.Column="1" ItemsSource="{Binding Addresses}" VerticalAlignment="Top">
                   <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
                   </ItemsControl.ItemsPanel>
@@ -132,7 +138,7 @@
                   </ItemsControl.DataTemplates>
                 </ItemsControl>
             </Grid>
-          </Border>
+          </DockPanel>
 
           <!-- Peers: full-width cards stacking vertically. -->
           <StackPanel Name="PeersHost" Margin="0,2,0,2">

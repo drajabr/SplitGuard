@@ -21,15 +21,13 @@ public partial class MainWindow : Window, IDialogs
     record ThemeDef(string Name, ThemeVariant Variant, string? Page, string? Surface, string? Item,
                  double Dim, byte Hair, byte Field);
 
-    // Surface palette registry (page + card + chip fill + borders + text contrast).
+    // Light/dark switch: "auto" follows the OS (adaptive overlay), "light" and "graphite"
+    // force the tone. The header button cycles auto → light → graphite.
     static readonly ThemeDef[] Palettes =
     {
         new("auto",     ThemeVariant.Default, null,      null,      null,      0.68, 0x33, 0x40),
         new("light",    ThemeVariant.Light,  "#F4F3F0", "#FFFFFF", "#ECEAE4", 0.62, 0x33, 0x42),
-        new("pearl",    ThemeVariant.Light,  "#EAE8E2", "#F7F5F0", "#E0DDD5", 0.62, 0x36, 0x46),
-        new("slate",    ThemeVariant.Dark,   "#363C43", "#414750", "#2D333A", 0.72, 0x3E, 0x50),
         new("graphite", ThemeVariant.Dark,   "#24272B", "#2E3339", "#1F2226", 0.70, 0x38, 0x48),
-        new("dark",     ThemeVariant.Dark,   "#1A1C1F", "#25282C", "#17191C", 0.70, 0x34, 0x44),
     };
 
     // Accent hue is its own control, independent of the surface theme (see Views.Accents).
@@ -184,7 +182,9 @@ public partial class MainWindow : Window, IDialogs
         resources["DimOpacity"] = t.Dim;
         resources["HairlineBrush"] = new SolidColorBrush(Color.FromArgb(t.Hair, 0x80, 0x80, 0x80));
         resources["FieldBorderBrush"] = new SolidColorBrush(Color.FromArgb(t.Field, 0x80, 0x80, 0x80));
-        ToolTip.SetTip(ThemeButton, $"Theme: {t.Name}");
+        // Icon reflects the mode: contrast (auto), sun (light), moon (dark).
+        ThemeGlyph.Text = t.Name switch { "light" => "", "graphite" => "", _ => "" };
+        ToolTip.SetTip(ThemeButton, t.Name == "auto" ? "Theme: follow system" : $"Theme: {t.Name}");
         ApplyAccent(); // re-resolve so a "mono" accent flips with the theme
     }
 

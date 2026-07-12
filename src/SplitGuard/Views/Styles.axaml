@@ -36,6 +36,12 @@
   <Style Selector="TextBox.mono">
     <Setter Property="FontSize" Value="{DynamicResource Fs12}" />
   </Style>
+  <!-- Shrink-to-content field: sizes to its text, or just its watermark when empty
+       (the watermark is measured), instead of stretching to fill. -->
+  <Style Selector="TextBox.fit">
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+  </Style>
   <!-- Tiny numeric boxes (metric, counts, timeout): slim padding so 2-3 digits fit
        in half the normal width. -->
   <Style Selector="TextBox.num">
