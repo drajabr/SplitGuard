@@ -29,20 +29,20 @@
         </StackPanel>
       </DockPanel>
 
-      <StackPanel IsVisible="{Binding IsExpanded}">
+      <StackPanel x:Name="PeerBody" IsVisible="False">
         <Grid Margin="14,4,14,2" ColumnDefinitions="54,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
 
-          <TextBlock Grid.Row="0" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Endpoint" IsVisible="{Binding ShowWgFields}" Margin="0,7,8,4" />
-          <!-- Endpoint shrinks to its content; keepalive flows right after it and wraps below
-               only when the row runs out of room. -->
-          <WrapPanel Grid.Row="0" Grid.Column="1" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
-            <TextBox Classes="mono fit" MinWidth="90" MaxWidth="260" Margin="0,0,12,4" Text="{Binding Endpoint}" Watermark="host:port" />
-            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="0,0,0,4">
+          <TextBlock Grid.Row="0" Grid.Column="0" Classes="lbl" VerticalAlignment="Center" Text="Endpoint" IsVisible="{Binding ShowWgFields}" Margin="0,0,8,4" />
+          <!-- Endpoint stays left (shrinks to content); keepalive is pegged to the right edge.
+               The endpoint fills the gap and clips before it can push keepalive off the card. -->
+          <DockPanel Grid.Row="0" Grid.Column="1" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="12,0,0,0">
               <TextBlock Classes="lbl" Text="keepalive" VerticalAlignment="Center"
                          ToolTip.Tip="PersistentKeepalive — seconds between keepalive packets (blank = off)" />
               <TextBox Classes="mono num" Width="42" Text="{Binding KeepaliveText}" Watermark="off" VerticalAlignment="Center" />
             </StackPanel>
-          </WrapPanel>
+            <TextBox Classes="mono fit" MinWidth="90" MaxWidth="260" Text="{Binding Endpoint}" Watermark="host:port" VerticalAlignment="Center" />
+          </DockPanel>
 
           <TextBlock Grid.Row="1" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Keys" IsVisible="{Binding ShowWgFields}" Margin="0,5,8,4" />
           <Grid Grid.Row="1" Grid.Column="1" ColumnDefinitions="*,*" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">

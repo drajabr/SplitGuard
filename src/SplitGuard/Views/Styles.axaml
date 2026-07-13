@@ -1,8 +1,9 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-  <!-- Fields read as soft filled rows (no outline); the Fluent border is off and only the
-       focused field gets a thin accent ring. -->
+  <!-- Fields read as soft filled rows (no visible outline); the 1.5px border is reserved
+       transparently at rest so the accent focus-ring can fade in without shifting the text
+       (zero jitter). Only the ring color changes on hover/focus. -->
   <Style Selector="TextBox">
     <Setter Property="MinHeight" Value="{DynamicResource CtrlH}" />
     <Setter Property="Padding" Value="8,3" />
@@ -10,15 +11,25 @@
     <Setter Property="FontSize" Value="{DynamicResource Fs13}" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
     <Setter Property="Background" Value="{DynamicResource FieldFillBrush}" />
-    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="BorderThickness" Value="1.5" />
     <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
+  <!-- Universal field animation: fill + ring color fade. Must live on the template border
+       (that's the element whose brushes the hover/focus setters change). Thickness is never
+       animated (it's constant 1.5) so nothing reflows. -->
+  <Style Selector="TextBox /template/ Border#PART_BorderElement">
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.13" Easing="CubicEaseOut" />
+        <BrushTransition Property="BorderBrush" Duration="0:0:0.13" Easing="CubicEaseOut" />
+      </Transitions>
+    </Setter>
   </Style>
   <Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
     <Setter Property="Background" Value="{DynamicResource FieldFillHoverBrush}" />
   </Style>
   <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
     <Setter Property="Background" Value="{DynamicResource FieldFillBrush}" />
-    <Setter Property="BorderThickness" Value="1.5" />
     <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
   </Style>
   <!-- Read-only public-key display that copies on click; looks like a field. -->
@@ -78,6 +89,17 @@
     <Setter Property="VerticalContentAlignment" Value="Center" />
     <Setter Property="HorizontalContentAlignment" Value="Center" />
   </Style>
+  <!-- Universal button animation: every hover/press/selected bg+fg+border fades, on the
+       templated ContentPresenter where all button state setters land. -->
+  <Style Selector="Button /template/ ContentPresenter">
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.13" Easing="CubicEaseOut" />
+        <BrushTransition Property="Foreground" Duration="0:0:0.13" Easing="CubicEaseOut" />
+        <BrushTransition Property="BorderBrush" Duration="0:0:0.13" Easing="CubicEaseOut" />
+      </Transitions>
+    </Setter>
+  </Style>
   <Style Selector="Button.icon">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />
@@ -94,6 +116,11 @@
   </Style>
   <Style Selector="ToggleButton.icon /template/ ContentPresenter">
     <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Foreground" Duration="0:0:0.13" Easing="CubicEaseOut" />
+      </Transitions>
+    </Setter>
   </Style>
   <Style Selector="ToggleButton.icon:pointerover /template/ ContentPresenter">
     <Setter Property="Background" Value="Transparent" />
@@ -112,8 +139,19 @@
   <Style Selector="Button.link">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />
-    <Setter Property="Padding" Value="4,2" />
+    <Setter Property="Padding" Value="7,3" />
     <Setter Property="MinHeight" Value="0" />
+    <Setter Property="CornerRadius" Value="5" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+  </Style>
+  <!-- Fix the weird link hover: a subtle rounded fill (not Fluent gray) that keeps the
+       accent text (Fluent otherwise repaints the ContentPresenter fg on hover). -->
+  <Style Selector="Button.link:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource FieldFillHoverBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+  </Style>
+  <Style Selector="Button.link:pressed /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource FieldFillBrush}" />
     <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
   </Style>
   <!-- Header action buttons (Add / Settings): subtle, pill-ish. -->
@@ -140,22 +178,29 @@
     <Setter Property="Background" Value="{DynamicResource ItemBrush}" />
   </Style>
 
-  <!-- Segmented option buttons inside the Settings popover. -->
+  <!-- Segmented option buttons inside the appearance menu: soft filled, borderless; the
+       selected one fills with the accent. -->
   <Style Selector="Button.seg">
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="BorderBrush" Value="{DynamicResource FieldBorderBrush}" />
-    <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="Padding" Value="8,2" />
+    <Setter Property="Background" Value="{DynamicResource FieldFillBrush}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="9,3" />
     <Setter Property="MinHeight" Value="0" />
-    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="CornerRadius" Value="6" />
     <Setter Property="FontSize" Value="{DynamicResource Fs12}" />
+  </Style>
+  <Style Selector="Button.seg:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource FieldFillHoverBrush}" />
   </Style>
   <Style Selector="Button.seg.sel">
     <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
     <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
   </Style>
   <Style Selector="Button.seg.sel /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+  </Style>
+  <Style Selector="Button.seg.sel:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
     <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
   </Style>
 
@@ -184,6 +229,12 @@
   </Style>
   <Style Selector="ToggleButton.conn /template/ Border#track">
     <Setter Property="Opacity" Value="0.45" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.15" Easing="CubicEaseOut" />
+        <DoubleTransition Property="Opacity" Duration="0:0:0.15" Easing="CubicEaseOut" />
+      </Transitions>
+    </Setter>
   </Style>
   <Style Selector="ToggleButton.conn:checked /template/ Border#track">
     <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
@@ -193,29 +244,73 @@
     <Setter Property="RenderTransform" Value="translateX(18px)" />
   </Style>
 
+  <!-- Danger = a red ghost (Delete tunnel, Remove peer): no fill/border until a faint
+       danger-tinted hover; text stays red in every state. Must be declared after Button.link
+       so "link danger" (Remove peer) resolves to the danger color. -->
   <Style Selector="Button.danger">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
+  </Style>
+  <Style Selector="Button.danger /template/ ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
+  </Style>
+  <Style Selector="Button.danger:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource DangerBgBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
+  </Style>
+  <Style Selector="Button.danger:pressed /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource DangerBgBrush}" />
     <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
   </Style>
   <Style Selector="Button.danger.armed">
     <Setter Property="FontWeight" Value="Bold" />
   </Style>
+
+  <!-- Primary = a solid accent rounded button (Save); hover/press darken via an opacity dip
+       so fill + label stay in contrast. -->
   <Style Selector="Button.primary">
     <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
     <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="7" />
+    <Setter Property="Padding" Value="16,3" />
   </Style>
-  <!-- Override the templated ContentPresenter in every state so the label keeps its
-       on-accent color (the theme otherwise repaints it white on hover/press). -->
   <Style Selector="Button.primary /template/ ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
     <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
   </Style>
   <Style Selector="Button.primary:pointerover /template/ ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource AccentDimBrush}" />
+    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
     <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+    <Setter Property="Opacity" Value="0.88" />
   </Style>
   <Style Selector="Button.primary:pressed /template/ ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
     <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+    <Setter Property="Opacity" Value="0.78" />
+  </Style>
+
+  <!-- Quiet ghost secondary (Cancel + the raw-config toggle): muted label, no fill until a
+       soft hover. -->
+  <Style Selector="Button.quiet">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Opacity" Value="{DynamicResource DimOpacity}" />
+  </Style>
+  <Style Selector="Button.quiet:pointerover">
+    <Setter Property="Opacity" Value="1" />
+  </Style>
+  <Style Selector="Button.quiet /template/ ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.quiet:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource FieldFillHoverBrush}" />
+  </Style>
+  <Style Selector="Button.quiet:pressed /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource FieldFillBrush}" />
   </Style>
 
   <Style Selector="Border.card">
@@ -223,6 +318,11 @@
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="11" />
     <Setter Property="ClipToBounds" Value="True" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="BorderBrush" Duration="0:0:0.15" Easing="CubicEaseOut" />
+      </Transitions>
+    </Setter>
   </Style>
   <Style Selector="Border.card.editing">
     <Setter Property="BorderBrush" Value="{DynamicResource AccentDimBrush}" />
@@ -240,6 +340,16 @@
   </Style>
   <Style Selector="Border.item > DockPanel">
     <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.item">
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.13" Easing="CubicEaseOut" />
+      </Transitions>
+    </Setter>
+  </Style>
+  <Style Selector="Border.item:pointerover">
+    <Setter Property="Background" Value="{DynamicResource FieldFillHoverBrush}" />
   </Style>
   <Style Selector="Border.card">
     <Setter Property="Cursor" Value="Hand" />
@@ -275,7 +385,7 @@
   <!-- Peers are no longer boxed; a single top hairline separates each one (and the first
        from the interface section above it). -->
   <Style Selector="Border.peerblock">
-    <Setter Property="BorderBrush" Value="{DynamicResource HairlineBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource SeparatorBrush}" />
     <Setter Property="BorderThickness" Value="0,1,0,0" />
     <Setter Property="CornerRadius" Value="0" />
   </Style>
@@ -369,18 +479,21 @@
   <Style Selector="TextBlock.synnum">
     <Setter Property="Foreground" Value="{DynamicResource SynNumBrush}" />
   </Style>
-  <!-- Editable inputs are not syntax-highlighted; only read-only value chips are. Names stay
-       borderless and unfilled in every state (no field affordance on a title). -->
+  <!-- Tunnel + peer names share this class: a bold accent title with no fill and no visible
+       box at rest, revealing a thin ring on hover/focus so it reads as editable. The 1.5px
+       border footprint is inherited from the base TextBox (reserved transparently), so the
+       ring fades in via the base transition without shifting the title. -->
   <Style Selector="TextBox.plainname">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderBrush" Value="Transparent" />
   </Style>
   <Style Selector="TextBox.plainname:pointerover /template/ Border#PART_BorderElement">
     <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{DynamicResource FieldBorderBrush}" />
   </Style>
   <Style Selector="TextBox.plainname:focus /template/ Border#PART_BorderElement">
     <Setter Property="Background" Value="Transparent" />
-    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
   </Style>
 
   <Style Selector="ToggleSwitch">
@@ -389,8 +502,31 @@
     <Setter Property="MinWidth" Value="0" />
   </Style>
   <Style Selector="Separator">
-    <Setter Property="Background" Value="{DynamicResource HairlineBrush}" />
+    <Setter Property="Background" Value="{DynamicResource SeparatorBrush}" />
     <Setter Property="Height" Value="1" />
     <Setter Property="Margin" Value="0" />
+  </Style>
+
+  <!-- Menu surfaces, shared by the in-app flyout menus (Add + the logo menu) and, where
+       Avalonia renders it managed, the Windows tray menu. -->
+  <Style Selector="FlyoutPresenter">
+    <Setter Property="Background" Value="{DynamicResource MenuSurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource HairlineBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Padding" Value="5" />
+  </Style>
+  <Style Selector="MenuFlyoutPresenter">
+    <Setter Property="Background" Value="{DynamicResource MenuSurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource HairlineBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Padding" Value="4" />
+  </Style>
+  <Style Selector="MenuItem">
+    <Setter Property="MinHeight" Value="{DynamicResource CtrlH}" />
+    <Setter Property="Padding" Value="10,5" />
+    <Setter Property="CornerRadius" Value="5" />
+    <Setter Property="FontSize" Value="{DynamicResource Fs12}" />
   </Style>
 </Styles>

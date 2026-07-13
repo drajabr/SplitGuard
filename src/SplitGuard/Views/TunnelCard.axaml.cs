@@ -80,6 +80,8 @@ public partial class TunnelCard : UserControl
             var editing = _vm?.IsEditing ?? false;
             ExpandContent.IsVisible = editing;
             DetailPanel.IsVisible = !editing;
+            ExpandContent.Opacity = 1; // never leave a pane sub-opacity if a reveal was superseded
+            DetailPanel.Opacity = 1;
             Body.Height = double.NaN; // auto — sizes to content
         };
         // Re-resolve a per-card "mono" accent when the app theme flips.
@@ -223,15 +225,31 @@ public partial class TunnelCard : UserControl
         var from = Body.Bounds.Height;
         hide.IsVisible = false;
         show.IsVisible = true;
-        show.Opacity = 1;
         var w = Body.Bounds.Width;
         if (w < 1) w = 400;
         var to = NaturalHeight(show, w);
         if (to < 1 || from < 1 || Math.Abs(to - from) < 0.5)
         {
+            // No height change to ride — just show the pane, no reveal.
+            show.Opacity = 1;
+            if (show.RenderTransform is TranslateTransform t0) t0.Y = 0;
             Body.Height = double.NaN;
             return;
         }
+        // Reveal the incoming pane in step with the height tween: fade + a small slide up.
+        // Only one pane is ever visible (fade-in, not the crossfade that glitched); the
+        // reveal is a RenderTransform + Opacity so it never perturbs the measured height.
+        var shift = new TranslateTransform(0, RevealShift);
+        show.RenderTransform = shift;
+        show.Opacity = 0;
+        Tween(0, 1, AnimMs,
+            v => { if (_animGen == gen) { show.Opacity = v; shift.Y = RevealShift * (1 - v); } },
+            () =>
+            {
+                if (_animGen != gen) return;
+                show.Opacity = 1;
+                if (ReferenceEquals(show.RenderTransform, shift)) show.RenderTransform = null;
+            });
         Body.Height = from;
         Tween(from, to, AnimMs,
             v => { if (_animGen == gen) Body.Height = v; },
@@ -248,7 +266,7 @@ public partial class TunnelCard : UserControl
     // Render priority: default (background) ticks starve behind the heavy relayout a
     // collapse triggers (the VM rebuilds every peer), so the whole duration elapsed
     // before the first frame — the collapse snapped instead of animating.
-    static void Tween(double from, double to, int ms, Action<double> apply, Action? done = null)
+    internal static void Tween(double from, double to, int ms, Action<double> apply, Action? done = null)
     {
         if (Math.Abs(to - from) < 0.5) { apply(to); done?.Invoke(); return; }
         var sw = Stopwatch.StartNew();
@@ -303,6 +321,7 @@ public partial class TunnelCard : UserControl
     // ---- expand/collapse: explicit height animation of a single region ----------
 
     const int AnimMs = 200;
+    const double RevealShift = 8; // px the incoming pane content slides up from as it fades in
     int _animGen; // cancels a stale animation finalize on rapid re-toggle
 
     static double NaturalHeight(Control content, double width)
@@ -521,13 +540,13 @@ public partial class TunnelCard : UserControl
             return tb;
         }
 
-        // A hairline divider between peers.
+        // A soft, self-fading divider between peers.
         void AddSeparator()
         {
             DetailPanel.Children.Add(new Border
             {
                 Height = 1,
-                Background = (IBrush?)this.FindResource("HairlineBrush"),
+                Background = (IBrush?)this.FindResource("SeparatorBrush"),
                 Margin = new Avalonia.Thickness(0, 6, 0, 8),
             });
         }

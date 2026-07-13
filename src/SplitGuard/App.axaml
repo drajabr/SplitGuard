@@ -12,6 +12,7 @@
     <x:Double x:Key="Fs13">13</x:Double>
     <x:Double x:Key="Fs135">13.5</x:Double>
     <x:Double x:Key="Fs14">14</x:Double>
+    <x:Double x:Key="Fs15">15</x:Double>
     <x:Double x:Key="Fs17">17</x:Double>
     <x:Double x:Key="CtrlH">26</x:Double>
     <x:Double x:Key="HeaderH">38</x:Double>
@@ -33,6 +34,16 @@
     <SolidColorBrush x:Key="SuccessBrush">#4F9A34</SolidColorBrush>
     <SolidColorBrush x:Key="DotBrush">#8A8A8A</SolidColorBrush>
     <SolidColorBrush x:Key="WarningBgBrush">#22C77E16</SolidColorBrush>
+    <SolidColorBrush x:Key="DangerBgBrush">#22D14B41</SolidColorBrush>
+    <!-- Faded hairline for separators: transparent at both ends, faint neutral middle —
+         quieter and more modern than the flat HairlineBrush. -->
+    <LinearGradientBrush x:Key="SeparatorBrush" StartPoint="0%,50%" EndPoint="100%,50%">
+      <GradientStop Offset="0" Color="#00808080" />
+      <GradientStop Offset="0.15" Color="#30808080" />
+      <GradientStop Offset="0.5" Color="#30808080" />
+      <GradientStop Offset="0.85" Color="#30808080" />
+      <GradientStop Offset="1" Color="#00808080" />
+    </LinearGradientBrush>
   </Application.Resources>
   <Application.Styles>
     <FluentTheme />

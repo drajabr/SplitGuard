@@ -14,35 +14,22 @@
         DragDrop.AllowDrop="True">
   <DockPanel>
     <Border DockPanel.Dock="Top" Padding="12,6,146,6" Name="HeaderBar">
-      <DockPanel>
-        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
-          <Button Classes="hdr" Name="ThemeButton" Click="OnThemeClick" ToolTip.Tip="Theme">
-            <Path Name="ThemePath" Width="14" Height="14" Stretch="Uniform" Opacity="0.7" />
-          </Button>
-          <Button Classes="hdr" Name="AccentButton" Click="OnAccentClick" ToolTip.Tip="Accent color">
-            <Ellipse Width="11" Height="11" Fill="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
-          </Button>
-          <Button Classes="hdr" Name="FontButton" Click="OnFontClick" ToolTip.Tip="UI font">
-            <TextBlock Classes="glyph" Text="&#xE8D2;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
-          </Button>
-          <Button Classes="hdr" Name="ZoomButton" Click="OnZoomClick" ToolTip.Tip="Zoom">
-            <TextBlock Classes="glyph" Text="&#xE71E;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
-          </Button>
-        </StackPanel>
-        <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
-          <Image Name="LogoImage" Source="avares://SplitGuard/Assets/app.ico" Width="17" Height="17"
-                 VerticalAlignment="Center" IsHitTestVisible="False" />
-          <TextBlock FontSize="{DynamicResource Fs135}" FontWeight="Medium" VerticalAlignment="Center"
-                     Text="SplitGuard" IsHitTestVisible="False" />
-          <TextBlock Name="VersionLabel" FontSize="{DynamicResource Fs11}" Opacity="0.5"
-                     VerticalAlignment="Bottom" Margin="0,0,0,2" IsHitTestVisible="False" />
-          <Button Classes="hdr" Name="UpdateButton" Click="OnUpdateClick" VerticalAlignment="Center"
-                  ToolTip.Tip="{Binding UpdateTooltip}">
-            <TextBlock Classes="glyph updicon" Classes.hot="{Binding UpdateHighlight}"
-                       Text="{Binding UpdateGlyph}" FontSize="{DynamicResource Fs12}" />
-          </Button>
-        </StackPanel>
-      </DockPanel>
+      <!-- Left cluster only; the logo is the menu button. The title/version stay
+           non-hit-testable so empty header space still drags the OS window. -->
+      <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+        <Button Classes="hdr" Name="LogoButton" Click="OnLogoClick" Padding="3" VerticalAlignment="Center" ToolTip.Tip="Menu">
+          <Image Name="LogoImage" Source="avares://SplitGuard/Assets/app.ico" Width="23" Height="23" VerticalAlignment="Center" />
+        </Button>
+        <TextBlock FontSize="{DynamicResource Fs15}" FontWeight="SemiBold" VerticalAlignment="Center"
+                   Text="SplitGuard" IsHitTestVisible="False" />
+        <TextBlock Name="VersionLabel" FontSize="{DynamicResource Fs11}" Opacity="0.5"
+                   VerticalAlignment="Bottom" Margin="0,0,0,3" IsHitTestVisible="False" />
+        <Button Classes="hdr" Name="UpdateButton" Click="OnUpdateClick" VerticalAlignment="Center"
+                ToolTip.Tip="{Binding UpdateTooltip}">
+          <TextBlock Classes="glyph updicon" Classes.hot="{Binding UpdateHighlight}"
+                     Text="{Binding UpdateGlyph}" FontSize="{DynamicResource Fs12}" />
+        </Button>
+      </StackPanel>
     </Border>
 
     <Border DockPanel.Dock="Top" Background="{DynamicResource WarningBgBrush}" Padding="14,8" IsVisible="{Binding GpoWarning}">

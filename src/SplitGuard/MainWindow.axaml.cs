@@ -51,15 +51,10 @@ public partial class MainWindow : Window, IDialogs
     static readonly (string Key, double Base)[] ZoomResources =
     {
         ("Fs9", 9), ("Fs11", 11), ("Fs115", 11.5), ("Fs12", 12), ("Fs125", 12.5),
-        ("Fs13", 13), ("Fs135", 13.5), ("Fs14", 14), ("Fs17", 17),
+        ("Fs13", 13), ("Fs135", 13.5), ("Fs14", 14), ("Fs15", 15), ("Fs17", 17),
         ("CtrlH", 26), ("HeaderH", 38), ("CollapseH", 170),
     };
 
-    // Theme-switch icons (Material Design light_mode / dark_mode / contrast, 24×24) — one
-    // consistent family so auto, light and dark read as siblings.
-    const string SunGeometry = "M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13l2 0c.55 0 1-.45 1-1s-.45-1-1-1l-2 0c-.55 0-1 .45-1 1s.45 1 1 1zm18 0l2 0c.55 0 1-.45 1-1s-.45-1-1-1l-2 0c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z";
-    const string MoonGeometry = "M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z";
-    const string AutoGeometry = "M12 22c5.52 0 10-4.48 10-10S17.52 2 12 2 2 6.48 2 12s4.48 10 10 10zm1-17.93c3.94.49 7 3.85 7 7.93s-3.05 7.44-7 7.93V4.07z";
 
     int _themeIndex;
     int _accentIndex;
@@ -159,18 +154,16 @@ public partial class MainWindow : Window, IDialogs
 
     void ApplyFont()
     {
-        var (name, family) = FontSteps[_fontIndex];
+        var (_, family) = FontSteps[_fontIndex];
         FontFamily = new FontFamily(family);
-        ToolTip.SetTip(FontButton, $"UI font: {name}");
     }
 
     void ApplyZoom()
     {
-        var (name, scale) = ZoomSteps[_zoomIndex];
+        var (_, scale) = ZoomSteps[_zoomIndex];
         var resources = Avalonia.Application.Current!.Resources;
         foreach (var (key, baseValue) in ZoomResources)
             resources[key] = baseValue * scale;
-        ToolTip.SetTip(ZoomButton, $"Zoom: {name}");
     }
 
     // Surface theme: page + card/chip fills + borders + text contrast.
@@ -191,16 +184,21 @@ public partial class MainWindow : Window, IDialogs
         // Soft neutral fill behind borderless fields; a touch stronger on hover.
         resources["FieldFillBrush"] = new SolidColorBrush(Color.FromArgb(t.Name == "light" ? (byte)0x14 : (byte)0x1E, 0x80, 0x80, 0x80));
         resources["FieldFillHoverBrush"] = new SolidColorBrush(Color.FromArgb(t.Name == "light" ? (byte)0x20 : (byte)0x2E, 0x80, 0x80, 0x80));
-        // Light/dark switch icon: one consistent Material family (sun / moon / contrast).
-        ThemePath.Data = Avalonia.Media.Geometry.Parse(t.Name switch
-        {
-            "light" => SunGeometry,
-            "graphite" => MoonGeometry,
-            _ => AutoGeometry,
-        });
-        ThemePath.Fill = new SolidColorBrush(EffectiveVariant() == ThemeVariant.Light
-            ? Color.Parse("#1B2420") : Color.Parse("#E4E9E6"));
-        ToolTip.SetTip(ThemeButton, t.Name == "auto" ? "Theme: follow system" : $"Theme: {t.Name}");
+        // Menus/popups need an opaque backing (cards may be translucent overlays under "auto").
+        var menuBg = t.Surface is not null
+            ? Color.Parse(t.Surface)
+            : (EffectiveVariant() == ThemeVariant.Light ? Color.Parse("#FBFBFB") : Color.Parse("#2B2F34"));
+        resources["MenuSurfaceBrush"] = new SolidColorBrush(menuBg);
+        // Keys consumed by the Fluent MenuFlyoutPresenter/MenuItem (used by the tray menu on
+        // Windows): neutral hover wash + stable item text so it doesn't repaint on hover.
+        resources["MenuFlyoutPresenterBackground"] = new SolidColorBrush(menuBg);
+        resources["MenuFlyoutPresenterBorderBrush"] = resources["HairlineBrush"];
+        resources["MenuFlyoutItemBackgroundPointerOver"] = resources["ItemBrush"];
+        resources["MenuFlyoutItemBackgroundPressed"] = resources["ItemBrush"];
+        var menuFg = new SolidColorBrush(EffectiveVariant() == ThemeVariant.Light ? Color.Parse("#1B2420") : Color.Parse("#E4E9E6"));
+        resources["MenuFlyoutItemForeground"] = menuFg;
+        resources["MenuFlyoutItemForegroundPointerOver"] = menuFg;
+        resources["MenuFlyoutItemForegroundPressed"] = menuFg;
         ApplyAccent(); // re-resolve so a "mono" accent flips with the theme
     }
 
@@ -215,7 +213,7 @@ public partial class MainWindow : Window, IDialogs
     // Accent hue: brushes, Fluent's SystemAccent (toggles/focus/selection), and the icon.
     void ApplyAccent()
     {
-        var (name, hex) = AccentSteps[_accentIndex];
+        var (_, hex) = AccentSteps[_accentIndex];
         // "mono" = neutral accent that tracks the theme: white on dark, black on light.
         var color = hex.Length > 0
             ? Color.Parse(hex)
@@ -242,7 +240,6 @@ public partial class MainWindow : Window, IDialogs
         LogoImage.Source = icons.Logo;
         if (Avalonia.Application.Current is App app)
             app.SetAccentIcons(icons.Idle, icons.Active);
-        ToolTip.SetTip(AccentButton, $"Accent: {name}");
 
         // Save a branded PNG and register it as the toast-notification app icon/name.
         try
@@ -275,6 +272,7 @@ public partial class MainWindow : Window, IDialogs
     // ---- header controls: cycling view buttons + floating Add popover -----------
 
     Flyout? _addFlyout;
+    Flyout? _menuFlyout;
 
     void InitChrome()
     {
@@ -289,33 +287,117 @@ public partial class MainWindow : Window, IDialogs
     void OnUpdateClick(object? sender, RoutedEventArgs e) =>
         (DataContext as MainViewModel)?.OnUpdateButtonClicked();
 
-    void OnThemeClick(object? sender, RoutedEventArgs e)
+    // The logo opens the unified menu: Add actions, the tray-side settings, and appearance
+    // pickers — one themed flyout. Content is rebuilt each open so it reflects tray changes.
+    void OnLogoClick(object? sender, RoutedEventArgs e)
     {
-        _themeIndex = (_themeIndex + 1) % Palettes.Length;
-        ApplyTheme();
-        Persist(p => p.Theme = Palettes[_themeIndex].Name);
+        _menuFlyout ??= new Flyout { Placement = PlacementMode.BottomEdgeAlignedLeft };
+        _menuFlyout.Content = BuildMenuPanel();
+        _menuFlyout.ShowAt(LogoButton);
     }
 
-    void OnAccentClick(object? sender, RoutedEventArgs e)
+    Control BuildMenuPanel()
     {
-        _accentIndex = (_accentIndex + 1) % AccentSteps.Length;
-        ApplyAccent();
-        Persist(p => p.Accent = AccentSteps[_accentIndex].Name);
+        var root = new StackPanel { Spacing = 1, MinWidth = 248 };
+
+        root.Children.Add(SectionHeader("Add", first: true));
+        root.Children.Add(FlatItem("Import .conf…", () => _ = ImportConfAsync()));
+        root.Children.Add(FlatItem("New empty tunnel", () => (DataContext as MainViewModel)?.CreateEmptyTunnel()));
+        root.Children.Add(FlatItem("Rescan external tunnels", () => (DataContext as MainViewModel)?.RescanExternals()));
+
+        if (DataContext is MainViewModel vm)
+        {
+            root.Children.Add(new Separator { Margin = new Thickness(0, 4) });
+            root.Children.Add(SectionHeader("Settings"));
+            root.Children.Add(ToggleRow("Custom DNS forwarding", vm.HasCustomDns, on => vm.ToggleCustomDns(on)));
+            root.Children.Add(ToggleRow("Start on Windows startup", vm.Prefs.StartOnBoot, on =>
+            {
+                SplitGuard.Services.StartupService.Set(on);
+                vm.Prefs.StartOnBoot = on; vm.PersistPrefs();
+            }));
+            root.Children.Add(ToggleRow("Skip UAC prompt on launch", vm.Prefs.SkipUacLaunch, on =>
+            {
+                vm.Prefs.SkipUacLaunch = on; vm.PersistPrefs();
+                _ = Task.Run(() =>
+                {
+                    if (on) SplitGuard.Services.StartupService.RegisterLaunchTask();
+                    else SplitGuard.Services.StartupService.UnregisterLaunchTask();
+                });
+            }));
+            root.Children.Add(ToggleRow("Notifications", vm.Prefs.Notifications, on => { vm.Prefs.Notifications = on; vm.PersistPrefs(); }));
+            root.Children.Add(ToggleRow("Check for updates on startup", vm.Prefs.CheckUpdates, on => { vm.Prefs.CheckUpdates = on; vm.PersistPrefs(); }));
+        }
+
+        root.Children.Add(new Separator { Margin = new Thickness(0, 4) });
+        root.Children.Add(SectionHeader("Appearance"));
+        root.Children.Add(OptionBlock("Theme", System.Array.ConvertAll(Palettes, p => p.Name), _themeIndex, SelectTheme));
+        root.Children.Add(OptionBlock("Accent", System.Array.ConvertAll(AccentSteps, a => a.Name), _accentIndex, SelectAccent));
+        root.Children.Add(OptionBlock("Font", System.Array.ConvertAll(FontSteps, s => s.Name), _fontIndex, SelectFont));
+        root.Children.Add(OptionBlock("Zoom", System.Array.ConvertAll(ZoomSteps, s => s.Name), _zoomIndex, SelectZoom));
+        return root;
     }
 
-    void OnFontClick(object? sender, RoutedEventArgs e)
+    static Control SectionHeader(string text, bool first = false) => new TextBlock
     {
-        _fontIndex = (_fontIndex + 1) % FontSteps.Length;
-        ApplyFont();
-        Persist(p => p.Font = FontSteps[_fontIndex].Name);
+        Text = text.ToUpperInvariant(),
+        FontSize = 10.5, FontWeight = FontWeight.SemiBold, Opacity = 0.5,
+        Margin = new Thickness(8, first ? 4 : 9, 8, 3),
+    };
+
+    Button ToggleRow(string label, bool isOn, Action<bool> onToggle)
+    {
+        var accent = this.FindResource("AccentBrush") as IBrush ?? Brushes.Gray;
+        var check = new TextBlock
+        {
+            Classes = { "glyph" }, Text = "", FontSize = 12, Width = 18,
+            Margin = new Thickness(0, 0, 6, 0), Foreground = accent,
+            VerticalAlignment = VerticalAlignment.Center, Opacity = isOn ? 1 : 0,
+        };
+        var row = new DockPanel { LastChildFill = true };
+        DockPanel.SetDock(check, Dock.Left);
+        row.Children.Add(check);
+        row.Children.Add(new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center });
+        var state = isOn;
+        var btn = new Button
+        {
+            Content = row,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Left,
+            Background = Brushes.Transparent, BorderThickness = new Thickness(0),
+            Padding = new Thickness(8, 5), CornerRadius = new Avalonia.CornerRadius(5),
+        };
+        btn.Click += (_, _) => { state = !state; check.Opacity = state ? 1 : 0; onToggle(state); };
+        return btn;
     }
 
-    void OnZoomClick(object? sender, RoutedEventArgs e)
+    Control OptionBlock(string label, string[] names, int current, Action<int> pick)
     {
-        _zoomIndex = (_zoomIndex + 1) % ZoomSteps.Length;
-        ApplyZoom();
-        Persist(p => p.Zoom = ZoomSteps[_zoomIndex].Name);
+        var stack = new StackPanel { Margin = new Thickness(8, 2, 8, 5), Spacing = 4 };
+        stack.Children.Add(new TextBlock { Text = label, Opacity = 0.55, FontSize = 11, Margin = new Thickness(2, 0, 0, 1) });
+        var wrap = new WrapPanel();
+        var buttons = new List<Button>();
+        for (int i = 0; i < names.Length; i++)
+        {
+            int idx = i;
+            var seg = new Button { Content = names[i], Classes = { "seg" }, Margin = new Thickness(0, 0, 4, 4) };
+            if (i == current) seg.Classes.Add("sel");
+            seg.Click += (_, _) =>
+            {
+                foreach (var x in buttons) x.Classes.Remove("sel");
+                seg.Classes.Add("sel");
+                pick(idx);
+            };
+            buttons.Add(seg);
+            wrap.Children.Add(seg);
+        }
+        stack.Children.Add(wrap);
+        return stack;
     }
+
+    void SelectTheme(int i) { _themeIndex = i; ApplyTheme(); Persist(p => p.Theme = Palettes[i].Name); }
+    void SelectAccent(int i) { _accentIndex = i; ApplyAccent(); Persist(p => p.Accent = AccentSteps[i].Name); }
+    void SelectFont(int i) { _fontIndex = i; ApplyFont(); Persist(p => p.Font = FontSteps[i].Name); }
+    void SelectZoom(int i) { _zoomIndex = i; ApplyZoom(); Persist(p => p.Zoom = ZoomSteps[i].Name); }
 
     Control BuildAddPanel()
     {
@@ -338,7 +420,7 @@ public partial class MainWindow : Window, IDialogs
             BorderThickness = new Thickness(0),
             Padding = new Thickness(8, 5),
         };
-        b.Click += (_, _) => { _addFlyout?.Hide(); onClick(); };
+        b.Click += (_, _) => { _addFlyout?.Hide(); _menuFlyout?.Hide(); onClick(); };
         return b;
     }
 
