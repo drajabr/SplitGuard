@@ -40,30 +40,7 @@
       </StackPanel>
     </Border>
 
-    <!-- Persistent bottom bar: DNS + tunnel status on the left, Add on the right. -->
-    <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="0,1,0,0" Padding="14,6">
-      <DockPanel>
-        <Button DockPanel.Dock="Right" Name="AddButton" Classes="hdr" ToolTip.Tip="Add tunnel">
-          <StackPanel Orientation="Horizontal" Spacing="6">
-            <TextBlock Classes="glyph" Text="&#xE710;" FontSize="{DynamicResource Fs12}" Foreground="{DynamicResource AccentBrush}" />
-            <TextBlock Text="Add" VerticalAlignment="Center" FontSize="{DynamicResource Fs12}" />
-          </StackPanel>
-        </Button>
-        <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
-          <StackPanel Orientation="Horizontal" Spacing="6">
-            <Panel VerticalAlignment="Center">
-              <TextBlock Classes="glyph" Text="&#xE774;" FontSize="{DynamicResource Fs12}" Opacity="0.55"
-                         IsVisible="{Binding !DnsPinned}" />
-              <TextBlock Classes="glyph" Text="&#xE842;" FontSize="{DynamicResource Fs12}"
-                         Foreground="{DynamicResource AccentBrush}" IsVisible="{Binding DnsPinned}" />
-            </Panel>
-            <TextBlock Text="{Binding DnsStatus}" FontSize="{DynamicResource Fs12}" Opacity="0.85" VerticalAlignment="Center"
-                       Classes.accentfg="{Binding DnsPinned}" />
-          </StackPanel>
-        </StackPanel>
-      </DockPanel>
-    </Border>
-
+    <!-- Transient status bar (connect errors / failover); hidden until an event fires. -->
     <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="0,1,0,0" Padding="14,6"
             Classes="statusbar" Classes.shown="{Binding HasStatus}">
       <TextBlock Text="{Binding StatusText}" Classes="oktext" Classes.errtext="{Binding !StatusOk}" />

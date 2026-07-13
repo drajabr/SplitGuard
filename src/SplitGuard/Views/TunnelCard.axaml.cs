@@ -463,6 +463,8 @@ public partial class TunnelCard : UserControl
         DetailPanel.Children.Clear();
         if (_vm is null) return;
 
+        IBrush accent = this.TryFindResource("AccentBrush", out var ao) && ao is IBrush ab ? ab : Brushes.LimeGreen;
+
         TextBlock Mono(string text, IBrush brush)
         {
             // "mono" class → FontSize follows the zoom-scaled Fs12 resource.
@@ -532,12 +534,30 @@ public partial class TunnelCard : UserControl
             DetailPanel.Children.Add(grid);
         }
 
-        Control DnsValue(string dns)
+        // The DNS server as a bubble like the domains. When it's pinned as the device-wide
+        // (system) DNS, it's highlighted with the accent and a pin glyph instead of the plain
+        // blue bubble.
+        Control DnsValue(PeerViewModel peer)
         {
-            var tb = Mono(dns, Syntax.IpBrush);
-            tb.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center;
-            tb.Margin = new Avalonia.Thickness(0, 0, 8, 4);
-            return tb;
+            var dns = peer.Dns.Trim();
+            if (!peer.IsPinned) return Pill(dns, Syntax.IpBrush);
+
+            var pin = new TextBlock { Text = "", FontSize = 11, Foreground = accent, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center };
+            pin.Classes.Add("glyph");
+            var txt = Mono(dns, accent);
+            txt.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center;
+            var row = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 4, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center };
+            row.Children.Add(pin);
+            row.Children.Add(txt);
+            var bg = accent is ISolidColorBrush s ? new SolidColorBrush(s.Color, 0.18) : (IBrush)Brushes.Transparent;
+            return new Border
+            {
+                Background = bg,
+                CornerRadius = new Avalonia.CornerRadius(5),
+                Padding = new Avalonia.Thickness(7, 2),
+                Margin = new Avalonia.Thickness(0, 0, 5, 4),
+                Child = row,
+            };
         }
 
         // A soft, self-fading divider between peers.
@@ -550,8 +570,6 @@ public partial class TunnelCard : UserControl
                 Margin = new Avalonia.Thickness(0, 6, 0, 8),
             });
         }
-
-        IBrush accent = this.TryFindResource("AccentBrush", out var ao) && ao is IBrush ab ? ab : Brushes.LimeGreen;
 
         // One block per peer: a bold name + right-aligned live status line, then labelled
         // "routes" and "dns" rows whose values flow left as soft pills. The metric-preferred
@@ -598,7 +616,7 @@ public partial class TunnelCard : UserControl
             if (p.HasDns || p.DomainValues.Any())
             {
                 var content = new List<Control>();
-                if (p.HasDns) content.Add(DnsValue(p.Dns.Trim()));
+                if (p.HasDns) content.Add(DnsValue(p));
                 foreach (var d in p.DomainValues) content.Add(Pill(d, Syntax.DomainBrush));
                 LabeledRow("dns", content);
             }

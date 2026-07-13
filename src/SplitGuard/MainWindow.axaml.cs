@@ -147,7 +147,6 @@ public partial class MainWindow : Window, IDialogs
         ApplyTheme();   // also applies the accent (keeps "mono" in sync with the theme)
         ApplyFont();
         ApplyZoom();
-        InitChrome();
         // Reconcile the run-at-boot registry entry with the (possibly default-on) pref.
         try { StartupService.Set(prefs.StartOnBoot); } catch { }
     }
@@ -271,18 +270,7 @@ public partial class MainWindow : Window, IDialogs
 
     // ---- header controls: cycling view buttons + floating Add popover -----------
 
-    Flyout? _addFlyout;
-    Flyout? _menuFlyout;
-
-    void InitChrome()
-    {
-        // The floating Add button opens the add-options popover above itself. Right-edge
-        // aligned: the button sits at the window's right border, so a centered popover
-        // would spill outside the window.
-        _addFlyout ??= new Flyout { Placement = PlacementMode.TopEdgeAlignedRight };
-        _addFlyout.Content = BuildAddPanel();
-        AddButton.Flyout = _addFlyout;
-    }
+    MenuFlyout? _menuFlyout;
 
     void OnUpdateClick(object? sender, RoutedEventArgs e) =>
         (DataContext as MainViewModel)?.OnUpdateButtonClicked();
@@ -291,31 +279,32 @@ public partial class MainWindow : Window, IDialogs
     // pickers — one themed flyout. Content is rebuilt each open so it reflects tray changes.
     void OnLogoClick(object? sender, RoutedEventArgs e)
     {
-        _menuFlyout ??= new Flyout { Placement = PlacementMode.BottomEdgeAlignedLeft };
-        _menuFlyout.Content = BuildMenuPanel();
+        if (_menuFlyout is { IsOpen: true }) { _menuFlyout.Hide(); return; }
+        _menuFlyout = BuildMenu();
         _menuFlyout.ShowAt(LogoButton);
     }
 
-    Control BuildMenuPanel()
+    // A normal MenuItem-based menu (themed via the MenuFlyoutPresenter/MenuItem styles — the
+    // same path the Windows tray menu uses): Add actions, app settings as checkable items, and
+    // Appearance submenus. Rebuilt each open so checks/selection are fresh.
+    MenuFlyout BuildMenu()
     {
-        var root = new StackPanel { Spacing = 1, MinWidth = 248 };
+        var mf = new MenuFlyout { Placement = PlacementMode.BottomEdgeAlignedLeft };
 
-        root.Children.Add(SectionHeader("Add", first: true));
-        root.Children.Add(FlatItem("Import .conf…", () => _ = ImportConfAsync()));
-        root.Children.Add(FlatItem("New empty tunnel", () => (DataContext as MainViewModel)?.CreateEmptyTunnel()));
-        root.Children.Add(FlatItem("Rescan external tunnels", () => (DataContext as MainViewModel)?.RescanExternals()));
+        mf.Items.Add(MenuAction("Import configuration", () => _ = ImportConfAsync()));
+        mf.Items.Add(MenuAction("New empty tunnel", () => (DataContext as MainViewModel)?.CreateEmptyTunnel()));
+        mf.Items.Add(MenuAction("Rescan external tunnels", () => (DataContext as MainViewModel)?.RescanExternals()));
 
         if (DataContext is MainViewModel vm)
         {
-            root.Children.Add(new Separator { Margin = new Thickness(0, 4) });
-            root.Children.Add(SectionHeader("Settings"));
-            root.Children.Add(ToggleRow("Custom DNS forwarding", vm.HasCustomDns, on => vm.ToggleCustomDns(on)));
-            root.Children.Add(ToggleRow("Start on Windows startup", vm.Prefs.StartOnBoot, on =>
+            mf.Items.Add(new Separator());
+            mf.Items.Add(MenuCheck("Custom DNS forwarding", vm.HasCustomDns, on => vm.ToggleCustomDns(on)));
+            mf.Items.Add(MenuCheck("Start on Windows startup", vm.Prefs.StartOnBoot, on =>
             {
                 SplitGuard.Services.StartupService.Set(on);
                 vm.Prefs.StartOnBoot = on; vm.PersistPrefs();
             }));
-            root.Children.Add(ToggleRow("Skip UAC prompt on launch", vm.Prefs.SkipUacLaunch, on =>
+            mf.Items.Add(MenuCheck("Skip UAC prompt on launch", vm.Prefs.SkipUacLaunch, on =>
             {
                 vm.Prefs.SkipUacLaunch = on; vm.PersistPrefs();
                 _ = Task.Run(() =>
@@ -324,105 +313,59 @@ public partial class MainWindow : Window, IDialogs
                     else SplitGuard.Services.StartupService.UnregisterLaunchTask();
                 });
             }));
-            root.Children.Add(ToggleRow("Notifications", vm.Prefs.Notifications, on => { vm.Prefs.Notifications = on; vm.PersistPrefs(); }));
-            root.Children.Add(ToggleRow("Check for updates on startup", vm.Prefs.CheckUpdates, on => { vm.Prefs.CheckUpdates = on; vm.PersistPrefs(); }));
+            mf.Items.Add(MenuCheck("Notifications", vm.Prefs.Notifications, on => { vm.Prefs.Notifications = on; vm.PersistPrefs(); }));
+            mf.Items.Add(MenuCheck("Check for updates on startup", vm.Prefs.CheckUpdates, on => { vm.Prefs.CheckUpdates = on; vm.PersistPrefs(); }));
         }
 
-        root.Children.Add(new Separator { Margin = new Thickness(0, 4) });
-        root.Children.Add(SectionHeader("Appearance"));
-        root.Children.Add(OptionBlock("Theme", System.Array.ConvertAll(Palettes, p => p.Name), _themeIndex, SelectTheme));
-        root.Children.Add(OptionBlock("Accent", System.Array.ConvertAll(AccentSteps, a => a.Name), _accentIndex, SelectAccent));
-        root.Children.Add(OptionBlock("Font", System.Array.ConvertAll(FontSteps, s => s.Name), _fontIndex, SelectFont));
-        root.Children.Add(OptionBlock("Zoom", System.Array.ConvertAll(ZoomSteps, s => s.Name), _zoomIndex, SelectZoom));
-        return root;
+        mf.Items.Add(new Separator());
+        mf.Items.Add(MenuSub("Theme", System.Array.ConvertAll(Palettes, p => p.Name), _themeIndex, SelectTheme));
+        mf.Items.Add(MenuSub("Accent", System.Array.ConvertAll(AccentSteps, a => a.Name), _accentIndex, SelectAccent));
+        mf.Items.Add(MenuSub("Font", System.Array.ConvertAll(FontSteps, s => s.Name), _fontIndex, SelectFont));
+        mf.Items.Add(MenuSub("Zoom", System.Array.ConvertAll(ZoomSteps, s => s.Name), _zoomIndex, SelectZoom));
+        return mf;
     }
 
-    static Control SectionHeader(string text, bool first = false) => new TextBlock
+    static MenuItem MenuAction(string header, Action onClick)
     {
-        Text = text.ToUpperInvariant(),
-        FontSize = 10.5, FontWeight = FontWeight.SemiBold, Opacity = 0.5,
-        Margin = new Thickness(8, first ? 4 : 9, 8, 3),
-    };
-
-    Button ToggleRow(string label, bool isOn, Action<bool> onToggle)
-    {
-        var accent = this.FindResource("AccentBrush") as IBrush ?? Brushes.Gray;
-        var check = new TextBlock
-        {
-            Classes = { "glyph" }, Text = "", FontSize = 12, Width = 18,
-            Margin = new Thickness(0, 0, 6, 0), Foreground = accent,
-            VerticalAlignment = VerticalAlignment.Center, Opacity = isOn ? 1 : 0,
-        };
-        var row = new DockPanel { LastChildFill = true };
-        DockPanel.SetDock(check, Dock.Left);
-        row.Children.Add(check);
-        row.Children.Add(new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center });
-        var state = isOn;
-        var btn = new Button
-        {
-            Content = row,
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-            HorizontalContentAlignment = HorizontalAlignment.Left,
-            Background = Brushes.Transparent, BorderThickness = new Thickness(0),
-            Padding = new Thickness(8, 5), CornerRadius = new Avalonia.CornerRadius(5),
-        };
-        btn.Click += (_, _) => { state = !state; check.Opacity = state ? 1 : 0; onToggle(state); };
-        return btn;
+        var mi = new MenuItem { Header = header };
+        mi.Click += (_, _) => onClick();
+        return mi;
     }
 
-    Control OptionBlock(string label, string[] names, int current, Action<int> pick)
+    MenuItem MenuCheck(string header, bool isOn, Action<bool> toggle)
     {
-        var stack = new StackPanel { Margin = new Thickness(8, 2, 8, 5), Spacing = 4 };
-        stack.Children.Add(new TextBlock { Text = label, Opacity = 0.55, FontSize = 11, Margin = new Thickness(2, 0, 0, 1) });
-        var wrap = new WrapPanel();
-        var buttons = new List<Button>();
+        var mi = new MenuItem { Header = header };
+        if (isOn) mi.Icon = CheckIcon();
+        mi.Click += (_, _) => toggle(!isOn);
+        return mi;
+    }
+
+    MenuItem MenuSub(string header, string[] names, int current, Action<int> pick)
+    {
+        var parent = new MenuItem { Header = header };
         for (int i = 0; i < names.Length; i++)
         {
             int idx = i;
-            var seg = new Button { Content = names[i], Classes = { "seg" }, Margin = new Thickness(0, 0, 4, 4) };
-            if (i == current) seg.Classes.Add("sel");
-            seg.Click += (_, _) =>
-            {
-                foreach (var x in buttons) x.Classes.Remove("sel");
-                seg.Classes.Add("sel");
-                pick(idx);
-            };
-            buttons.Add(seg);
-            wrap.Children.Add(seg);
+            var child = new MenuItem { Header = names[i] };
+            if (i == current) child.Icon = CheckIcon();
+            child.Click += (_, _) => pick(idx);
+            parent.Items.Add(child);
         }
-        stack.Children.Add(wrap);
-        return stack;
+        return parent;
     }
+
+    TextBlock CheckIcon() => new()
+    {
+        Classes = { "glyph" }, Text = "", FontSize = 12,
+        Foreground = this.FindResource("AccentBrush") as IBrush ?? Brushes.Gray,
+    };
+
 
     void SelectTheme(int i) { _themeIndex = i; ApplyTheme(); Persist(p => p.Theme = Palettes[i].Name); }
     void SelectAccent(int i) { _accentIndex = i; ApplyAccent(); Persist(p => p.Accent = AccentSteps[i].Name); }
     void SelectFont(int i) { _fontIndex = i; ApplyFont(); Persist(p => p.Font = FontSteps[i].Name); }
     void SelectZoom(int i) { _zoomIndex = i; ApplyZoom(); Persist(p => p.Zoom = ZoomSteps[i].Name); }
 
-    Control BuildAddPanel()
-    {
-        var sp = new StackPanel { Spacing = 1, MinWidth = 190 };
-        sp.Children.Add(FlatItem("Import .conf…", () => _ = ImportConfAsync()));
-        sp.Children.Add(FlatItem("New empty tunnel", () => (DataContext as MainViewModel)?.CreateEmptyTunnel()));
-        sp.Children.Add(new Separator { Margin = new Thickness(0, 4) });
-        sp.Children.Add(FlatItem("Rescan external tunnels", () => (DataContext as MainViewModel)?.RescanExternals()));
-        return sp;
-    }
-
-    Button FlatItem(string text, Action onClick)
-    {
-        var b = new Button
-        {
-            Content = text,
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-            HorizontalContentAlignment = HorizontalAlignment.Left,
-            Background = Brushes.Transparent,
-            BorderThickness = new Thickness(0),
-            Padding = new Thickness(8, 5),
-        };
-        b.Click += (_, _) => { _addFlyout?.Hide(); _menuFlyout?.Hide(); onClick(); };
-        return b;
-    }
 
     async Task ImportConfAsync()
     {

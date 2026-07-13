@@ -55,10 +55,11 @@ public partial class PeerBlock : UserControl
             AnimateReveal(_vm.IsExpanded);
     }
 
-    // Fade + slide the body; the OUTER tunnel card owns the height motion (it animates via
-    // ExpandContent.SizeChanged once IsVisible flips). Expand: flip IsVisible first so the
-    // card grows to the right target, then fade/slide in. Collapse: fade out, THEN flip
-    // IsVisible so the card shrinks. Uses the card's render-priority tween.
+    // The OUTER tunnel card owns the height motion (it animates via ExpandContent.SizeChanged
+    // once IsVisible flips). Expand: flip IsVisible so the card grows, and fade/slide the body
+    // in over the same window. Collapse: flip IsVisible off immediately so the card shrinks at
+    // the exact same rate it grew — no separate fade-out pass (that made collapse feel ~2x
+    // slower than expand).
     void AnimateReveal(bool expand)
     {
         var gen = ++_revealGen;
@@ -76,9 +77,9 @@ public partial class PeerBlock : UserControl
         }
         else
         {
-            TunnelCard.Tween(PeerBody.Opacity, 0, RevealMs,
-                v => { if (_revealGen == gen) { PeerBody.Opacity = v; _shift.Y = RevealShift * (1 - v); } },
-                () => { if (_revealGen == gen) PeerBody.IsVisible = false; });
+            PeerBody.Opacity = 0;
+            _shift.Y = 0;
+            PeerBody.IsVisible = false; // card shrinks now, same 200ms as the grow
         }
     }
 

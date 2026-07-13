@@ -163,7 +163,10 @@
     <Setter Property="CornerRadius" Value="5" />
   </Style>
   <Style Selector="Button.hdr:pointerover /template/ ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource ItemBrush}" />
+    <Setter Property="Background" Value="{DynamicResource FieldFillHoverBrush}" />
+  </Style>
+  <Style Selector="Button.hdr:pressed /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource FieldFillBrush}" />
   </Style>
 
   <!-- Floating Add control: centered at the page bottom, borderless, icon over label. -->

@@ -8,7 +8,7 @@
     <StackPanel>
       <!-- Header (always visible; clicking its empty space toggles the body, like the
            tunnel card): name on the left, live status on the right. -->
-      <DockPanel Name="HeaderRow" Background="Transparent" Margin="14,9,14,3">
+      <DockPanel Name="HeaderRow" Background="Transparent" Margin="0,9,14,3">
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
           <TextBlock Classes="muted" Text="{Binding HandshakeText, Converter={x:Static views:Syntax.OrDots}}" />
           <TextBlock Classes="muted" Text="{Binding PingText, Converter={x:Static views:Syntax.OrDots}}"
