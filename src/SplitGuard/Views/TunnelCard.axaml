@@ -6,9 +6,7 @@
              xmlns:ae="using:AvaloniaEdit"
              x:Class="SplitGuard.Views.TunnelCard">
   <Border Classes="card" Classes.editing="{Binding IsEditing}" Background="{DynamicResource SurfaceBrush}">
-    <Grid ColumnDefinitions="Auto,*">
-      <Border Grid.Column="0" Width="4" Background="{DynamicResource AccentBrush}" />
-      <StackPanel Grid.Column="1">
+    <StackPanel>
       <DockPanel Name="HeaderRow" Background="Transparent" Margin="12,5" Height="{DynamicResource HeaderH}">
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
           <StackPanel Orientation="Horizontal" Spacing="3" IsVisible="{Binding StatsVisible}">
@@ -24,26 +22,24 @@
                           ToolTip.Tip="Connect / disconnect (saves &amp; applies while editing)" />
           </StackPanel>
         </StackPanel>
-        <Grid VerticalAlignment="Center" ColumnDefinitions="Auto,Auto,Auto,*">
-          <Ellipse Grid.Column="0" Name="StatusDot" Classes="dot" Classes.up="{Binding ShowUp}" Classes.connecting="{Binding ShowConnecting}"
-                   PointerPressed="OnDotPressed" ToolTip.Tip="{Binding ConnLabel}" />
-          <TextBox Grid.Column="1" MinWidth="60" HorizontalAlignment="Left" Margin="10,0,0,0" VerticalAlignment="Center"
+        <Grid VerticalAlignment="Center" ColumnDefinitions="Auto,Auto,*">
+          <TextBox Grid.Column="0" MinWidth="60" HorizontalAlignment="Left" VerticalAlignment="Center"
                    FontSize="{DynamicResource Fs17}" FontWeight="SemiBold"
                    Foreground="{DynamicResource AccentBrush}" Text="{Binding Name}"
                    Classes.plainname="{Binding !NameEditable}"
                    IsReadOnly="{Binding !NameEditable}" IsHitTestVisible="{Binding NameEditable}" />
-          <Border Grid.Column="2" Background="{DynamicResource ItemBrush}" CornerRadius="4" Padding="6,2" Margin="10,0,0,0"
+          <Border Grid.Column="1" Background="{DynamicResource ItemBrush}" CornerRadius="4" Padding="6,2" Margin="10,0,0,0"
                   IsVisible="{Binding IsExternal}" VerticalAlignment="Center">
             <TextBlock FontSize="{DynamicResource Fs11}" Opacity="0.7" Text="External" />
           </Border>
-          <TextBlock Grid.Column="3" Classes="mono synip" Margin="10,0,0,0" VerticalAlignment="Center"
+          <TextBlock Grid.Column="2" Classes="mono synip" Margin="10,0,0,0" VerticalAlignment="Center"
                      TextTrimming="CharacterEllipsis" Text="{Binding CollapsedSummary}" IsVisible="{Binding !IsEditing}" />
         </Grid>
       </DockPanel>
 
       <Border Name="Body" Classes="body">
       <Panel>
-      <StackPanel Name="DetailPanel" Margin="30,0,12,8" IsHitTestVisible="{Binding !IsEditing}" />
+      <StackPanel Name="DetailPanel" Margin="20,0,12,8" IsHitTestVisible="{Binding !IsEditing}" />
       <StackPanel Name="ExpandContent" IsHitTestVisible="{Binding IsEditing}">
         <Separator />
 
@@ -175,7 +171,6 @@
       </StackPanel>
       </Panel>
       </Border>
-      </StackPanel>
-    </Grid>
+    </StackPanel>
   </Border>
 </UserControl>

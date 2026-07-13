@@ -300,15 +300,6 @@ public partial class TunnelCard : UserControl
         Resources["OnAccentBrush"] = new SolidColorBrush(Accents.On(color));
     }
 
-    void OnDotPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (_vm is { IsEditing: true })
-        {
-            _vm.CycleAccent();
-            e.Handled = true;
-        }
-    }
-
     // ---- expand/collapse: explicit height animation of a single region ----------
 
     const int AnimMs = 200;
@@ -567,8 +558,15 @@ public partial class TunnelCard : UserControl
             }
             // Live status while connected: uptime since the first handshake on the left,
             // transfer totals centered, and — when a healthcheck runs — the RTT on the
-            // right. Without one, the totals take the right slot instead.
-            if (p.HasStats)
+            // right. Without one, the totals take the right slot instead. A real peer that
+            // isn't connected still gets the line, shown as dots, so the card keeps its shape.
+            if (!p.HasStats && wg)
+            {
+                var dots = Mono("·····", Syntax.IpBrush);
+                dots.Margin = new Avalonia.Thickness(0, 0, 0, 2);
+                DetailPanel.Children.Add(dots);
+            }
+            else if (p.HasStats)
             {
                 var uptime = string.IsNullOrEmpty(p.UptimeText) ? "·····" : $"up {p.UptimeText}";
                 var totals = $"↑ {p.TxTotalText}    ↓ {p.RxTotalText}";
