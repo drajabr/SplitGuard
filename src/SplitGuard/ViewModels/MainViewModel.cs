@@ -104,6 +104,138 @@ public class MainViewModel : ObservableObject, ITunnelHost
     bool _statusOk;
     public bool StatusOk { get => _statusOk; set => Set(ref _statusOk, value); }
 
+    // ---- self-update ------------------------------------------------------------
+
+    // One button in the header steps through this: click while Idle checks GitHub and, if a
+    // newer release exists, downloads its installer; a click while Ready launches it.
+    public enum UpdateStatus { Idle, Checking, Downloading, Ready, UpToDate, Error }
+
+    UpdateStatus _update = UpdateStatus.Idle;
+    UpdateInfo? _pendingUpdate;
+    string _installerPath = "";
+    double _downloadPct;
+    int _updateRevertToken;
+
+    void SetUpdate(UpdateStatus s)
+    {
+        _update = s;
+        Raise(nameof(UpdateGlyph));
+        Raise(nameof(UpdateTooltip));
+        Raise(nameof(UpdateHighlight));
+    }
+
+    // Segoe MDL2 glyph the button shows for each state.
+    public string UpdateGlyph => _update switch
+    {
+        UpdateStatus.Checking => "",     // Sync
+        UpdateStatus.Downloading => "",  // Download
+        UpdateStatus.Ready => "",        // UpdateRestore (the "update available" badge)
+        UpdateStatus.UpToDate => "",     // CheckMark
+        UpdateStatus.Error => "",        // Error
+        _ => "",                          // Idle: same update glyph, dimmed
+    };
+
+    public string UpdateTooltip => _update switch
+    {
+        UpdateStatus.Checking => "Checking for updates…",
+        UpdateStatus.Downloading => $"Downloading {_pendingUpdate?.Tag}… {_downloadPct:P0}",
+        UpdateStatus.Ready => $"Update {_pendingUpdate?.Tag} ready — click to install",
+        UpdateStatus.UpToDate => $"Up to date (v{UpdateService.CurrentVersion})",
+        UpdateStatus.Error => "Update check failed — click to retry",
+        _ => $"Check for updates (v{UpdateService.CurrentVersion})",
+    };
+
+    // The button lights up (accent) only when an update is downloaded and ready to install.
+    public bool UpdateHighlight => _update == UpdateStatus.Ready;
+
+    // Header button click: install when ready, ignore while busy, otherwise (re)check.
+    public void OnUpdateButtonClicked()
+    {
+        switch (_update)
+        {
+            case UpdateStatus.Ready: InstallUpdate(); break;
+            case UpdateStatus.Checking or UpdateStatus.Downloading: break;
+            default: _ = CheckForUpdatesAsync(manual: true); break;
+        }
+    }
+
+    // Check GitHub and, if newer, download the installer. `manual` distinguishes a user
+    // click (surface errors, no toast) from the silent once-a-day startup check (toast on
+    // success so a hidden-to-tray app still tells the user).
+    public async Task CheckForUpdatesAsync(bool manual)
+    {
+        if (_update is UpdateStatus.Checking or UpdateStatus.Downloading) return;
+        SetUpdate(UpdateStatus.Checking);
+        try
+        {
+            var info = await UpdateService.CheckAsync();
+            _config.Ui.LastUpdateCheck = DateTime.UtcNow.ToString("o");
+            PersistPrefs();
+            if (info is null)
+            {
+                if (manual) { SetUpdate(UpdateStatus.UpToDate); RevertUpdateLater(UpdateStatus.UpToDate); }
+                else SetUpdate(UpdateStatus.Idle);
+                return;
+            }
+            _pendingUpdate = info;
+            _downloadPct = 0;
+            SetUpdate(UpdateStatus.Downloading);
+            var progress = new Progress<double>(p => Dispatcher.UIThread.Post(() =>
+            {
+                _downloadPct = p;
+                if (_update == UpdateStatus.Downloading) Raise(nameof(UpdateTooltip));
+            }));
+            _installerPath = await UpdateService.DownloadAsync(info, progress);
+            SetUpdate(UpdateStatus.Ready);
+            if (!manual) Notify("Update available", $"SplitGuard {info.Tag} is ready to install.", false);
+        }
+        catch (Exception ex)
+        {
+            SetUpdate(UpdateStatus.Error);
+            RevertUpdateLater(UpdateStatus.Error);
+            if (manual) { StatusText = $"Update check failed: {ex.Message}"; StatusOk = false; }
+        }
+    }
+
+    void InstallUpdate()
+    {
+        if (string.IsNullOrEmpty(_installerPath) || !File.Exists(_installerPath))
+        {
+            _ = CheckForUpdatesAsync(manual: true); // installer went missing — re-fetch
+            return;
+        }
+        try
+        {
+            UpdateService.LaunchInstaller(_installerPath);
+            SplitGuard.App.ExitApplication?.Invoke(); // free the running files for the setup
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Couldn't start the installer: {ex.Message}";
+            StatusOk = false;
+        }
+    }
+
+    // Fall back to Idle a few seconds after a transient state (up-to-date / error) unless the
+    // state has since changed.
+    async void RevertUpdateLater(UpdateStatus from)
+    {
+        var token = ++_updateRevertToken;
+        await Task.Delay(5000);
+        if (_update == from && token == _updateRevertToken) SetUpdate(UpdateStatus.Idle);
+    }
+
+    // Startup: check at most once a day (and on the very first run) when the pref is on.
+    void MaybeCheckUpdatesOnStartup()
+    {
+        if (!_config.Ui.CheckUpdates) return;
+        if (DateTime.TryParse(_config.Ui.LastUpdateCheck, null,
+                System.Globalization.DateTimeStyles.RoundtripKind, out var last)
+            && DateTime.UtcNow - last.ToUniversalTime() < TimeSpan.FromDays(1))
+            return;
+        _ = CheckForUpdatesAsync(manual: false);
+    }
+
     // Fire an OS/in-app notification when the user has them enabled.
     void Notify(string title, string message, bool isError)
     {
@@ -153,6 +285,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
             await Task.Run(Reconcile);
             RefreshPins();
             await Task.Run(RefreshCatchAll);
+            MaybeCheckUpdatesOnStartup();
         }
         else
         {

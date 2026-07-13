@@ -349,6 +349,15 @@
     <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
   </Style>
 
+  <!-- Header update button: dim by default, accented + full opacity once an update is ready. -->
+  <Style Selector="TextBlock.updicon">
+    <Setter Property="Opacity" Value="0.55" />
+  </Style>
+  <Style Selector="TextBlock.updicon.hot">
+    <Setter Property="Opacity" Value="1" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+  </Style>
+
   <Style Selector="TextBlock.synip">
     <Setter Property="Foreground" Value="{DynamicResource SynIpBrush}" />
   </Style>

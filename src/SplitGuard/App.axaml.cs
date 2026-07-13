@@ -14,6 +14,8 @@ namespace SplitGuard;
 public class App : Application
 {
     public static Action? ShowMainWindow;
+    // Clean shutdown from anywhere (e.g. handing off to the update installer).
+    public static Action? ExitApplication;
 
     bool _exiting;
     TrayIcon? _tray;
@@ -78,6 +80,7 @@ public class App : Application
             _tray?.Dispose();
             desktop.Shutdown();
         };
+        ExitApplication = _exitAction;
         RebuildTrayMenu();
         _tray.IsVisible = true;
     }
@@ -228,6 +231,18 @@ public class App : Application
             RebuildTrayMenu();
         };
         settings.Menu.Items.Add(notif);
+        var updates = new NativeMenuItem("Check for updates on startup")
+        {
+            ToggleType = NativeMenuItemToggleType.CheckBox,
+            IsChecked = _vm.Prefs.CheckUpdates,
+        };
+        updates.Click += (_, _) =>
+        {
+            _vm.Prefs.CheckUpdates = !_vm.Prefs.CheckUpdates;
+            _vm.PersistPrefs();
+            RebuildTrayMenu();
+        };
+        settings.Menu.Items.Add(updates);
         menu.Items.Add(settings);
         menu.Items.Add(new NativeMenuItemSeparator());
 

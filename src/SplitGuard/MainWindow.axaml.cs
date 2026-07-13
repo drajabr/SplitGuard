@@ -283,6 +283,9 @@ public partial class MainWindow : Window, IDialogs
         AddButton.Flyout = _addFlyout;
     }
 
+    void OnUpdateClick(object? sender, RoutedEventArgs e) =>
+        (DataContext as MainViewModel)?.OnUpdateButtonClicked();
+
     void OnThemeClick(object? sender, RoutedEventArgs e)
     {
         _themeIndex = (_themeIndex + 1) % Palettes.Length;
