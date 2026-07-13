@@ -1,32 +1,31 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
+  <!-- Fields read as soft filled rows (no outline); the Fluent border is off and only the
+       focused field gets a thin accent ring. -->
   <Style Selector="TextBox">
     <Setter Property="MinHeight" Value="{DynamicResource CtrlH}" />
     <Setter Property="Padding" Value="8,3" />
     <Setter Property="CornerRadius" Value="6" />
     <Setter Property="FontSize" Value="{DynamicResource Fs13}" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="BorderBrush" Value="{DynamicResource FieldBorderBrush}" />
-  </Style>
-  <!-- The Fluent template fills a solid background on hover/focus; keep it transparent
-       so only the border reacts (the fill read as a heavy highlight). -->
-  <Style Selector="TextBox /template/ Border#PART_BorderElement">
-    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Background" Value="{DynamicResource FieldFillBrush}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="BorderBrush" Value="Transparent" />
   </Style>
   <Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
-    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Background" Value="{DynamicResource FieldFillHoverBrush}" />
   </Style>
   <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
-    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Background" Value="{DynamicResource FieldFillBrush}" />
+    <Setter Property="BorderThickness" Value="1.5" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
   </Style>
   <!-- Read-only public-key display that copies on click; looks like a field. -->
   <Style Selector="Button.keyfield">
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="BorderBrush" Value="{DynamicResource FieldBorderBrush}" />
-    <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Background" Value="{DynamicResource FieldFillBrush}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="6" />
     <Setter Property="Padding" Value="8,0" />
     <Setter Property="Height" Value="{DynamicResource CtrlH}" />
     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
@@ -45,11 +44,12 @@
   <!-- Tiny numeric boxes (metric, counts, timeout): slim padding so 2-3 digits fit
        in half the normal width. -->
   <Style Selector="TextBox.num">
-    <Setter Property="Padding" Value="2,3" />
+    <Setter Property="Padding" Value="7,3" />
     <Setter Property="MinWidth" Value="0" />
-    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
   </Style>
   <Style Selector="TextBox.error">
+    <Setter Property="BorderThickness" Value="1.5" />
     <Setter Property="BorderBrush" Value="{DynamicResource DangerBrush}" />
   </Style>
   <!-- Inline "+" add box: a square button-like affordance that becomes an input on focus. -->
@@ -58,8 +58,6 @@
     <Setter Property="Height" Value="{DynamicResource CtrlH}" />
     <Setter Property="Padding" Value="4,3" />
     <Setter Property="HorizontalContentAlignment" Value="Center" />
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="BorderBrush" Value="{DynamicResource FieldBorderBrush}" />
   </Style>
   <!-- On focus the "+" clears and the box grows with what's typed — no fixed jump. -->
   <Style Selector="TextBox.addbox:focus">
@@ -233,9 +231,8 @@
        MinHeight (not Height): long values wrap to more lines and the chip grows,
        keeping the × inside the box, top-right. -->
   <Style Selector="Border.item">
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="BorderBrush" Value="{DynamicResource FieldBorderBrush}" />
-    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Background" Value="{DynamicResource FieldFillBrush}" />
+    <Setter Property="BorderThickness" Value="0" />
     <Setter Property="CornerRadius" Value="6" />
     <Setter Property="Padding" Value="8,3" />
     <Setter Property="MinHeight" Value="{DynamicResource CtrlH}" />
@@ -275,10 +272,12 @@
     <Setter Property="Opacity" Value="1" />
   </Style>
 
+  <!-- Peers are no longer boxed; a single top hairline separates each one (and the first
+       from the interface section above it). -->
   <Style Selector="Border.peerblock">
     <Setter Property="BorderBrush" Value="{DynamicResource HairlineBrush}" />
-    <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="BorderThickness" Value="0,1,0,0" />
+    <Setter Property="CornerRadius" Value="0" />
   </Style>
 
   <Style Selector="TextBlock.lbl">
@@ -370,10 +369,18 @@
   <Style Selector="TextBlock.synnum">
     <Setter Property="Foreground" Value="{DynamicResource SynNumBrush}" />
   </Style>
-  <!-- Editable inputs are not syntax-highlighted; only read-only value chips are. -->
+  <!-- Editable inputs are not syntax-highlighted; only read-only value chips are. Names stay
+       borderless and unfilled in every state (no field affordance on a title). -->
   <Style Selector="TextBox.plainname">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
+  <Style Selector="TextBox.plainname:pointerover /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="TextBox.plainname:focus /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
   </Style>
 
   <Style Selector="ToggleSwitch">

@@ -188,6 +188,9 @@ public partial class MainWindow : Window, IDialogs
         resources["DimOpacity"] = t.Dim;
         resources["HairlineBrush"] = new SolidColorBrush(Color.FromArgb(t.Hair, 0x80, 0x80, 0x80));
         resources["FieldBorderBrush"] = new SolidColorBrush(Color.FromArgb(t.Field, 0x80, 0x80, 0x80));
+        // Soft neutral fill behind borderless fields; a touch stronger on hover.
+        resources["FieldFillBrush"] = new SolidColorBrush(Color.FromArgb(t.Name == "light" ? (byte)0x14 : (byte)0x1E, 0x80, 0x80, 0x80));
+        resources["FieldFillHoverBrush"] = new SolidColorBrush(Color.FromArgb(t.Name == "light" ? (byte)0x20 : (byte)0x2E, 0x80, 0x80, 0x80));
         // Light/dark switch icon: one consistent Material family (sun / moon / contrast).
         ThemePath.Data = Avalonia.Media.Geometry.Parse(t.Name switch
         {

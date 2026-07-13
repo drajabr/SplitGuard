@@ -24,7 +24,7 @@
         </StackPanel>
         <Grid VerticalAlignment="Center" ColumnDefinitions="Auto,Auto,*">
           <TextBox Grid.Column="0" MinWidth="60" HorizontalAlignment="Left" VerticalAlignment="Center"
-                   FontSize="{DynamicResource Fs17}" FontWeight="SemiBold"
+                   FontSize="{DynamicResource Fs17}" FontWeight="Bold"
                    Foreground="{DynamicResource AccentBrush}" Text="{Binding Name}"
                    Classes.plainname="{Binding !NameEditable}"
                    IsReadOnly="{Binding !NameEditable}" IsHitTestVisible="{Binding NameEditable}" />
@@ -41,7 +41,6 @@
       <Panel>
       <StackPanel Name="DetailPanel" Margin="20,0,12,8" IsHitTestVisible="{Binding !IsEditing}" />
       <StackPanel Name="ExpandContent" IsHitTestVisible="{Binding IsEditing}">
-        <Separator />
 
         <Border Name="EditorHost" Margin="12,8" CornerRadius="4" BorderBrush="{DynamicResource FieldBorderBrush}" BorderThickness="1"
                 IsVisible="{Binding IsTextMode}">
@@ -152,8 +151,7 @@
         <TextBlock Classes="errtext" Margin="12,0,12,8" Text="{Binding ValidationError}"
                    IsVisible="{Binding ValidationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
-        <Separator />
-        <DockPanel Margin="12,8">
+        <DockPanel Margin="12,16,12,10">
           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
             <Button Command="{Binding ToggleTextModeCommand}" IsVisible="{Binding ShowInterfaceSection}"
                     ToolTip.Tip="Toggle raw config editing (Ctrl+E)">

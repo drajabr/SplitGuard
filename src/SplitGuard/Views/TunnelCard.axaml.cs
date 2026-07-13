@@ -452,149 +452,141 @@ public partial class TunnelCard : UserControl
             return tb;
         }
 
-        TextBlock Label(string text)
+        // A soft filled pill (no border), used for routes and domains — same look as the
+        // edit-mode chips, tinted to its text color.
+        Border Pill(string text, IBrush fg)
         {
-            var tb = new TextBlock { Text = text };
-            tb.Classes.Add("lbl");
-            tb.Margin = new Avalonia.Thickness(0, 0, 6, 0);
-            return tb;
+            IBrush bg = fg is ISolidColorBrush s ? new SolidColorBrush(s.Color, 0.15) : Brushes.Transparent;
+            var tb = Mono(text, fg);
+            tb.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center;
+            return new Border
+            {
+                Background = bg,
+                CornerRadius = new Avalonia.CornerRadius(5),
+                Padding = new Avalonia.Thickness(7, 2),
+                Margin = new Avalonia.Thickness(0, 0, 5, 4),
+                Child = tb,
+            };
         }
 
-        // One row: left content (control), and an optional right-aligned value that wraps
-        // (right-aligned) to more lines rather than overlapping the left content.
-        void AddRow(Control? leftContent, string right, IBrush rightBrush)
+        // "label   value(s)" row: a muted label in a fixed column, content wrapping beside it.
+        void LabeledRow(string label, IReadOnlyList<Control> content)
         {
             var grid = new Grid
             {
-                Margin = new Avalonia.Thickness(0, 0, 0, 2),
+                Margin = new Avalonia.Thickness(0, 0, 0, 3),
                 ColumnDefinitions = new ColumnDefinitions("Auto,*"),
             };
-            if (leftContent is not null) { Grid.SetColumn(leftContent, 0); grid.Children.Add(leftContent); }
-            if (right.Length > 0)
-            {
-                var r = new TextBlock
-                {
-                    Text = right, Foreground = rightBrush,
-                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-                    TextAlignment = Avalonia.Media.TextAlignment.Right,
-                    Margin = new Avalonia.Thickness(12, 0, 0, 0),
-                };
-                r.Classes.Add("mono");
-                Grid.SetColumn(r, 1);
-                grid.Children.Add(r);
-            }
+            var lbl = new TextBlock { Text = label, Width = 50, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top, Margin = new Avalonia.Thickness(0, 2, 8, 0) };
+            lbl.Classes.Add("lbl");
+            Grid.SetColumn(lbl, 0);
+            grid.Children.Add(lbl);
+            var wrap = new WrapPanel();
+            foreach (var c in content) wrap.Children.Add(c);
+            Grid.SetColumn(wrap, 1);
+            grid.Children.Add(wrap);
             DetailPanel.Children.Add(grid);
         }
 
-        StackPanel Left(params Control[] items)
+        // The peer's name (bold accent) with its live status flushed right — uptime, transfer
+        // totals and RTT while connected, or dots when it isn't.
+        void NameLine(string name, string stats, IBrush accent)
         {
-            var sp = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 6 };
-            foreach (var i in items) sp.Children.Add(i);
-            return sp;
+            var grid = new Grid
+            {
+                Margin = new Avalonia.Thickness(0, 0, 0, 4),
+                ColumnDefinitions = new ColumnDefinitions("Auto,*"),
+            };
+            var nm = Mono(name, accent);
+            nm.FontWeight = Avalonia.Media.FontWeight.Bold;
+            Grid.SetColumn(nm, 0);
+            grid.Children.Add(nm);
+            var st = new TextBlock
+            {
+                Text = stats, Opacity = 0.5,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                TextAlignment = Avalonia.Media.TextAlignment.Right,
+            };
+            st.Classes.Add("mono");
+            Grid.SetColumn(st, 1);
+            grid.Children.Add(st);
+            DetailPanel.Children.Add(grid);
         }
 
-        // A hairline divider between peer blocks.
+        Control DnsValue(string dns)
+        {
+            var tb = Mono(dns, Syntax.IpBrush);
+            tb.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center;
+            tb.Margin = new Avalonia.Thickness(0, 0, 8, 4);
+            return tb;
+        }
+
+        // A hairline divider between peers.
         void AddSeparator()
         {
             DetailPanel.Children.Add(new Border
             {
                 Height = 1,
                 Background = (IBrush?)this.FindResource("HairlineBrush"),
-                Margin = new Avalonia.Thickness(0, 5, 0, 5),
+                Margin = new Avalonia.Thickness(0, 6, 0, 8),
             });
         }
 
-        // One block per peer: name on the left, its allowed IPs on the right; a DNS +
-        // domains line; and, when a ping host is set, a full-width status line
-        // (up · last RTT · avg · loss). Peers are separated by a hairline.
+        IBrush accent = this.TryFindResource("AccentBrush", out var ao) && ao is IBrush ab ? ab : Brushes.LimeGreen;
+
+        // One block per peer: a bold name + right-aligned live status line, then labelled
+        // "routes" and "dns" rows whose values flow left as soft pills. The metric-preferred
+        // (or live-active) failover route is tinted with the accent and marked "· active",
+        // and pulled out of the plain route list so nothing is duplicated. Peers separate
+        // with a hairline.
         bool first = true;
         for (int i = 0; i < _vm.Peers.Count; i++)
         {
             var p = _vm.Peers[i];
+            var wg = !_vm.IsExternal && !_vm.IsCustom;
             if (!first) AddSeparator();
             first = false;
 
-            // Failover routes this peer serves get their own line and come out of the plain
-            // allowed-IPs list so nothing is duplicated. Shown for the active member of any
-            // route group it's in — the live-arbitrated one when connected, else the
-            // metric-preferred one (lowest metric = 1st) so an assigned metric previews it
-            // even before the tunnel is up. Standby members keep their IPs as-is.
-            var wg = !_vm.IsExternal && !_vm.IsCustom;
-            var isActiveMember = wg && (p.FailoverRole == "active"
-                || (string.IsNullOrEmpty(p.FailoverRole) && _vm.Host.RouteGroupInfo(p) is { Position: 1 }));
-            IReadOnlyList<string> activeRoutes = isActiveMember
-                ? _vm.Host.RouteGroupCidrs(p)
-                : System.Array.Empty<string>();
+            if (wg)
+            {
+                var name = string.IsNullOrWhiteSpace(p.Name)
+                    ? (_vm.Peers.Count > 1 ? $"peer {i + 1}" : "peer")
+                    : p.Name.Trim();
+                string stats;
+                if (p.HasStats)
+                {
+                    var parts = new List<string>();
+                    if (!string.IsNullOrEmpty(p.UptimeText)) parts.Add(p.UptimeText);
+                    parts.Add($"↑ {p.TxTotalText}  ↓ {p.RxTotalText}");
+                    if (p.HasPingHost && !string.IsNullOrEmpty(p.PingText)) parts.Add(p.PingText);
+                    stats = string.Join("   ·   ", parts);
+                }
+                else stats = "·····";
+                NameLine(name, stats, accent);
 
-            if (!_vm.IsExternal && !_vm.IsCustom)
-            {
-                var name = new TextBlock
-                {
-                    Text = string.IsNullOrWhiteSpace(p.Name)
-                        ? (_vm.Peers.Count > 1 ? $"peer {i + 1}" : "peer")
-                        : p.Name.Trim(),
-                };
-                name.Classes.Add("mono");
-                name.Classes.Add("accentfg");
-                var items = new List<Control> { name };
-                if (!string.IsNullOrEmpty(p.HandshakeText)) items.Add(Label(p.HandshakeText));
-                var ips = p.AllowedIpValues
-                    .Where(ip => !activeRoutes.Contains(Models.WireGuardConf.CanonicalCidr(ip)));
-                AddRow(Left(items.ToArray()), string.Join(", ", ips), Syntax.IpBrush);
+                var isActiveMember = p.FailoverRole == "active"
+                    || (string.IsNullOrEmpty(p.FailoverRole) && _vm.Host.RouteGroupInfo(p) is { Position: 1 });
+                IReadOnlyList<string> activeRoutes = isActiveMember
+                    ? _vm.Host.RouteGroupCidrs(p)
+                    : System.Array.Empty<string>();
+                var routePills = new List<Control>();
+                foreach (var a in activeRoutes) routePills.Add(Pill($"{a} · active", accent));
+                foreach (var ip in p.AllowedIpValues.Where(ip => !activeRoutes.Contains(Models.WireGuardConf.CanonicalCidr(ip))))
+                    routePills.Add(Pill(ip, Syntax.IpBrush));
+                if (routePills.Count > 0) LabeledRow("routes", routePills);
             }
-            var domains = string.Join(", ", p.DomainValues);
-            if (p.HasDns || domains.Length > 0)
+
+            if (p.HasDns || p.DomainValues.Any())
             {
-                Control? left = p.HasDns ? Left(Label("DNS"), Mono(p.Dns.Trim(), Syntax.IpBrush)) : null;
-                AddRow(left, domains, Syntax.DomainBrush);
-            }
-            // The failover routes this peer is actively serving right now.
-            if (activeRoutes.Count > 0)
-            {
-                var active = new TextBlock { Text = "active" };
-                active.Classes.Add("mono");
-                active.Classes.Add("accentfg");
-                AddRow(Left(active), string.Join(", ", activeRoutes), Syntax.IpBrush);
-            }
-            // Live status while connected: uptime since the first handshake on the left,
-            // transfer totals centered, and — when a healthcheck runs — the RTT on the
-            // right. Without one, the totals take the right slot instead. A real peer that
-            // isn't connected still gets the line, shown as dots, so the card keeps its shape.
-            if (!p.HasStats && wg)
-            {
-                var dots = Mono("·····", Syntax.IpBrush);
-                dots.Margin = new Avalonia.Thickness(0, 0, 0, 2);
-                DetailPanel.Children.Add(dots);
-            }
-            else if (p.HasStats)
-            {
-                var uptime = string.IsNullOrEmpty(p.UptimeText) ? "·····" : $"up {p.UptimeText}";
-                var totals = $"↑ {p.TxTotalText}    ↓ {p.RxTotalText}";
-                var statGrid = new Grid { Margin = new Avalonia.Thickness(0, 0, 0, 2) };
-                statGrid.ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto");
-                var left = Mono(uptime, Syntax.IpBrush);
-                Grid.SetColumn(left, 0);
-                statGrid.Children.Add(left);
-                var mid = Mono(totals, Syntax.IpBrush);
-                if (p.HasPingHost)
-                {
-                    mid.TextAlignment = Avalonia.Media.TextAlignment.Center;
-                    Grid.SetColumn(mid, 1);
-                    var rtt = Mono(string.IsNullOrEmpty(p.PingText) ? "·····" : p.PingText, Syntax.IpBrush);
-                    Grid.SetColumn(rtt, 2);
-                    statGrid.Children.Add(rtt);
-                }
-                else
-                {
-                    Grid.SetColumn(mid, 2);
-                }
-                statGrid.Children.Add(mid);
-                DetailPanel.Children.Add(statGrid);
+                var content = new List<Control>();
+                if (p.HasDns) content.Add(DnsValue(p.Dns.Trim()));
+                foreach (var d in p.DomainValues) content.Add(Pill(d, Syntax.DomainBrush));
+                LabeledRow("dns", content);
             }
         }
 
         if (DetailPanel.Children.Count == 0)
-            AddRow(Mono("no peers configured", Syntax.IpBrush), "", Syntax.IpBrush);
+            LabeledRow("", new List<Control> { Mono("no peers configured", Syntax.IpBrush) });
     }
 
     // Collapsed: a click anywhere on the card expands it. Expanded: only a click on
