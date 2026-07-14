@@ -525,6 +525,8 @@
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="8" />
     <Setter Property="Padding" Value="4" />
+    <!-- Small gap so a dropdown doesn't sit flush against its menu-bar title. -->
+    <Setter Property="Margin" Value="0,3,0,0" />
   </Style>
   <Style Selector="MenuItem">
     <Setter Property="MinHeight" Value="{DynamicResource CtrlH}" />
@@ -538,8 +540,8 @@
     <Setter Property="Padding" Value="0" />
   </Style>
   <Style Selector="Menu > MenuItem">
-    <Setter Property="Padding" Value="9,4" />
+    <Setter Property="Padding" Value="8,3" />
     <Setter Property="CornerRadius" Value="6" />
-    <Setter Property="FontSize" Value="{DynamicResource Fs13}" />
+    <Setter Property="FontSize" Value="{DynamicResource Fs12}" />
   </Style>
 </Styles>

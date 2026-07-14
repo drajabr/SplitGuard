@@ -186,6 +186,12 @@ public partial class MainWindow : Window, IDialogs
             ? Color.Parse(t.Surface)
             : (EffectiveVariant() == ThemeVariant.Light ? Color.Parse("#FBFBFB") : Color.Parse("#2B2F34"));
         resources["MenuSurfaceBrush"] = new SolidColorBrush(menuBg);
+        // Menu-bar band: the title-bar strip, lifted slightly off the page. Opaque theme
+        // surface when the palette defines one; a faint neutral overlay under "auto" so the
+        // OS-adaptive title bar still shows through.
+        resources["HeaderBandBrush"] = new SolidColorBrush(t.Surface is not null
+            ? Color.Parse(t.Surface)
+            : Color.FromArgb(0x26, 0x80, 0x80, 0x80));
         // Keys consumed by the Fluent MenuFlyoutPresenter/MenuItem (used by the menu bar and the
         // Windows tray menu). Surface follows the theme; the hover shade is set in ApplyAccent.
         resources["MenuFlyoutPresenterBackground"] = new SolidColorBrush(menuBg);
@@ -269,7 +275,18 @@ public partial class MainWindow : Window, IDialogs
         vm.PersistPrefs();
     }
 
-    // ---- header controls: cycling view buttons + floating Add popover -----------
+    // ---- menu bar --------------------------------------------------------------
+
+    // The header band has a background, so it's hit-testable and suppresses the OS title-bar
+    // drag. Restore it: pressing empty band space (the logo included — it's non-hit-test) moves
+    // the window; presses on the menu bar go to it.
+    void OnHeaderPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        for (var el = e.Source as Visual; el is not null && el != HeaderBar; el = el.GetVisualParent())
+            if (el is MenuItem or Menu or Button) return;
+        BeginMoveDrag(e);
+    }
 
     // Each top-level menu rebuilds its items as it opens (and once eagerly at startup so the
     // first open is populated), keeping checkmarks, the appearance selection, and the update

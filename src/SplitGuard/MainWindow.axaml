@@ -13,15 +13,16 @@
         RenderOptions.TextRenderingMode="SubpixelAntialias"
         DragDrop.AllowDrop="True">
   <DockPanel>
-    <Border DockPanel.Dock="Top" Padding="12,4,146,4" Name="HeaderBar">
-      <!-- Logo + name are non-hit-testable so empty header space still drags the OS window;
-           the menu bar sits inline next to them. -->
-      <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
+    <Border DockPanel.Dock="Top" Padding="12,4,146,4" Name="HeaderBar" PointerPressed="OnHeaderPressed"
+            Background="{DynamicResource HeaderBandBrush}"
+            BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="0,0,0,1">
+      <!-- Logo (non-hit-testable so empty header space still drags the OS window) + the menu
+           bar. The app name lives in the OS title bar / taskbar, not here (keeps the menus
+           clear of the caption buttons at the 520px minimum width). -->
+      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
         <Image Name="LogoImage" Source="avares://SplitGuard/Assets/app.ico" Width="27" Height="27"
                VerticalAlignment="Center" IsHitTestVisible="False" />
-        <TextBlock FontSize="{DynamicResource Fs15}" FontWeight="SemiBold" VerticalAlignment="Center"
-                   Text="SplitGuard" IsHitTestVisible="False" />
-        <Menu Name="MenuBar" VerticalAlignment="Center" Margin="4,0,0,0">
+        <Menu Name="MenuBar" VerticalAlignment="Center">
           <MenuItem Name="TunnelMenu" Header="Tunnel" SubmenuOpened="OnMenuOpening" />
           <MenuItem Name="SettingsMenu" Header="Settings" SubmenuOpened="OnMenuOpening" />
           <MenuItem Name="AppearanceMenu" Header="Appearance" />
