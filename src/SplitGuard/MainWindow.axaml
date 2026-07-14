@@ -24,7 +24,7 @@
         <Menu Name="MenuBar" VerticalAlignment="Center" Margin="4,0,0,0">
           <MenuItem Name="TunnelMenu" Header="Tunnel" SubmenuOpened="OnMenuOpening" />
           <MenuItem Name="SettingsMenu" Header="Settings" SubmenuOpened="OnMenuOpening" />
-          <MenuItem Name="AppearanceMenu" Header="Appearance" SubmenuOpened="OnMenuOpening" />
+          <MenuItem Name="AppearanceMenu" Header="Appearance" />
           <MenuItem Name="AboutMenu" SubmenuOpened="OnMenuOpening">
             <MenuItem.Header>
               <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">

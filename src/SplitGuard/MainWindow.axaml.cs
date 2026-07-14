@@ -376,10 +376,15 @@ public partial class MainWindow : Window, IDialogs
     };
 
 
-    void SelectTheme(int i) { _themeIndex = i; ApplyTheme(); Persist(p => p.Theme = Palettes[i].Name); }
-    void SelectAccent(int i) { _accentIndex = i; ApplyAccent(); Persist(p => p.Accent = AccentSteps[i].Name); }
-    void SelectFont(int i) { _fontIndex = i; ApplyFont(); Persist(p => p.Font = FontSteps[i].Name); }
-    void SelectZoom(int i) { _zoomIndex = i; ApplyZoom(); Persist(p => p.Zoom = ZoomSteps[i].Name); }
+    // Appearance has cascading submenus, so it is NOT rebuilt on open (that detaches the child
+    // submenus). Instead it's built once eagerly and refreshed AFTER a pick — deferred so the
+    // menu finishes closing first (rebuilding it while open would keep it open) — so the next
+    // open shows the new checkmark.
+    void RefreshAppearance() => Avalonia.Threading.Dispatcher.UIThread.Post(() => BuildMenuItems(AppearanceMenu));
+    void SelectTheme(int i) { _themeIndex = i; ApplyTheme(); Persist(p => p.Theme = Palettes[i].Name); RefreshAppearance(); }
+    void SelectAccent(int i) { _accentIndex = i; ApplyAccent(); Persist(p => p.Accent = AccentSteps[i].Name); RefreshAppearance(); }
+    void SelectFont(int i) { _fontIndex = i; ApplyFont(); Persist(p => p.Font = FontSteps[i].Name); RefreshAppearance(); }
+    void SelectZoom(int i) { _zoomIndex = i; ApplyZoom(); Persist(p => p.Zoom = ZoomSteps[i].Name); RefreshAppearance(); }
 
 
     async Task ImportConfAsync()
