@@ -286,26 +286,28 @@ public partial class MainWindow : Window, IDialogs
         BeginMoveDrag(e);
     }
 
-    // Each top-level menu rebuilds its items as it opens (and once eagerly at startup so the
-    // first open is populated), keeping checkmarks, the appearance selection, and the update
-    // state fresh.
+    MenuItem? _appearanceMenu; // the Appearance submenu nested inside Settings
+
+    // Add is static (built once at startup). Settings refreshes its check icons IN PLACE as it
+    // opens — it must NOT be rebuilt on open, which would detach its nested Appearance submenus.
+    // About is flat, so it rebuilds on open to keep the version/update line fresh.
     void OnMenuOpening(object? sender, RoutedEventArgs e)
     {
-        if (sender is MenuItem mi) BuildMenuItems(mi);
+        if (ReferenceEquals(sender, SettingsMenu)) RefreshSettingsChecks();
+        else if (ReferenceEquals(sender, AboutMenu)) BuildMenuItems(AboutMenu);
     }
 
     void BuildMenus()
     {
-        BuildMenuItems(TunnelMenu);
+        BuildMenuItems(AddMenu);
         BuildMenuItems(SettingsMenu);
-        BuildMenuItems(AppearanceMenu);
         BuildMenuItems(AboutMenu);
     }
 
     void BuildMenuItems(MenuItem m)
     {
         m.Items.Clear();
-        if (ReferenceEquals(m, TunnelMenu))
+        if (ReferenceEquals(m, AddMenu))
         {
             m.Items.Add(MenuAction("Import configuration…", () => _ = ImportConfAsync()));
             m.Items.Add(MenuAction("New empty tunnel", () => (DataContext as MainViewModel)?.CreateEmptyTunnel()));
@@ -313,13 +315,13 @@ public partial class MainWindow : Window, IDialogs
         }
         else if (ReferenceEquals(m, SettingsMenu) && DataContext is MainViewModel sv)
         {
-            m.Items.Add(MenuCheck("Custom DNS forwarding", sv.HasCustomDns, on => sv.ToggleCustomDns(on)));
-            m.Items.Add(MenuCheck("Start on Windows startup", sv.Prefs.StartOnBoot, on =>
+            m.Items.Add(MenuCheck("Custom DNS forwarding", () => sv.HasCustomDns, on => sv.ToggleCustomDns(on)));
+            m.Items.Add(MenuCheck("Start on Windows startup", () => sv.Prefs.StartOnBoot, on =>
             {
                 SplitGuard.Services.StartupService.Set(on);
                 sv.Prefs.StartOnBoot = on; sv.PersistPrefs();
             }));
-            m.Items.Add(MenuCheck("Skip UAC prompt on launch", sv.Prefs.SkipUacLaunch, on =>
+            m.Items.Add(MenuCheck("Skip UAC prompt on launch", () => sv.Prefs.SkipUacLaunch, on =>
             {
                 sv.Prefs.SkipUacLaunch = on; sv.PersistPrefs();
                 _ = Task.Run(() =>
@@ -328,15 +330,12 @@ public partial class MainWindow : Window, IDialogs
                     else SplitGuard.Services.StartupService.UnregisterLaunchTask();
                 });
             }));
-            m.Items.Add(MenuCheck("Notifications", sv.Prefs.Notifications, on => { sv.Prefs.Notifications = on; sv.PersistPrefs(); }));
-            m.Items.Add(MenuCheck("Check for updates on startup", sv.Prefs.CheckUpdates, on => { sv.Prefs.CheckUpdates = on; sv.PersistPrefs(); }));
-        }
-        else if (ReferenceEquals(m, AppearanceMenu))
-        {
-            m.Items.Add(MenuSub("Theme", System.Array.ConvertAll(Palettes, p => p.Name), _themeIndex, SelectTheme));
-            m.Items.Add(MenuSub("Accent", System.Array.ConvertAll(AccentSteps, a => a.Name), _accentIndex, SelectAccent));
-            m.Items.Add(MenuSub("Font", System.Array.ConvertAll(FontSteps, s => s.Name), _fontIndex, SelectFont));
-            m.Items.Add(MenuSub("Zoom", System.Array.ConvertAll(ZoomSteps, s => s.Name), _zoomIndex, SelectZoom));
+            m.Items.Add(MenuCheck("Notifications", () => sv.Prefs.Notifications, on => { sv.Prefs.Notifications = on; sv.PersistPrefs(); }));
+            m.Items.Add(MenuCheck("Check for updates on startup", () => sv.Prefs.CheckUpdates, on => { sv.Prefs.CheckUpdates = on; sv.PersistPrefs(); }));
+            m.Items.Add(new Separator());
+            _appearanceMenu = new MenuItem { Header = "Appearance" };
+            BuildAppearanceItems(_appearanceMenu);
+            m.Items.Add(_appearanceMenu);
         }
         else if (ReferenceEquals(m, AboutMenu) && DataContext is MainViewModel av)
         {
@@ -362,12 +361,34 @@ public partial class MainWindow : Window, IDialogs
         return mi;
     }
 
-    MenuItem MenuCheck(string header, bool isOn, Action<bool> toggle)
+    // Checkable Settings item. Takes a live getter (not a captured bool) so the check can be
+    // refreshed in place on open — Settings is built once and never rebuilt (to keep its nested
+    // Appearance submenus attached), so a captured value would go stale after a tray toggle.
+    MenuItem MenuCheck(string header, Func<bool> isOn, Action<bool> toggle)
     {
-        var mi = new MenuItem { Header = header };
-        if (isOn) mi.Icon = CheckIcon();
-        mi.Click += (_, _) => toggle(!isOn);
+        var mi = new MenuItem { Header = header, Tag = isOn };
+        SetCheck(mi, isOn());
+        mi.Click += (_, _) => toggle(!isOn());
         return mi;
+    }
+
+    void SetCheck(MenuItem mi, bool on) => mi.Icon = on ? CheckIcon() : null;
+
+    void RefreshSettingsChecks()
+    {
+        foreach (var mi in SettingsMenu.Items.OfType<MenuItem>())
+            if (mi.Tag is Func<bool> f) SetCheck(mi, f());
+    }
+
+    // The Appearance submenu (nested in Settings): Theme/Accent/Font/Zoom pickers. Built once and
+    // rebuilt only after a pick (deferred), never on open, so its cascades stay attached.
+    void BuildAppearanceItems(MenuItem m)
+    {
+        m.Items.Clear();
+        m.Items.Add(MenuSub("Theme", System.Array.ConvertAll(Palettes, p => p.Name), _themeIndex, SelectTheme));
+        m.Items.Add(MenuSub("Accent", System.Array.ConvertAll(AccentSteps, a => a.Name), _accentIndex, SelectAccent));
+        m.Items.Add(MenuSub("Font", System.Array.ConvertAll(FontSteps, s => s.Name), _fontIndex, SelectFont));
+        m.Items.Add(MenuSub("Zoom", System.Array.ConvertAll(ZoomSteps, s => s.Name), _zoomIndex, SelectZoom));
     }
 
     MenuItem MenuSub(string header, string[] names, int current, Action<int> pick)
@@ -391,11 +412,12 @@ public partial class MainWindow : Window, IDialogs
     };
 
 
-    // Appearance has cascading submenus, so it is NOT rebuilt on open (that detaches the child
-    // submenus). Instead it's built once eagerly and refreshed AFTER a pick — deferred so the
-    // menu finishes closing first (rebuilding it while open would keep it open) — so the next
-    // open shows the new checkmark.
-    void RefreshAppearance() => Avalonia.Threading.Dispatcher.UIThread.Post(() => BuildMenuItems(AppearanceMenu));
+    // After an appearance pick, rebuild the nested Appearance submenu's items (deferred so the
+    // menu finishes closing first) to move the checkmark — never on open, so cascades survive.
+    void RefreshAppearance() => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+    {
+        if (_appearanceMenu is not null) BuildAppearanceItems(_appearanceMenu);
+    });
     void SelectTheme(int i) { _themeIndex = i; ApplyTheme(); Persist(p => p.Theme = Palettes[i].Name); RefreshAppearance(); }
     void SelectAccent(int i) { _accentIndex = i; ApplyAccent(); Persist(p => p.Accent = AccentSteps[i].Name); RefreshAppearance(); }
     void SelectFont(int i) { _fontIndex = i; ApplyFont(); Persist(p => p.Font = FontSteps[i].Name); RefreshAppearance(); }

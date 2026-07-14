@@ -540,6 +540,7 @@
     <Setter Property="Padding" Value="0" />
   </Style>
   <Style Selector="Menu > MenuItem">
+    <Setter Property="MinHeight" Value="0" />
     <Setter Property="Padding" Value="8,3" />
     <Setter Property="CornerRadius" Value="6" />
     <Setter Property="FontSize" Value="{DynamicResource Fs12}" />
