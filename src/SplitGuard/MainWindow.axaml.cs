@@ -70,9 +70,6 @@ public partial class MainWindow : Window, IDialogs
         AddHandler(DragDrop.DragOverEvent, (_, e) =>
             e.DragEffects = e.Data.Contains(DataFormats.Files) ? DragDropEffects.Copy : DragDropEffects.None);
         AddHandler(DragDrop.DropEvent, OnDrop);
-
-        var v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
-        if (v is not null) VersionLabel.Text = $"v{v.Major}.{v.Minor}.{v.Build}";
     }
 
     async void OnDrop(object? sender, DragEventArgs e)
@@ -147,6 +144,7 @@ public partial class MainWindow : Window, IDialogs
         ApplyTheme();   // also applies the accent (keeps "mono" in sync with the theme)
         ApplyFont();
         ApplyZoom();
+        BuildMenus();
         // Reconcile the run-at-boot registry entry with the (possibly default-on) pref.
         try { StartupService.Set(prefs.StartOnBoot); } catch { }
     }
@@ -270,59 +268,73 @@ public partial class MainWindow : Window, IDialogs
 
     // ---- header controls: cycling view buttons + floating Add popover -----------
 
-    MenuFlyout? _menuFlyout;
-
-    void OnUpdateClick(object? sender, RoutedEventArgs e) =>
-        (DataContext as MainViewModel)?.OnUpdateButtonClicked();
-
-    // The logo opens the unified menu: Add actions, the tray-side settings, and appearance
-    // pickers — one themed flyout. Content is rebuilt each open so it reflects tray changes.
-    void OnLogoClick(object? sender, RoutedEventArgs e)
+    // Each top-level menu rebuilds its items as it opens (and once eagerly at startup so the
+    // first open is populated), keeping checkmarks, the appearance selection, and the update
+    // state fresh.
+    void OnMenuOpening(object? sender, RoutedEventArgs e)
     {
-        if (_menuFlyout is { IsOpen: true }) { _menuFlyout.Hide(); return; }
-        _menuFlyout = BuildMenu();
-        _menuFlyout.ShowAt(LogoButton);
+        if (sender is MenuItem mi) BuildMenuItems(mi);
     }
 
-    // A normal MenuItem-based menu (themed via the MenuFlyoutPresenter/MenuItem styles — the
-    // same path the Windows tray menu uses): Add actions, app settings as checkable items, and
-    // Appearance submenus. Rebuilt each open so checks/selection are fresh.
-    MenuFlyout BuildMenu()
+    void BuildMenus()
     {
-        var mf = new MenuFlyout { Placement = PlacementMode.BottomEdgeAlignedLeft };
+        BuildMenuItems(TunnelMenu);
+        BuildMenuItems(SettingsMenu);
+        BuildMenuItems(AppearanceMenu);
+        BuildMenuItems(AboutMenu);
+    }
 
-        mf.Items.Add(MenuAction("Import configuration", () => _ = ImportConfAsync()));
-        mf.Items.Add(MenuAction("New empty tunnel", () => (DataContext as MainViewModel)?.CreateEmptyTunnel()));
-        mf.Items.Add(MenuAction("Rescan external tunnels", () => (DataContext as MainViewModel)?.RescanExternals()));
-
-        if (DataContext is MainViewModel vm)
+    void BuildMenuItems(MenuItem m)
+    {
+        m.Items.Clear();
+        if (ReferenceEquals(m, TunnelMenu))
         {
-            mf.Items.Add(new Separator());
-            mf.Items.Add(MenuCheck("Custom DNS forwarding", vm.HasCustomDns, on => vm.ToggleCustomDns(on)));
-            mf.Items.Add(MenuCheck("Start on Windows startup", vm.Prefs.StartOnBoot, on =>
+            m.Items.Add(MenuAction("Import configuration…", () => _ = ImportConfAsync()));
+            m.Items.Add(MenuAction("New empty tunnel", () => (DataContext as MainViewModel)?.CreateEmptyTunnel()));
+            m.Items.Add(MenuAction("Rescan external tunnels", () => (DataContext as MainViewModel)?.RescanExternals()));
+        }
+        else if (ReferenceEquals(m, SettingsMenu) && DataContext is MainViewModel sv)
+        {
+            m.Items.Add(MenuCheck("Custom DNS forwarding", sv.HasCustomDns, on => sv.ToggleCustomDns(on)));
+            m.Items.Add(MenuCheck("Start on Windows startup", sv.Prefs.StartOnBoot, on =>
             {
                 SplitGuard.Services.StartupService.Set(on);
-                vm.Prefs.StartOnBoot = on; vm.PersistPrefs();
+                sv.Prefs.StartOnBoot = on; sv.PersistPrefs();
             }));
-            mf.Items.Add(MenuCheck("Skip UAC prompt on launch", vm.Prefs.SkipUacLaunch, on =>
+            m.Items.Add(MenuCheck("Skip UAC prompt on launch", sv.Prefs.SkipUacLaunch, on =>
             {
-                vm.Prefs.SkipUacLaunch = on; vm.PersistPrefs();
+                sv.Prefs.SkipUacLaunch = on; sv.PersistPrefs();
                 _ = Task.Run(() =>
                 {
                     if (on) SplitGuard.Services.StartupService.RegisterLaunchTask();
                     else SplitGuard.Services.StartupService.UnregisterLaunchTask();
                 });
             }));
-            mf.Items.Add(MenuCheck("Notifications", vm.Prefs.Notifications, on => { vm.Prefs.Notifications = on; vm.PersistPrefs(); }));
-            mf.Items.Add(MenuCheck("Check for updates on startup", vm.Prefs.CheckUpdates, on => { vm.Prefs.CheckUpdates = on; vm.PersistPrefs(); }));
+            m.Items.Add(MenuCheck("Notifications", sv.Prefs.Notifications, on => { sv.Prefs.Notifications = on; sv.PersistPrefs(); }));
+            m.Items.Add(MenuCheck("Check for updates on startup", sv.Prefs.CheckUpdates, on => { sv.Prefs.CheckUpdates = on; sv.PersistPrefs(); }));
         }
+        else if (ReferenceEquals(m, AppearanceMenu))
+        {
+            m.Items.Add(MenuSub("Theme", System.Array.ConvertAll(Palettes, p => p.Name), _themeIndex, SelectTheme));
+            m.Items.Add(MenuSub("Accent", System.Array.ConvertAll(AccentSteps, a => a.Name), _accentIndex, SelectAccent));
+            m.Items.Add(MenuSub("Font", System.Array.ConvertAll(FontSteps, s => s.Name), _fontIndex, SelectFont));
+            m.Items.Add(MenuSub("Zoom", System.Array.ConvertAll(ZoomSteps, s => s.Name), _zoomIndex, SelectZoom));
+        }
+        else if (ReferenceEquals(m, AboutMenu) && DataContext is MainViewModel av)
+        {
+            m.Items.Add(new MenuItem { Header = $"SplitGuard  {av.CurrentVersionText}", IsEnabled = false });
+            m.Items.Add(new Separator());
+            var upd = MenuAction(av.UpdateActionText, () => av.OnUpdateButtonClicked());
+            if (av.UpdateHighlight) upd.Foreground = this.FindResource("AccentBrush") as IBrush;
+            m.Items.Add(upd);
+            m.Items.Add(MenuAction("View on GitHub", () => OpenUrl("https://github.com/drajabr/SplitGuard")));
+        }
+    }
 
-        mf.Items.Add(new Separator());
-        mf.Items.Add(MenuSub("Theme", System.Array.ConvertAll(Palettes, p => p.Name), _themeIndex, SelectTheme));
-        mf.Items.Add(MenuSub("Accent", System.Array.ConvertAll(AccentSteps, a => a.Name), _accentIndex, SelectAccent));
-        mf.Items.Add(MenuSub("Font", System.Array.ConvertAll(FontSteps, s => s.Name), _fontIndex, SelectFont));
-        mf.Items.Add(MenuSub("Zoom", System.Array.ConvertAll(ZoomSteps, s => s.Name), _zoomIndex, SelectZoom));
-        return mf;
+    static void OpenUrl(string url)
+    {
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true }); }
+        catch { }
     }
 
     static MenuItem MenuAction(string header, Action onClick)

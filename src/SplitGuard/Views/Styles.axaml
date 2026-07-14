@@ -532,4 +532,14 @@
     <Setter Property="CornerRadius" Value="5" />
     <Setter Property="FontSize" Value="{DynamicResource Fs12}" />
   </Style>
+  <!-- Menu bar: a transparent strip in the title bar; top-level titles are compact. -->
+  <Style Selector="Menu">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Padding" Value="0" />
+  </Style>
+  <Style Selector="Menu > MenuItem">
+    <Setter Property="Padding" Value="9,4" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="FontSize" Value="{DynamicResource Fs13}" />
+  </Style>
 </Styles>

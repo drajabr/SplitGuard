@@ -13,22 +13,28 @@
         RenderOptions.TextRenderingMode="SubpixelAntialias"
         DragDrop.AllowDrop="True">
   <DockPanel>
-    <Border DockPanel.Dock="Top" Padding="12,6,146,6" Name="HeaderBar">
-      <!-- Left cluster only; the logo is the menu button. The title/version stay
-           non-hit-testable so empty header space still drags the OS window. -->
-      <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
-        <Button Classes="hdr" Name="LogoButton" Click="OnLogoClick" Padding="3" VerticalAlignment="Center" ToolTip.Tip="Menu">
-          <Image Name="LogoImage" Source="avares://SplitGuard/Assets/app.ico" Width="23" Height="23" VerticalAlignment="Center" />
-        </Button>
+    <Border DockPanel.Dock="Top" Padding="12,4,146,4" Name="HeaderBar">
+      <!-- Logo + name are non-hit-testable so empty header space still drags the OS window;
+           the menu bar sits inline next to them. -->
+      <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
+        <Image Name="LogoImage" Source="avares://SplitGuard/Assets/app.ico" Width="27" Height="27"
+               VerticalAlignment="Center" IsHitTestVisible="False" />
         <TextBlock FontSize="{DynamicResource Fs15}" FontWeight="SemiBold" VerticalAlignment="Center"
                    Text="SplitGuard" IsHitTestVisible="False" />
-        <TextBlock Name="VersionLabel" FontSize="{DynamicResource Fs11}" Opacity="0.5"
-                   VerticalAlignment="Bottom" Margin="0,0,0,3" IsHitTestVisible="False" />
-        <Button Classes="hdr" Name="UpdateButton" Click="OnUpdateClick" VerticalAlignment="Center"
-                ToolTip.Tip="{Binding UpdateTooltip}">
-          <TextBlock Classes="glyph updicon" Classes.hot="{Binding UpdateHighlight}"
-                     Text="{Binding UpdateGlyph}" FontSize="{DynamicResource Fs12}" />
-        </Button>
+        <Menu Name="MenuBar" VerticalAlignment="Center" Margin="4,0,0,0">
+          <MenuItem Name="TunnelMenu" Header="Tunnel" SubmenuOpened="OnMenuOpening" />
+          <MenuItem Name="SettingsMenu" Header="Settings" SubmenuOpened="OnMenuOpening" />
+          <MenuItem Name="AppearanceMenu" Header="Appearance" SubmenuOpened="OnMenuOpening" />
+          <MenuItem Name="AboutMenu" SubmenuOpened="OnMenuOpening">
+            <MenuItem.Header>
+              <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                <TextBlock Text="About" VerticalAlignment="Center" />
+                <Ellipse Width="6" Height="6" VerticalAlignment="Center"
+                         Fill="{DynamicResource AccentBrush}" IsVisible="{Binding UpdateHighlight}" />
+              </StackPanel>
+            </MenuItem.Header>
+          </MenuItem>
+        </Menu>
       </StackPanel>
     </Border>
 

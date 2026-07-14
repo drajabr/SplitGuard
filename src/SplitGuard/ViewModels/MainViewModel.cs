@@ -122,7 +122,19 @@ public class MainViewModel : ObservableObject, ITunnelHost
         Raise(nameof(UpdateGlyph));
         Raise(nameof(UpdateTooltip));
         Raise(nameof(UpdateHighlight));
+        Raise(nameof(UpdateActionText));
     }
+
+    // The About menu's update line: install the downloaded update, show progress, or check.
+    public string UpdateActionText => _update switch
+    {
+        UpdateStatus.Ready => $"Install update {_pendingUpdate?.Tag}",
+        UpdateStatus.Checking => "Checking for updates…",
+        UpdateStatus.Downloading => $"Downloading {_pendingUpdate?.Tag}…",
+        _ => "Check for updates",
+    };
+
+    public string CurrentVersionText => $"v{UpdateService.CurrentVersion}";
 
     // Segoe MDL2 glyph the button shows for each state.
     public string UpdateGlyph => _update switch
