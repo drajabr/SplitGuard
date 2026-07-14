@@ -186,12 +186,11 @@ public partial class MainWindow : Window, IDialogs
             ? Color.Parse(t.Surface)
             : (EffectiveVariant() == ThemeVariant.Light ? Color.Parse("#FBFBFB") : Color.Parse("#2B2F34"));
         resources["MenuSurfaceBrush"] = new SolidColorBrush(menuBg);
-        // Menu-bar band: the title-bar strip, lifted slightly off the page. Opaque theme
-        // surface when the palette defines one; a faint neutral overlay under "auto" so the
-        // OS-adaptive title bar still shows through.
-        resources["HeaderBandBrush"] = new SolidColorBrush(t.Surface is not null
+        // The header bubble around logo+menu: the opaque theme surface where defined, else a
+        // clear neutral overlay so the pill reads on the OS-adaptive title bar.
+        resources["BubbleBrush"] = new SolidColorBrush(t.Surface is not null
             ? Color.Parse(t.Surface)
-            : Color.FromArgb(0x26, 0x80, 0x80, 0x80));
+            : Color.FromArgb(0x30, 0x80, 0x80, 0x80));
         // Keys consumed by the Fluent MenuFlyoutPresenter/MenuItem (used by the menu bar and the
         // Windows tray menu). Surface follows the theme; the hover shade is set in ApplyAccent.
         resources["MenuFlyoutPresenterBackground"] = new SolidColorBrush(menuBg);
@@ -277,13 +276,12 @@ public partial class MainWindow : Window, IDialogs
 
     // ---- menu bar --------------------------------------------------------------
 
-    // The header band has a background, so it's hit-testable and suppresses the OS title-bar
-    // drag. Restore it: pressing empty band space (the logo included — it's non-hit-test) moves
-    // the window; presses on the menu bar go to it.
-    void OnHeaderPressed(object? sender, PointerPressedEventArgs e)
+    // The bubble is hit-testable, so pressing it (the logo or its padding — but not a menu)
+    // drags the window too; the empty strip beside it drags natively via the OS caption.
+    void OnBubblePressed(object? sender, PointerPressedEventArgs e)
     {
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
-        for (var el = e.Source as Visual; el is not null && el != HeaderBar; el = el.GetVisualParent())
+        for (var el = e.Source as Visual; el is not null && el != sender; el = el.GetVisualParent())
             if (el is MenuItem or Menu or Button) return;
         BeginMoveDrag(e);
     }
