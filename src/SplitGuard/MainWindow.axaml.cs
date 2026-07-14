@@ -186,12 +186,10 @@ public partial class MainWindow : Window, IDialogs
             ? Color.Parse(t.Surface)
             : (EffectiveVariant() == ThemeVariant.Light ? Color.Parse("#FBFBFB") : Color.Parse("#2B2F34"));
         resources["MenuSurfaceBrush"] = new SolidColorBrush(menuBg);
-        // Keys consumed by the Fluent MenuFlyoutPresenter/MenuItem (used by the tray menu on
-        // Windows): neutral hover wash + stable item text so it doesn't repaint on hover.
+        // Keys consumed by the Fluent MenuFlyoutPresenter/MenuItem (used by the menu bar and the
+        // Windows tray menu). Surface follows the theme; the hover shade is set in ApplyAccent.
         resources["MenuFlyoutPresenterBackground"] = new SolidColorBrush(menuBg);
         resources["MenuFlyoutPresenterBorderBrush"] = resources["HairlineBrush"];
-        resources["MenuFlyoutItemBackgroundPointerOver"] = resources["ItemBrush"];
-        resources["MenuFlyoutItemBackgroundPressed"] = resources["ItemBrush"];
         var menuFg = new SolidColorBrush(EffectiveVariant() == ThemeVariant.Light ? Color.Parse("#1B2420") : Color.Parse("#E4E9E6"));
         resources["MenuFlyoutItemForeground"] = menuFg;
         resources["MenuFlyoutItemForegroundPointerOver"] = menuFg;
@@ -220,6 +218,11 @@ public partial class MainWindow : Window, IDialogs
         resources["AccentDimBrush"] = new SolidColorBrush(color, 0.4);
         // Text/glyphs on accent fills — mono's white accent needs dark text, not white.
         resources["OnAccentBrush"] = new SolidColorBrush(Accents.On(color));
+        // Menu item hover/press = a soft shade of the accent (menu bar + tray menu share the
+        // Fluent MenuItem theme, so both pick these up).
+        resources["MenuFlyoutItemBackgroundPointerOver"] = new SolidColorBrush(color, 0.20);
+        resources["MenuFlyoutItemBackgroundPressed"] = new SolidColorBrush(color, 0.30);
+        resources["MenuFlyoutItemBackgroundSelected"] = new SolidColorBrush(color, 0.20);
         resources["SystemAccentColor"] = color;
         resources["SystemAccentColorDark1"] = Shade(color, 0.85);
         resources["SystemAccentColorDark2"] = Shade(color, 0.70);
