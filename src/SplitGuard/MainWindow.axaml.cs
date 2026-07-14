@@ -70,6 +70,9 @@ public partial class MainWindow : Window, IDialogs
         AddHandler(DragDrop.DragOverEvent, (_, e) =>
             e.DragEffects = e.Data.Contains(DataFormats.Files) ? DragDropEffects.Copy : DragDropEffects.None);
         AddHandler(DragDrop.DropEvent, OnDrop);
+        // Collapse the settings panel on any press outside it (tunnelled + handledEventsToo so it
+        // still fires when a card or control handles the press first).
+        AddHandler(PointerPressedEvent, OnWindowPointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
     }
 
     async void OnDrop(object? sender, DragEventArgs e)
@@ -144,7 +147,7 @@ public partial class MainWindow : Window, IDialogs
         ApplyTheme();   // also applies the accent (keeps "mono" in sync with the theme)
         ApplyFont();
         ApplyZoom();
-        BuildMenus();
+        BuildSettingsPanel();
         // Reconcile the run-at-boot registry entry with the (possibly default-on) pref.
         try { StartupService.Set(prefs.StartOnBoot); } catch { }
     }
@@ -274,155 +277,221 @@ public partial class MainWindow : Window, IDialogs
         vm.PersistPrefs();
     }
 
-    // ---- menu bar --------------------------------------------------------------
+    // ---- header + settings panel ----------------------------------------------
 
-    // The bubble is hit-testable, so pressing it (the logo or its padding — but not a menu)
-    // drags the window too; the empty strip beside it drags natively via the OS caption.
-    void OnBubblePressed(object? sender, PointerPressedEventArgs e)
+    // Header update affordance: install when ready, otherwise (re)check — the VM steps the state.
+    void OnUpdateClick(object? sender, RoutedEventArgs e) =>
+        (DataContext as MainViewModel)?.OnUpdateButtonClicked();
+
+    // Bottom-bar Add menu.
+    void OnImportClick(object? sender, RoutedEventArgs e) => _ = ImportConfAsync();
+    void OnNewTunnelClick(object? sender, RoutedEventArgs e) => (DataContext as MainViewModel)?.CreateEmptyTunnel();
+    void OnRescanClick(object? sender, RoutedEventArgs e) => (DataContext as MainViewModel)?.RescanExternals();
+
+    // ---- settings panel: a bottom-bar expander that grows upward over the list ----
+
+    bool _settingsOpen;
+    int _setAnimGen; // cancels a stale expand/collapse finalize on rapid re-toggle
+
+    void OnSettingsToggleClick(object? sender, RoutedEventArgs e) => SetSettingsOpen(!_settingsOpen);
+
+    // Collapse when a press lands outside the panel and its toggle (a tunnel card, the list, the
+    // title bar). Tunnelled + handledEventsToo so it still fires when a child handles the press.
+    void OnWindowPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
-        for (var el = e.Source as Visual; el is not null && el != sender; el = el.GetVisualParent())
-            if (el is MenuItem or Menu or Button) return;
-        BeginMoveDrag(e);
+        if (!_settingsOpen) return;
+        for (var el = e.Source as Visual; el is not null; el = el.GetVisualParent())
+            if (ReferenceEquals(el, SettingsRegion) || ReferenceEquals(el, SettingsToggle)) return;
+        SetSettingsOpen(false);
     }
 
-    MenuItem? _appearanceMenu; // the Appearance submenu nested inside Settings
-
-    // Add is static (built once at startup). Settings refreshes its check icons IN PLACE as it
-    // opens — it must NOT be rebuilt on open, which would detach its nested Appearance submenus.
-    // About is flat, so it rebuilds on open to keep the version/update line fresh.
-    void OnMenuOpening(object? sender, RoutedEventArgs e)
+    // Animate SettingsRegion.Height between 0 and the panel's natural height with the same tween
+    // the cards use (200ms CubicEaseOut). Rebuild the panel on open so its toggle/selection state
+    // is fresh (e.g. after a tray-menu change). Released to Auto once open so it follows content.
+    void SetSettingsOpen(bool open)
     {
-        if (ReferenceEquals(sender, SettingsMenu)) RefreshSettingsChecks();
-        else if (ReferenceEquals(sender, AboutMenu)) BuildMenuItems(AboutMenu);
-    }
+        _settingsOpen = open;
+        SettingsChevron.Text = open ? "" : ""; // down = click to close; up = opens upward
+        if (open) BuildSettingsPanel();
 
-    void BuildMenus()
-    {
-        BuildMenuItems(AddMenu);
-        BuildMenuItems(SettingsMenu);
-        BuildMenuItems(AboutMenu);
-    }
-
-    void BuildMenuItems(MenuItem m)
-    {
-        m.Items.Clear();
-        if (ReferenceEquals(m, AddMenu))
+        var gen = ++_setAnimGen;
+        var from = SettingsRegion.Bounds.Height;
+        double to = 0;
+        if (open)
         {
-            m.Items.Add(MenuAction("Import configuration…", () => _ = ImportConfAsync()));
-            m.Items.Add(MenuAction("New empty tunnel", () => (DataContext as MainViewModel)?.CreateEmptyTunnel()));
-            m.Items.Add(MenuAction("Rescan external tunnels", () => (DataContext as MainViewModel)?.RescanExternals()));
+            var w = SettingsRegion.Bounds.Width;
+            if (w < 1) w = Bounds.Width;
+            SettingsCard.Measure(new Size(w, double.PositiveInfinity));
+            to = SettingsCard.DesiredSize.Height;
         }
-        else if (ReferenceEquals(m, SettingsMenu) && DataContext is MainViewModel sv)
+        TunnelCard.Tween(from, to, 200,
+            v => { if (_setAnimGen == gen) SettingsRegion.Height = v; },
+            () => { if (_setAnimGen == gen && open) SettingsRegion.Height = double.NaN; });
+    }
+
+    // (Re)build the two columns. General = toggles with side effects; Appearance = inline pickers.
+    void BuildSettingsPanel()
+    {
+        if (DataContext is not MainViewModel sv) return;
+        GeneralList.Children.Clear();
+        GeneralList.Children.Add(ToggleRow("Custom DNS forwarding", () => sv.HasCustomDns, on => sv.ToggleCustomDns(on)));
+        GeneralList.Children.Add(ToggleRow("Start on Windows startup", () => sv.Prefs.StartOnBoot, on =>
         {
-            m.Items.Add(MenuCheck("Custom DNS forwarding", () => sv.HasCustomDns, on => sv.ToggleCustomDns(on)));
-            m.Items.Add(MenuCheck("Start on Windows startup", () => sv.Prefs.StartOnBoot, on =>
+            StartupService.Set(on);
+            sv.Prefs.StartOnBoot = on; sv.PersistPrefs();
+        }));
+        GeneralList.Children.Add(ToggleRow("Skip UAC prompt on launch", () => sv.Prefs.SkipUacLaunch, on =>
+        {
+            sv.Prefs.SkipUacLaunch = on; sv.PersistPrefs();
+            _ = Task.Run(() =>
             {
-                SplitGuard.Services.StartupService.Set(on);
-                sv.Prefs.StartOnBoot = on; sv.PersistPrefs();
-            }));
-            m.Items.Add(MenuCheck("Skip UAC prompt on launch", () => sv.Prefs.SkipUacLaunch, on =>
-            {
-                sv.Prefs.SkipUacLaunch = on; sv.PersistPrefs();
-                _ = Task.Run(() =>
-                {
-                    if (on) SplitGuard.Services.StartupService.RegisterLaunchTask();
-                    else SplitGuard.Services.StartupService.UnregisterLaunchTask();
-                });
-            }));
-            m.Items.Add(MenuCheck("Notifications", () => sv.Prefs.Notifications, on => { sv.Prefs.Notifications = on; sv.PersistPrefs(); }));
-            m.Items.Add(MenuCheck("Check for updates on startup", () => sv.Prefs.CheckUpdates, on => { sv.Prefs.CheckUpdates = on; sv.PersistPrefs(); }));
-            m.Items.Add(new Separator());
-            _appearanceMenu = new MenuItem { Header = "Appearance" };
-            BuildAppearanceItems(_appearanceMenu);
-            m.Items.Add(_appearanceMenu);
-        }
-        else if (ReferenceEquals(m, AboutMenu) && DataContext is MainViewModel av)
+                if (on) StartupService.RegisterLaunchTask();
+                else StartupService.UnregisterLaunchTask();
+            });
+        }));
+        GeneralList.Children.Add(ToggleRow("Notifications", () => sv.Prefs.Notifications, on => { sv.Prefs.Notifications = on; sv.PersistPrefs(); }));
+        // Turning on the update check runs one now, so a found update surfaces the header arrow.
+        GeneralList.Children.Add(ToggleRow("Check for updates on startup", () => sv.Prefs.CheckUpdates, on =>
         {
-            m.Items.Add(new MenuItem { Header = $"SplitGuard  {av.CurrentVersionText}", IsEnabled = false });
-            m.Items.Add(new Separator());
-            var upd = MenuAction(av.UpdateActionText, () => av.OnUpdateButtonClicked());
-            if (av.UpdateHighlight) upd.Foreground = this.FindResource("AccentBrush") as IBrush;
-            m.Items.Add(upd);
-            m.Items.Add(MenuAction("View on GitHub", () => OpenUrl("https://github.com/drajabr/SplitGuard")));
-        }
+            sv.Prefs.CheckUpdates = on; sv.PersistPrefs();
+            if (on) _ = sv.CheckForUpdatesAsync(manual: true);
+        }));
+
+        AppearanceList.Children.Clear();
+        AppearanceList.Children.Add(PickerGroup("Theme", System.Array.ConvertAll(Palettes, p => p.Name), _themeIndex, SelectTheme));
+        AppearanceList.Children.Add(AccentGroup());
+        AppearanceList.Children.Add(FontGroup());
+        AppearanceList.Children.Add(PickerGroup("Scale", System.Array.ConvertAll(ZoomSteps, s => s.Name), _zoomIndex, SelectZoom));
+
+        RefreshSettingsSummary();
     }
 
-    static void OpenUrl(string url)
+    // "label [ switch ]" row: a pill switch (shared look with the connect toggle) flushed right.
+    // Uses Click (fires after the toggle) so building the row with the current state never re-runs
+    // the side effect.
+    Control ToggleRow(string label, Func<bool> get, Action<bool> set)
     {
-        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true }); }
-        catch { }
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), Margin = new Thickness(0, 3, 0, 3) };
+        var tb = new TextBlock { Text = label, TextTrimming = TextTrimming.CharacterEllipsis };
+        tb.Classes.Add("setlabel");
+        Grid.SetColumn(tb, 0);
+        var sw = new ToggleButton { IsChecked = get(), VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right };
+        sw.Classes.Add("pill");
+        sw.Click += (_, _) => { set(sw.IsChecked == true); RefreshSettingsSummary(); };
+        Grid.SetColumn(sw, 1);
+        grid.Children.Add(tb);
+        grid.Children.Add(sw);
+        return grid;
     }
 
-    static MenuItem MenuAction(string header, Action onClick)
+    // A label with segmented option buttons below it; the current one wears the accent fill
+    // (Button.seg.sel).
+    Control PickerGroup(string label, string[] names, int current, Action<int> pick)
     {
-        var mi = new MenuItem { Header = header };
-        mi.Click += (_, _) => onClick();
-        return mi;
-    }
-
-    // Checkable Settings item. Takes a live getter (not a captured bool) so the check can be
-    // refreshed in place on open — Settings is built once and never rebuilt (to keep its nested
-    // Appearance submenus attached), so a captured value would go stale after a tray toggle.
-    MenuItem MenuCheck(string header, Func<bool> isOn, Action<bool> toggle)
-    {
-        var mi = new MenuItem { Header = header, Tag = isOn };
-        SetCheck(mi, isOn());
-        mi.Click += (_, _) => toggle(!isOn());
-        return mi;
-    }
-
-    void SetCheck(MenuItem mi, bool on) => mi.Icon = on ? CheckIcon() : null;
-
-    void RefreshSettingsChecks()
-    {
-        foreach (var mi in SettingsMenu.Items.OfType<MenuItem>())
-            if (mi.Tag is Func<bool> f) SetCheck(mi, f());
-    }
-
-    // The Appearance submenu (nested in Settings): Theme/Accent/Font/Zoom pickers. Built once and
-    // rebuilt only after a pick (deferred), never on open, so its cascades stay attached.
-    void BuildAppearanceItems(MenuItem m)
-    {
-        m.Items.Clear();
-        m.Items.Add(MenuSub("Theme", System.Array.ConvertAll(Palettes, p => p.Name), _themeIndex, SelectTheme));
-        m.Items.Add(MenuSub("Accent", System.Array.ConvertAll(AccentSteps, a => a.Name), _accentIndex, SelectAccent));
-        m.Items.Add(MenuSub("Font", System.Array.ConvertAll(FontSteps, s => s.Name), _fontIndex, SelectFont));
-        m.Items.Add(MenuSub("Zoom", System.Array.ConvertAll(ZoomSteps, s => s.Name), _zoomIndex, SelectZoom));
-    }
-
-    MenuItem MenuSub(string header, string[] names, int current, Action<int> pick)
-    {
-        var parent = new MenuItem { Header = header };
+        var group = new StackPanel { Spacing = 5 };
+        var lbl = new TextBlock { Text = label };
+        lbl.Classes.Add("lbl");
+        group.Children.Add(lbl);
+        // Equal-width cells; a 5px gap between via per-button right margin, cancelled at the row's
+        // right edge by the negative margin so the row stays flush with the label above it.
+        var row = new UniformGrid { Rows = 1, Columns = names.Length, Margin = new Thickness(0, 0, -5, 0) };
+        var buttons = new List<Button>();
         for (int i = 0; i < names.Length; i++)
         {
             int idx = i;
-            var child = new MenuItem { Header = names[i] };
-            if (i == current) child.Icon = CheckIcon();
-            child.Click += (_, _) => pick(idx);
-            parent.Items.Add(child);
+            var b = new Button { Content = names[i], Margin = new Thickness(0, 0, 5, 0) };
+            b.Classes.Add("seg");
+            if (i == current) b.Classes.Add("sel");
+            b.Click += (_, _) =>
+            {
+                pick(idx);
+                for (int k = 0; k < buttons.Count; k++) buttons[k].Classes.Set("sel", k == idx);
+            };
+            row.Children.Add(b);
+            buttons.Add(b);
         }
-        return parent;
+        group.Children.Add(row);
+        return group;
     }
 
-    TextBlock CheckIcon() => new()
+    // Font picker: an "Ag" sample rendered in each typeface (so the option reads as the font
+    // itself, not a name that would truncate in the narrow column); the family name is a tooltip.
+    Control FontGroup()
     {
-        Classes = { "glyph" }, Text = "", FontSize = 12,
-        Foreground = this.FindResource("AccentBrush") as IBrush ?? Brushes.Gray,
-    };
+        var group = new StackPanel { Spacing = 5 };
+        var lbl = new TextBlock { Text = "Font" };
+        lbl.Classes.Add("lbl");
+        group.Children.Add(lbl);
+        var row = new UniformGrid { Rows = 1, Columns = FontSteps.Length, Margin = new Thickness(0, 0, -5, 0) };
+        var buttons = new List<Button>();
+        for (int i = 0; i < FontSteps.Length; i++)
+        {
+            int idx = i;
+            var (name, family) = FontSteps[i];
+            var sample = new TextBlock { Text = "Ag", FontFamily = new FontFamily(family), FontSize = 14 };
+            var b = new Button { Content = sample, Margin = new Thickness(0, 0, 5, 0) };
+            b.Classes.Add("seg");
+            ToolTip.SetTip(b, name);
+            if (i == _fontIndex) b.Classes.Add("sel");
+            b.Click += (_, _) =>
+            {
+                SelectFont(idx);
+                for (int k = 0; k < buttons.Count; k++) buttons[k].Classes.Set("sel", k == idx);
+            };
+            row.Children.Add(b);
+            buttons.Add(b);
+        }
+        group.Children.Add(row);
+        return group;
+    }
 
-
-    // After an appearance pick, rebuild the nested Appearance submenu's items (deferred so the
-    // menu finishes closing first) to move the checkmark — never on open, so cascades survive.
-    void RefreshAppearance() => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+    // Accent picker: a color swatch per hue; the selected tile gets an accent ring (Button.swatch).
+    Control AccentGroup()
     {
-        if (_appearanceMenu is not null) BuildAppearanceItems(_appearanceMenu);
-    });
-    void SelectTheme(int i) { _themeIndex = i; ApplyTheme(); Persist(p => p.Theme = Palettes[i].Name); RefreshAppearance(); }
-    void SelectAccent(int i) { _accentIndex = i; ApplyAccent(); Persist(p => p.Accent = AccentSteps[i].Name); RefreshAppearance(); }
-    void SelectFont(int i) { _fontIndex = i; ApplyFont(); Persist(p => p.Font = FontSteps[i].Name); RefreshAppearance(); }
-    void SelectZoom(int i) { _zoomIndex = i; ApplyZoom(); Persist(p => p.Zoom = ZoomSteps[i].Name); RefreshAppearance(); }
+        var group = new StackPanel { Spacing = 5 };
+        var lbl = new TextBlock { Text = "Accent" };
+        lbl.Classes.Add("lbl");
+        group.Children.Add(lbl);
+        var row = new UniformGrid { Rows = 1, Columns = AccentSteps.Length, Margin = new Thickness(0, 0, -5, 0) };
+        var buttons = new List<Button>();
+        for (int i = 0; i < AccentSteps.Length; i++)
+        {
+            int idx = i;
+            var (_, hex) = AccentSteps[i];
+            var color = hex.Length > 0 ? Color.Parse(hex) : Color.Parse("#8A93A0"); // mono -> neutral chip
+            var dot = new Border { Width = 15, Height = 15, CornerRadius = new CornerRadius(8), Background = new SolidColorBrush(color) };
+            var b = new Button { Content = dot, Height = 26, Margin = new Thickness(0, 0, 5, 0) };
+            b.Classes.Add("swatch");
+            if (i == _accentIndex) b.Classes.Add("sel");
+            b.Click += (_, _) =>
+            {
+                SelectAccent(idx);
+                for (int k = 0; k < buttons.Count; k++) buttons[k].Classes.Set("sel", k == idx);
+            };
+            row.Children.Add(b);
+            buttons.Add(b);
+        }
+        group.Children.Add(row);
+        return group;
+    }
 
+    // Collapsed-bar summary: how many of the five toggles are on, plus the current theme.
+    void RefreshSettingsSummary()
+    {
+        if (DataContext is not MainViewModel sv) return;
+        int n = 0;
+        if (sv.HasCustomDns) n++;
+        if (sv.Prefs.StartOnBoot) n++;
+        if (sv.Prefs.SkipUacLaunch) n++;
+        if (sv.Prefs.Notifications) n++;
+        if (sv.Prefs.CheckUpdates) n++;
+        SettingsSummary.Text = $"·  {n} on  ·  {Palettes[_themeIndex].Name}";
+    }
+
+    void SelectTheme(int i) { _themeIndex = i; ApplyTheme(); Persist(p => p.Theme = Palettes[i].Name); RefreshSettingsSummary(); }
+    void SelectAccent(int i) { _accentIndex = i; ApplyAccent(); Persist(p => p.Accent = AccentSteps[i].Name); }
+    void SelectFont(int i) { _fontIndex = i; ApplyFont(); Persist(p => p.Font = FontSteps[i].Name); }
+    void SelectZoom(int i) { _zoomIndex = i; ApplyZoom(); Persist(p => p.Zoom = ZoomSteps[i].Name); }
 
     async Task ImportConfAsync()
     {

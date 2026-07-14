@@ -122,6 +122,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
         Raise(nameof(UpdateGlyph));
         Raise(nameof(UpdateTooltip));
         Raise(nameof(UpdateHighlight));
+        Raise(nameof(UpdateVisible));
         Raise(nameof(UpdateActionText));
     }
 
@@ -159,6 +160,12 @@ public class MainViewModel : ObservableObject, ITunnelHost
 
     // The button lights up (accent) only when an update is downloaded and ready to install.
     public bool UpdateHighlight => _update == UpdateStatus.Ready;
+
+    // The update affordance next to the version is hidden until something's happening: a check
+    // is running, an update is downloading/ready, or a transient up-to-date/error result. Idle
+    // (nothing to show) keeps it out of the header. Turning on "check for updates" runs a check,
+    // which surfaces it.
+    public bool UpdateVisible => _update != UpdateStatus.Idle;
 
     // Header button click: install when ready, ignore while busy, otherwise (re)check.
     public void OnUpdateButtonClicked()

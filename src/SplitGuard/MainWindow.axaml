@@ -13,36 +13,26 @@
         RenderOptions.TextRenderingMode="SubpixelAntialias"
         DragDrop.AllowDrop="True">
   <DockPanel>
-    <!-- Title-bar strip: no background, so its empty area is not hit-testable and falls
-         through to the OS caption (native drag / double-click-maximize / snap). Left padding
-         14 aligns the bubble's left edge with the cards below; top 8 / bottom 0 makes the gap
-         above the bubble match the gap below it (bottom 0 + the cards' 8px top margin). Right
-         padding reserves the OS caption buttons. -->
-    <Border DockPanel.Dock="Top" Padding="14,8,146,0">
-      <!-- One rounded bubble wraps the logo + menu, floating in the strip. A press on the
-           bubble (but not on a menu) also drags the window, so the logo/pill is draggable too;
-           the empty strip to its right drags natively. -->
-      <Border Name="MenuBubble" HorizontalAlignment="Left" VerticalAlignment="Center"
-              Background="{DynamicResource BubbleBrush}" CornerRadius="8" Padding="5,1"
-              PointerPressed="OnBubblePressed">
-        <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
-          <Image Name="LogoImage" Source="avares://SplitGuard/Assets/app.ico" Width="22" Height="22"
-                 VerticalAlignment="Center" IsHitTestVisible="False" />
-          <Menu Name="MenuBar" VerticalAlignment="Center">
-            <MenuItem Name="AddMenu" Header="Add" />
-            <MenuItem Name="SettingsMenu" Header="Settings" SubmenuOpened="OnMenuOpening" />
-            <MenuItem Name="AboutMenu" SubmenuOpened="OnMenuOpening">
-              <MenuItem.Header>
-                <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
-                  <TextBlock Text="About" VerticalAlignment="Center" />
-                  <Ellipse Width="6" Height="6" VerticalAlignment="Center"
-                           Fill="{DynamicResource AccentBrush}" IsVisible="{Binding UpdateHighlight}" />
-                </StackPanel>
-              </MenuItem.Header>
-            </MenuItem>
-          </Menu>
-        </StackPanel>
-      </Border>
+    <!-- Title strip inside the extended-client title bar. No background, so empty areas (and
+         the non-hit-testable logo/title/version) fall through to the OS caption and drag the
+         window natively. Left padding 14 lines the logo up with the cards below; right padding
+         reserves the OS caption buttons. Only the update button captures the pointer. -->
+    <Border DockPanel.Dock="Top" Padding="14,8,146,8">
+      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+        <Image Name="LogoImage" Source="avares://SplitGuard/Assets/app.ico" Width="24" Height="24"
+               VerticalAlignment="Center" IsHitTestVisible="False" />
+        <TextBlock Text="SplitGuard" FontSize="{DynamicResource Fs17}" FontWeight="SemiBold"
+                   VerticalAlignment="Center" IsHitTestVisible="False" />
+        <TextBlock Text="{Binding CurrentVersionText}" FontSize="{DynamicResource Fs11}" Opacity="0.5"
+                   VerticalAlignment="Bottom" Margin="0,0,0,3" IsHitTestVisible="False" />
+        <!-- Update affordance: hidden until a check/download is happening or an update is ready
+             (accent glyph). First click downloads, a second installs. -->
+        <Button Classes="hdr" Name="UpdateButton" Click="OnUpdateClick" VerticalAlignment="Center"
+                IsVisible="{Binding UpdateVisible}" ToolTip.Tip="{Binding UpdateTooltip}">
+          <TextBlock Classes="glyph updicon" Classes.hot="{Binding UpdateHighlight}"
+                     Text="{Binding UpdateGlyph}" FontSize="{DynamicResource Fs12}" />
+        </Button>
+      </StackPanel>
     </Border>
 
     <Border DockPanel.Dock="Top" Background="{DynamicResource WarningBgBrush}" Padding="14,8" IsVisible="{Binding GpoWarning}">
@@ -51,6 +41,60 @@
         <TextBlock FontSize="{DynamicResource Fs12}" TextWrapping="Wrap" VerticalAlignment="Center"
                    Text="Group Policy DNS rules are active on this machine and override local ones — this tool's rules won't take effect." />
       </StackPanel>
+    </Border>
+
+    <!-- Bottom bar: Settings expander (left) + Add (right), one card at the page bottom. Same
+         side inset (14) and radius (card = 11) as the tunnel cards so it lines up with them. -->
+    <Border DockPanel.Dock="Bottom" Classes="card" Background="{DynamicResource SurfaceBrush}"
+            Margin="14,0,14,12" Padding="5">
+      <Grid ColumnDefinitions="*,Auto,Auto">
+        <Button Grid.Column="0" Name="SettingsToggle" Classes="hdr" Click="OnSettingsToggleClick"
+                HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="8,6">
+          <DockPanel>
+            <TextBlock DockPanel.Dock="Right" Name="SettingsChevron" Classes="glyph" Text="&#xE70E;"
+                       FontSize="{DynamicResource Fs12}" Opacity="0.6" VerticalAlignment="Center" />
+            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <TextBlock Classes="glyph accentfg" Text="&#xE713;" FontSize="{DynamicResource Fs14}" />
+              <TextBlock Text="Settings" Classes="setlabel" />
+              <TextBlock Name="SettingsSummary" Classes="muted" />
+            </StackPanel>
+          </DockPanel>
+        </Button>
+        <Border Grid.Column="1" Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,5" />
+        <Button Grid.Column="2" Name="AddButton" Classes="hdr" Padding="12,6" ToolTip.Tip="Add a tunnel">
+          <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+            <TextBlock Classes="glyph accentfg" Text="&#xE710;" FontSize="{DynamicResource Fs14}" />
+            <TextBlock Text="Add" Classes="setlabel" />
+          </StackPanel>
+          <Button.Flyout>
+            <MenuFlyout Placement="TopEdgeAlignedRight">
+              <MenuItem Header="Import configuration…" Click="OnImportClick" />
+              <MenuItem Header="New empty tunnel" Click="OnNewTunnelClick" />
+              <MenuItem Header="Rescan external tunnels" Click="OnRescanClick" />
+            </MenuFlyout>
+          </Button.Flyout>
+        </Button>
+      </Grid>
+    </Border>
+
+    <!-- Expandable settings panel, docked just above the bottom bar so it grows upward over the
+         list. Its Height is animated 0 <-> content by the code-behind (same tween as the cards);
+         collapsed it clips to nothing. -->
+    <Border DockPanel.Dock="Bottom" Name="SettingsRegion" ClipToBounds="True" Height="0">
+      <Border Name="SettingsCard" Classes="card" Background="{DynamicResource SurfaceBrush}"
+              Margin="14,0,14,8" Padding="12,10">
+        <Grid ColumnDefinitions="1.3*,Auto,1*">
+          <StackPanel Grid.Column="0">
+            <TextBlock Classes="lbl" Text="General" Margin="0,0,0,6" />
+            <StackPanel Name="GeneralList" Spacing="1" />
+          </StackPanel>
+          <Border Grid.Column="1" Width="1" Background="{DynamicResource SeparatorBrush}" Margin="14,2" />
+          <StackPanel Grid.Column="2">
+            <TextBlock Classes="lbl" Text="Appearance" Margin="0,0,0,6" />
+            <StackPanel Name="AppearanceList" Spacing="10" />
+          </StackPanel>
+        </Grid>
+      </Border>
     </Border>
 
     <!-- Transient status bar (connect errors / failover); hidden until an event fires. -->

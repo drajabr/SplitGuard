@@ -186,10 +186,10 @@
   <Style Selector="Button.seg">
     <Setter Property="Background" Value="{DynamicResource FieldFillBrush}" />
     <Setter Property="BorderThickness" Value="0" />
-    <Setter Property="Padding" Value="9,3" />
+    <Setter Property="Padding" Value="6,3" />
     <Setter Property="MinHeight" Value="0" />
     <Setter Property="CornerRadius" Value="6" />
-    <Setter Property="FontSize" Value="{DynamicResource Fs12}" />
+    <Setter Property="FontSize" Value="{DynamicResource Fs11}" />
   </Style>
   <Style Selector="Button.seg:pointerover /template/ ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource FieldFillHoverBrush}" />
@@ -207,9 +207,10 @@
     <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
   </Style>
 
-  <!-- Connect toggle: a pill switch. Dim track when off, accent when on; the white knob
-       slides across. -->
-  <Style Selector="ToggleButton.conn">
+  <!-- Pill switch: dim track when off, accent when on; the white knob slides across. Shared by
+       the tunnel connect toggle (.conn) and the settings-panel switches (.pill) so both read
+       identically. -->
+  <Style Selector="ToggleButton.conn, ToggleButton.pill">
     <Setter Property="Width" Value="40" />
     <Setter Property="Height" Value="22" />
     <Setter Property="Padding" Value="0" />
@@ -230,7 +231,7 @@
       </ControlTemplate>
     </Setter>
   </Style>
-  <Style Selector="ToggleButton.conn /template/ Border#track">
+  <Style Selector="ToggleButton.conn /template/ Border#track, ToggleButton.pill /template/ Border#track">
     <Setter Property="Opacity" Value="0.45" />
     <Setter Property="Transitions">
       <Transitions>
@@ -239,12 +240,31 @@
       </Transitions>
     </Setter>
   </Style>
-  <Style Selector="ToggleButton.conn:checked /template/ Border#track">
+  <Style Selector="ToggleButton.conn:checked /template/ Border#track, ToggleButton.pill:checked /template/ Border#track">
     <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
     <Setter Property="Opacity" Value="1" />
   </Style>
-  <Style Selector="ToggleButton.conn:checked /template/ Ellipse#knob">
+  <Style Selector="ToggleButton.conn:checked /template/ Ellipse#knob, ToggleButton.pill:checked /template/ Ellipse#knob">
     <Setter Property="RenderTransform" Value="translateX(18px)" />
+  </Style>
+
+  <!-- Accent swatch (appearance picker): a color dot on a soft filled tile; the selected one
+       gets an accent ring. Same fill + radius as Button.seg so the two picker rows align. -->
+  <Style Selector="Button.swatch">
+    <Setter Property="Background" Value="{DynamicResource FieldFillBrush}" />
+    <Setter Property="BorderThickness" Value="1.5" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.swatch:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource FieldFillHoverBrush}" />
+  </Style>
+  <Style Selector="Button.swatch.sel">
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
   </Style>
 
   <!-- Danger = a red ghost (Delete tunnel, Remove peer): no fill/border until a faint
@@ -405,6 +425,11 @@
   <Style Selector="TextBlock.muted">
     <Setter Property="FontSize" Value="{DynamicResource Fs12}" />
     <Setter Property="Opacity" Value="{DynamicResource DimOpacity}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <!-- Settings-panel row label: full-opacity body text that scales with the zoom step. -->
+  <Style Selector="TextBlock.setlabel">
+    <Setter Property="FontSize" Value="{DynamicResource Fs125}" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
   <Style Selector="TextBlock.glyph">
