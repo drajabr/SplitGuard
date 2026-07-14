@@ -8,6 +8,8 @@ public interface ITunnelHost
 {
     void RequestConnect(TunnelViewModel tunnel);
     void RequestDisconnect(TunnelViewModel tunnel);
+    // Persist the tunnel's on/off intent (TunnelConfig.Connected) for startup restore.
+    void PersistConnectedState(TunnelViewModel tunnel);
     void TogglePin(TunnelViewModel tunnel, PeerViewModel peer);
     bool IsDomainInUse(string domain, PeerViewModel except);
     // Whether this peer's allowed IPs overlap another peer's (metric is moot otherwise).
@@ -208,6 +210,11 @@ public class TunnelViewModel : ObservableObject
                 Host.CustomActiveChanged(this);
                 return;
             }
+            // Record the user's on/off intent so it can be restored at next startup. Written
+            // only here (the explicit toggle: power button or tray) — never in SetConnectedState,
+            // so a transient connect failure or app exit doesn't clear it.
+            Config!.Connected = value;
+            Host.PersistConnectedState(this);
             if (value) Host.RequestConnect(this);
             else Host.RequestDisconnect(this);
         }

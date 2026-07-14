@@ -256,6 +256,23 @@ public class MainViewModel : ObservableObject, ITunnelHost
 
     public void AccentChanged(TunnelViewModel tunnel) => _store.Save(_config);
 
+    // Persist the tunnel's on/off intent (set in the IsConnected setter) so it can be restored
+    // at startup.
+    public void PersistConnectedState(TunnelViewModel tunnel) => _store.Save(_config);
+
+    // Bring back the tunnels the user had turned on. Driving the IsConnected setter reuses
+    // validation (a stale config surfaces an error and stays off instead of throwing), the NRPT
+    // apply, catch-all/pin refresh, and the tray update — identical to a manual connect. Must
+    // run after Reconcile so its stale-rule purge doesn't strip the freshly-applied peer rules.
+    // Externals (official client), the custom DNS card, and demo mode are excluded.
+    void RestoreConnections()
+    {
+        if (RuleStore.DemoMode) return;
+        foreach (var vm in Tunnels.Where(t => !t.IsExternal && !t.IsCustom && !t.IsEditing
+                                              && t.Config is { Connected: true } && !t.IsConnected).ToList())
+            vm.IsConnected = true;
+    }
+
     // A tunnel refused to turn on because its config is incomplete/invalid.
     public void ReportError(TunnelViewModel tunnel, string message)
     {
@@ -297,6 +314,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
             await Task.Run(Reconcile);
             RefreshPins();
             await Task.Run(RefreshCatchAll);
+            RestoreConnections();
             MaybeCheckUpdatesOnStartup();
         }
         else

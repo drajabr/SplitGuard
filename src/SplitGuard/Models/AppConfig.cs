@@ -58,6 +58,9 @@ public class TunnelConfig
     public List<PeerConfig> Peers { get; set; } = new();
     // Optional per-card accent hue name (null = use the global accent).
     public string? Accent { get; set; }
+    // Whether the user last had this tunnel turned on; restored at startup (mirrors
+    // CustomDnsConfig.Active). Default false so existing configs never auto-connect.
+    public bool Connected { get; set; }
 }
 
 public class PeerConfig
