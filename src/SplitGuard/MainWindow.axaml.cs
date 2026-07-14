@@ -23,11 +23,16 @@ public partial class MainWindow : Window, IDialogs
 
     // Light/dark switch: "auto" follows the OS (adaptive overlay), "light" and "graphite"
     // force the tone. The header button cycles auto → light → graphite.
+    // Four explicit shades from brightest to darkest, plus "auto" (follows the OS light/dark).
+    // white = crisp pure white (cards read via their border); light = a softer, dimmer off-white
+    // with cards lifted above the page; graphite = the muted dark; black = true black (OLED).
     static readonly ThemeDef[] Palettes =
     {
         new("auto",     ThemeVariant.Default, null,      null,      null,      0.68, 0x33, 0x40),
-        new("light",    ThemeVariant.Light,  "#F4F3F0", "#FFFFFF", "#ECEAE4", 0.62, 0x33, 0x42),
+        new("white",    ThemeVariant.Light,  "#FFFFFF", "#FFFFFF", "#EEECE6", 0.60, 0x30, 0x3E),
+        new("light",    ThemeVariant.Light,  "#EFEDE8", "#FBFAF7", "#E5E3DC", 0.62, 0x34, 0x42),
         new("graphite", ThemeVariant.Dark,   "#24272B", "#2E3339", "#1F2226", 0.70, 0x38, 0x48),
+        new("black",    ThemeVariant.Dark,   "#000000", "#141619", "#0C0D0F", 0.72, 0x44, 0x54),
     };
 
     // Accent hue is its own control, independent of the surface theme (see Views.Accents).
@@ -43,9 +48,10 @@ public partial class MainWindow : Window, IDialogs
     };
     static readonly (string Name, double Scale)[] ZoomSteps =
     {
-        ("100%", 1.0),
-        ("125%", 1.25),
-        ("150%", 1.5),
+        ("1x",   1.0),
+        ("1.1x", 1.1),
+        ("1.2x", 1.2),
+        ("1.3x", 1.3),
     };
     // Fonts and layout metrics scale together — no transforms, so wrapping stays correct.
     static readonly (string Key, double Base)[] ZoomResources =
@@ -358,10 +364,10 @@ public partial class MainWindow : Window, IDialogs
         }));
 
         AppearanceList.Children.Clear();
-        AppearanceList.Children.Add(PickerGroup("Theme", System.Array.ConvertAll(Palettes, p => p.Name), _themeIndex, SelectTheme));
+        AppearanceList.Children.Add(ThemeGroup());
         AppearanceList.Children.Add(AccentGroup());
         AppearanceList.Children.Add(FontGroup());
-        AppearanceList.Children.Add(PickerGroup("Scale", System.Array.ConvertAll(ZoomSteps, s => s.Name), _zoomIndex, SelectZoom));
+        AppearanceList.Children.Add(PickerGroup(System.Array.ConvertAll(ZoomSteps, s => s.Name), _zoomIndex, SelectZoom));
 
         RefreshSettingsSummary();
     }
@@ -384,16 +390,11 @@ public partial class MainWindow : Window, IDialogs
         return grid;
     }
 
-    // A label with segmented option buttons below it; the current one wears the accent fill
-    // (Button.seg.sel).
-    Control PickerGroup(string label, string[] names, int current, Action<int> pick)
+    // Equal-width segmented option row; the current one wears the accent fill (Button.seg.sel).
+    // No label — the options are self-evident and it keeps the panel compact. The 5px inter-button
+    // gap is a per-button right margin, cancelled at the row's right edge by the negative margin.
+    Control PickerGroup(string[] names, int current, Action<int> pick)
     {
-        var group = new StackPanel { Spacing = 5 };
-        var lbl = new TextBlock { Text = label };
-        lbl.Classes.Add("lbl");
-        group.Children.Add(lbl);
-        // Equal-width cells; a 5px gap between via per-button right margin, cancelled at the row's
-        // right edge by the negative margin so the row stays flush with the label above it.
         var row = new UniformGrid { Rows = 1, Columns = names.Length, Margin = new Thickness(0, 0, -5, 0) };
         var buttons = new List<Button>();
         for (int i = 0; i < names.Length; i++)
@@ -410,18 +411,13 @@ public partial class MainWindow : Window, IDialogs
             row.Children.Add(b);
             buttons.Add(b);
         }
-        group.Children.Add(row);
-        return group;
+        return row;
     }
 
-    // Font picker: an "Ag" sample rendered in each typeface (so the option reads as the font
-    // itself, not a name that would truncate in the narrow column); the family name is a tooltip.
+    // Font picker: an "Ag" sample rendered in each typeface (reads as the font itself and never
+    // truncates); the family name is a tooltip.
     Control FontGroup()
     {
-        var group = new StackPanel { Spacing = 5 };
-        var lbl = new TextBlock { Text = "Font" };
-        lbl.Classes.Add("lbl");
-        group.Children.Add(lbl);
         var row = new UniformGrid { Rows = 1, Columns = FontSteps.Length, Margin = new Thickness(0, 0, -5, 0) };
         var buttons = new List<Button>();
         for (int i = 0; i < FontSteps.Length; i++)
@@ -441,17 +437,48 @@ public partial class MainWindow : Window, IDialogs
             row.Children.Add(b);
             buttons.Add(b);
         }
-        group.Children.Add(row);
-        return group;
+        return row;
+    }
+
+    // Theme picker: a shade swatch per palette (its page color) so the row reads as a light->dark
+    // ramp; "auto" is a split light/dark chip signalling "follows the OS". Selected tile = accent ring.
+    Control ThemeGroup()
+    {
+        var hair = this.FindResource("HairlineBrush") as IBrush ?? Brushes.Gray;
+        var row = new UniformGrid { Rows = 1, Columns = Palettes.Length, Margin = new Thickness(0, 0, -5, 0) };
+        var buttons = new List<Button>();
+        for (int i = 0; i < Palettes.Length; i++)
+        {
+            int idx = i;
+            var pal = Palettes[i];
+            var dot = new Border { Width = 15, Height = 15, CornerRadius = new CornerRadius(8), BorderBrush = hair, BorderThickness = new Thickness(1) };
+            if (pal.Page is null)
+                dot.Background = new LinearGradientBrush
+                {
+                    StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
+                    EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
+                    GradientStops = { new GradientStop(Color.Parse("#F7F7F5"), 0.5), new GradientStop(Color.Parse("#26292E"), 0.5) },
+                };
+            else
+                dot.Background = new SolidColorBrush(Color.Parse(pal.Page));
+            var b = new Button { Content = dot, Height = 26, Margin = new Thickness(0, 0, 5, 0) };
+            b.Classes.Add("swatch");
+            ToolTip.SetTip(b, pal.Name);
+            if (i == _themeIndex) b.Classes.Add("sel");
+            b.Click += (_, _) =>
+            {
+                SelectTheme(idx);
+                for (int k = 0; k < buttons.Count; k++) buttons[k].Classes.Set("sel", k == idx);
+            };
+            row.Children.Add(b);
+            buttons.Add(b);
+        }
+        return row;
     }
 
     // Accent picker: a color swatch per hue; the selected tile gets an accent ring (Button.swatch).
     Control AccentGroup()
     {
-        var group = new StackPanel { Spacing = 5 };
-        var lbl = new TextBlock { Text = "Accent" };
-        lbl.Classes.Add("lbl");
-        group.Children.Add(lbl);
         var row = new UniformGrid { Rows = 1, Columns = AccentSteps.Length, Margin = new Thickness(0, 0, -5, 0) };
         var buttons = new List<Button>();
         for (int i = 0; i < AccentSteps.Length; i++)
@@ -471,8 +498,7 @@ public partial class MainWindow : Window, IDialogs
             row.Children.Add(b);
             buttons.Add(b);
         }
-        group.Children.Add(row);
-        return group;
+        return row;
     }
 
     // Collapsed-bar summary: how many of the five toggles are on, plus the current theme.

@@ -246,6 +246,9 @@
   </Style>
   <Style Selector="ToggleButton.conn:checked /template/ Ellipse#knob, ToggleButton.pill:checked /template/ Ellipse#knob">
     <Setter Property="RenderTransform" Value="translateX(18px)" />
+    <!-- Knob takes the on-accent color when checked so it stays visible on the accent track —
+         white on green/blue/red, but dark on a near-white "mono" track (which otherwise hid it). -->
+    <Setter Property="Fill" Value="{DynamicResource OnAccentBrush}" />
   </Style>
 
   <!-- Accent swatch (appearance picker): a color dot on a soft filled tile; the selected one

@@ -183,74 +183,7 @@ public class App : Application
         if (menu.Items.Count > 0)
             menu.Items.Add(new NativeMenuItemSeparator());
 
-        // App settings live here in the tray.
-        var settings = new NativeMenuItem("Settings") { Menu = new NativeMenu() };
-        var custom = new NativeMenuItem("Custom DNS forwarding")
-        {
-            ToggleType = NativeMenuItemToggleType.CheckBox,
-            IsChecked = _vm.HasCustomDns,
-        };
-        custom.Click += (_, _) => { _vm.ToggleCustomDns(!_vm.HasCustomDns); RebuildTrayMenu(); };
-        settings.Menu!.Items.Add(custom);
-        var boot = new NativeMenuItem("Start on Windows startup")
-        {
-            ToggleType = NativeMenuItemToggleType.CheckBox,
-            IsChecked = _vm.Prefs.StartOnBoot,
-        };
-        boot.Click += (_, _) =>
-        {
-            var on = !_vm.Prefs.StartOnBoot;
-            SplitGuard.Services.StartupService.Set(on);
-            _vm.Prefs.StartOnBoot = on;
-            _vm.PersistPrefs();
-            RebuildTrayMenu();
-        };
-        settings.Menu.Items.Add(boot);
-        var skipUac = new NativeMenuItem("Skip UAC prompt on launch")
-        {
-            ToggleType = NativeMenuItemToggleType.CheckBox,
-            IsChecked = _vm.Prefs.SkipUacLaunch,
-        };
-        skipUac.Click += (_, _) =>
-        {
-            var on = !_vm.Prefs.SkipUacLaunch;
-            _vm.Prefs.SkipUacLaunch = on;
-            _vm.PersistPrefs();
-            _ = Task.Run(() =>
-            {
-                if (on) Services.StartupService.RegisterLaunchTask();
-                else Services.StartupService.UnregisterLaunchTask();
-            });
-            RebuildTrayMenu();
-        };
-        settings.Menu.Items.Add(skipUac);
-        var notif = new NativeMenuItem("Notifications")
-        {
-            ToggleType = NativeMenuItemToggleType.CheckBox,
-            IsChecked = _vm.Prefs.Notifications,
-        };
-        notif.Click += (_, _) =>
-        {
-            _vm.Prefs.Notifications = !_vm.Prefs.Notifications;
-            _vm.PersistPrefs();
-            RebuildTrayMenu();
-        };
-        settings.Menu.Items.Add(notif);
-        var updates = new NativeMenuItem("Check for updates on startup")
-        {
-            ToggleType = NativeMenuItemToggleType.CheckBox,
-            IsChecked = _vm.Prefs.CheckUpdates,
-        };
-        updates.Click += (_, _) =>
-        {
-            _vm.Prefs.CheckUpdates = !_vm.Prefs.CheckUpdates;
-            _vm.PersistPrefs();
-            RebuildTrayMenu();
-        };
-        settings.Menu.Items.Add(updates);
-        menu.Items.Add(settings);
-        menu.Items.Add(new NativeMenuItemSeparator());
-
+        // App settings now live only in the in-app Settings panel (bottom bar), not the tray.
         var show = new NativeMenuItem("Show");
         show.Click += (_, _) => ShowMainWindow?.Invoke();
         var exit = new NativeMenuItem("Exit");
