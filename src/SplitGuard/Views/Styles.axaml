@@ -53,11 +53,12 @@
     <Setter Property="MinWidth" Value="0" />
     <Setter Property="HorizontalAlignment" Value="Left" />
   </Style>
-  <!-- Tiny numeric boxes (metric, counts, timeout): slim padding so 2-3 digits fit
-       in half the normal width. -->
+  <!-- Tiny numeric boxes (metric, counts, timeout): slim padding, and they shrink to fit their
+       value (or the single-char watermark when empty) instead of a fixed width — like TextBox.fit. -->
   <Style Selector="TextBox.num">
     <Setter Property="Padding" Value="7,3" />
     <Setter Property="MinWidth" Value="0" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
     <Setter Property="HorizontalContentAlignment" Value="Left" />
   </Style>
   <Style Selector="TextBox.error">

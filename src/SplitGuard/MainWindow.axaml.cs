@@ -53,7 +53,6 @@ public partial class MainWindow : Window, IDialogs
         ("1.1x", 1.1),
         ("1.2x", 1.2),
         ("1.3x", 1.3),
-        ("1.4x", 1.4),
     };
     // Fonts and layout metrics scale together — no transforms, so wrapping stays correct.
     static readonly (string Key, double Base)[] ZoomResources =

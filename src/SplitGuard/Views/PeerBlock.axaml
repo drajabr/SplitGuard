@@ -23,7 +23,7 @@
           <!-- Failover rank, only while this peer's routes actually overlap another's. -->
           <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center" IsVisible="{Binding MetricEnabled}">
             <TextBlock Classes="lbl" Text="metric" ToolTip.Tip="{Binding MetricRankText}" />
-            <TextBox Classes="mono num" Width="34" Text="{Binding MetricText}" Watermark="0"
+            <TextBox Classes="mono num" Text="{Binding MetricText}" Watermark="0"
                      LostFocus="OnMetricCommitted" ToolTip.Tip="{Binding MetricRankText}" />
           </StackPanel>
         </StackPanel>
@@ -39,7 +39,7 @@
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="12,0,0,0">
               <TextBlock Classes="lbl" Text="keepalive" VerticalAlignment="Center"
                          ToolTip.Tip="PersistentKeepalive — seconds between keepalive packets (blank = off)" />
-              <TextBox Classes="mono num" Width="42" Text="{Binding KeepaliveText}" Watermark="off" VerticalAlignment="Center" />
+              <TextBox Classes="mono num" Text="{Binding KeepaliveText}" Watermark="off" VerticalAlignment="Center" />
             </StackPanel>
             <TextBox Classes="mono fit" MinWidth="90" MaxWidth="260" Text="{Binding Endpoint}" Watermark="host:port" VerticalAlignment="Center" />
           </DockPanel>
@@ -141,19 +141,19 @@
             <TextBox Classes="mono fit" MinWidth="96" MaxWidth="220" Margin="0,0,10,4" Text="{Binding PingHostText}" Watermark="host to ping" />
             <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="0,0,10,4">
               <TextBlock Classes="lbl" Text="every" VerticalAlignment="Center" IsEnabled="{Binding HasPingHost}" ToolTip.Tip="How often to probe, in seconds (1-3600, default 5)" />
-              <TextBox Classes="mono num" Width="34" Text="{Binding PingPeriodText}" Watermark="5" IsEnabled="{Binding HasPingHost}" />
+              <TextBox Classes="mono num" Text="{Binding PingPeriodText}" Watermark="5" IsEnabled="{Binding HasPingHost}" />
             </StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="0,0,10,4">
               <TextBlock Classes="lbl" Text="down" VerticalAlignment="Center" IsEnabled="{Binding HasPingHost}" ToolTip.Tip="Consecutive ping failures that mark this peer down (1-100, default 3)" />
-              <TextBox Classes="mono num" Width="34" Text="{Binding PingDownText}" Watermark="3" IsEnabled="{Binding HasPingHost}" />
+              <TextBox Classes="mono num" Text="{Binding PingDownText}" Watermark="3" IsEnabled="{Binding HasPingHost}" />
             </StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="0,0,10,4">
               <TextBlock Classes="lbl" Text="up" VerticalAlignment="Center" IsEnabled="{Binding HasPingHost}" ToolTip.Tip="Consecutive ping successes that bring it back up (1-100, default 3)" />
-              <TextBox Classes="mono num" Width="34" Text="{Binding PingUpText}" Watermark="3" IsEnabled="{Binding HasPingHost}" />
+              <TextBox Classes="mono num" Text="{Binding PingUpText}" Watermark="3" IsEnabled="{Binding HasPingHost}" />
             </StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="0,0,10,4">
               <TextBlock Classes="lbl" Text="t/o" VerticalAlignment="Center" IsEnabled="{Binding HasPingHost}" ToolTip.Tip="Timeout — seconds to wait for each ping reply (1-60, default 3)" />
-              <TextBox Classes="mono num" Width="34" Text="{Binding PingTimeoutText}" Watermark="3" IsEnabled="{Binding HasPingHost}" />
+              <TextBox Classes="mono num" Text="{Binding PingTimeoutText}" Watermark="3" IsEnabled="{Binding HasPingHost}" />
             </StackPanel>
           </WrapPanel>
 
