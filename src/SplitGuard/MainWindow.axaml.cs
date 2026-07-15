@@ -548,8 +548,9 @@ public partial class MainWindow : Window, IDialogs
         return row;
     }
 
-    // Theme picker: a shade swatch per palette (its page color) so the row reads as a light->dark
-    // ramp; "auto" is a split light/dark chip signalling "follows the OS". Selected tile = accent ring.
+    // Theme picker: each option is a full box filled with the palette's page shade, so the row
+    // reads as a light->dark ramp; "auto" is a split light/dark box signalling "follows the OS". A
+    // hairline keeps the near-white boxes visible on a white card. Selected box = accent ring.
     Control ThemeGroup()
     {
         var hair = this.FindResource("HairlineBrush") as IBrush ?? Brushes.Gray;
@@ -559,17 +560,17 @@ public partial class MainWindow : Window, IDialogs
         {
             int idx = i;
             var pal = Palettes[i];
-            var dot = new Border { Width = 15, Height = 15, CornerRadius = new CornerRadius(8), BorderBrush = hair, BorderThickness = new Thickness(1) };
+            var box = new Border { CornerRadius = new CornerRadius(5), BorderBrush = hair, BorderThickness = new Thickness(1) };
             if (pal.Page is null)
-                dot.Background = new LinearGradientBrush
+                box.Background = new LinearGradientBrush
                 {
                     StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
                     EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
                     GradientStops = { new GradientStop(Color.Parse("#F7F7F5"), 0.5), new GradientStop(Color.Parse("#26292E"), 0.5) },
                 };
             else
-                dot.Background = new SolidColorBrush(Color.Parse(pal.Page));
-            var b = new Button { Content = dot, Height = 26, Margin = new Thickness(2.5, 0) };
+                box.Background = new SolidColorBrush(Color.Parse(pal.Page));
+            var b = new Button { Content = box, Height = 26, Margin = new Thickness(2.5, 0) };
             b.Classes.Add("swatch");
             ToolTip.SetTip(b, pal.Name);
             if (i == _themeIndex) b.Classes.Add("sel");
@@ -584,7 +585,8 @@ public partial class MainWindow : Window, IDialogs
         return row;
     }
 
-    // Accent picker: a color swatch per hue; the selected tile gets an accent ring (Button.swatch).
+    // Accent picker: each option is a full box filled with the hue; the selected box gets an
+    // accent ring (Button.swatch).
     Control AccentGroup()
     {
         var row = new UniformGrid { Rows = 1, Columns = AccentSteps.Length, Margin = new Thickness(2.5, 0) };
@@ -593,9 +595,9 @@ public partial class MainWindow : Window, IDialogs
         {
             int idx = i;
             var (_, hex) = AccentSteps[i];
-            var color = hex.Length > 0 ? Color.Parse(hex) : Color.Parse("#8A93A0"); // mono -> neutral chip
-            var dot = new Border { Width = 15, Height = 15, CornerRadius = new CornerRadius(8), Background = new SolidColorBrush(color) };
-            var b = new Button { Content = dot, Height = 26, Margin = new Thickness(2.5, 0) };
+            var color = hex.Length > 0 ? Color.Parse(hex) : Color.Parse("#8A93A0"); // mono -> neutral fill
+            var box = new Border { CornerRadius = new CornerRadius(5), Background = new SolidColorBrush(color) };
+            var b = new Button { Content = box, Height = 26, Margin = new Thickness(2.5, 0) };
             b.Classes.Add("swatch");
             if (i == _accentIndex) b.Classes.Add("sel");
             b.Click += (_, _) =>

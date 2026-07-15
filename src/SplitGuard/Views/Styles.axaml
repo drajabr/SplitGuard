@@ -285,18 +285,19 @@
 
   <!-- Accent swatch (appearance picker): a color dot on a soft filled tile; the selected one
        gets an accent ring. Same fill + radius as Button.seg so the two picker rows align. -->
+  <!-- Swatch tile: the whole box is the color/shade (a stretched Border fills it, so the box
+       grows and shrinks with the column width). The 2px transparent ring is reserved so the
+       accent selection ring can appear without resizing the box; content stretches edge-to-edge. -->
   <Style Selector="Button.swatch">
-    <Setter Property="Background" Value="{DynamicResource FieldFillBrush}" />
-    <Setter Property="BorderThickness" Value="1.5" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="2" />
     <Setter Property="BorderBrush" Value="Transparent" />
-    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="CornerRadius" Value="7" />
     <Setter Property="Padding" Value="0" />
     <Setter Property="MinHeight" Value="0" />
     <Setter Property="HorizontalAlignment" Value="Stretch" />
-    <Setter Property="HorizontalContentAlignment" Value="Center" />
-  </Style>
-  <Style Selector="Button.swatch:pointerover /template/ ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource FieldFillHoverBrush}" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="VerticalContentAlignment" Value="Stretch" />
   </Style>
   <Style Selector="Button.swatch.sel">
     <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
