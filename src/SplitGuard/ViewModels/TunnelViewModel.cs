@@ -30,6 +30,10 @@ public interface ITunnelHost
     void CopyText(string text);
     void CustomActiveChanged(TunnelViewModel tunnel);
     void ReportError(TunnelViewModel tunnel, string message);
+    // Drag-to-reorder: how many user tunnels exist, a live move step, and the drop-time save.
+    int ReorderableCount { get; }
+    void MoveTunnel(TunnelViewModel tunnel, int toIndex);
+    void SaveTunnelOrder();
 }
 
 public class TunnelViewModel : ObservableObject

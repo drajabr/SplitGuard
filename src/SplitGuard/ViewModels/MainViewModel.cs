@@ -803,6 +803,39 @@ public class MainViewModel : ObservableObject, ITunnelHost
         }
     }
 
+    // ---- drag-to-reorder (user/wg tunnels only) ---------------------------------
+
+    // How many user tunnels there are (custom + externals are auto-sorted and never dragged).
+    public int ReorderableCount => Tunnels.Count(t => !t.IsCustom && !t.IsExternal);
+
+    // Live reorder step during a drag: move `vm` to `toIndex`, clamped to the user-tunnel band
+    // so it can never jump above the custom/external cards. No persistence — that waits for the
+    // drop (SaveTunnelOrder), so a drag that's cancelled leaves the saved order untouched until
+    // the pointer is released. Since OrderBy is stable, a later SortTunnels keeps this order.
+    public void MoveTunnel(TunnelViewModel vm, int toIndex)
+    {
+        if (vm.IsCustom || vm.IsExternal) return;
+        int from = Tunnels.IndexOf(vm);
+        if (from < 0) return;
+        int firstWg = -1, lastWg = -1;
+        for (int i = 0; i < Tunnels.Count; i++)
+            if (!Tunnels[i].IsCustom && !Tunnels[i].IsExternal) { if (firstWg < 0) firstWg = i; lastWg = i; }
+        if (firstWg < 0) return;
+        toIndex = Math.Clamp(toIndex, firstWg, lastWg);
+        if (toIndex != from) Tunnels.Move(from, toIndex);
+    }
+
+    // Persist the current user-tunnel order (called once on drop). _config.Tunnels holds exactly
+    // the wg tunnels, so mirroring the VM order there and saving is the whole job.
+    public void SaveTunnelOrder()
+    {
+        if (RuleStore.DemoMode) return;
+        var order = Tunnels.Where(t => !t.IsCustom && !t.IsExternal).Select(t => t.Config!).ToList();
+        _config.Tunnels.Clear();
+        foreach (var c in order) _config.Tunnels.Add(c);
+        _store.Save(_config);
+    }
+
     // Forget dismissed externals so the next scan re-adds any that are still present.
     public void RescanExternals()
     {
