@@ -10,10 +10,11 @@ public static class Accents
     // desaturated so accents read as chrome, not alarms.
     public static readonly (string Name, string Hex)[] Steps =
     {
-        ("green", "#3DAF7E"),
-        ("red",   "#D76D64"),
-        ("blue",  "#4A93CF"),
-        ("mono",  ""),
+        ("green",  "#3DAF7E"),
+        ("red",    "#D76D64"),
+        ("blue",   "#4A93CF"),
+        ("purple", "#8E86C9"),
+        ("mono",   ""),
     };
 
     // Foreground that reads on top of an accent fill: dark text on light accents

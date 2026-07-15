@@ -134,18 +134,25 @@
 
           <TextBlock Grid.Row="4" Grid.Column="0" Classes="lbl" VerticalAlignment="Top" Text="Ping" IsVisible="{Binding ShowWgFields}" Margin="0,7,8,4"
                      ToolTip.Tip="Healthcheck — in-tunnel IP probed on a fixed period. When set, it decides failover health; without it, handshake freshness decides. The knobs unlock once a valid host is set." />
-          <!-- Host then the four knobs flow left; the knob group wraps below the host as a
-               unit when the row runs out of room. -->
+          <!-- Host then the four knobs flow left; each knob is its own wrap item (label + box
+               kept together), so only the one that overflows drops to the next line, not the
+               whole group. -->
           <WrapPanel Grid.Row="4" Grid.Column="1" IsVisible="{Binding ShowWgFields}" Margin="0,0,0,4">
             <TextBox Classes="mono fit" MinWidth="96" MaxWidth="220" Margin="0,0,10,4" Text="{Binding PingHostText}" Watermark="host to ping" />
-            <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="0,0,0,4">
+            <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="0,0,10,4">
               <TextBlock Classes="lbl" Text="every" VerticalAlignment="Center" IsEnabled="{Binding HasPingHost}" ToolTip.Tip="How often to probe, in seconds (1-3600, default 5)" />
               <TextBox Classes="mono num" Width="34" Text="{Binding PingPeriodText}" Watermark="5" IsEnabled="{Binding HasPingHost}" />
-              <TextBlock Classes="lbl" Text="down" Margin="6,0,0,0" VerticalAlignment="Center" IsEnabled="{Binding HasPingHost}" ToolTip.Tip="Consecutive ping failures that mark this peer down (1-100, default 3)" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="0,0,10,4">
+              <TextBlock Classes="lbl" Text="down" VerticalAlignment="Center" IsEnabled="{Binding HasPingHost}" ToolTip.Tip="Consecutive ping failures that mark this peer down (1-100, default 3)" />
               <TextBox Classes="mono num" Width="34" Text="{Binding PingDownText}" Watermark="3" IsEnabled="{Binding HasPingHost}" />
-              <TextBlock Classes="lbl" Text="up" Margin="6,0,0,0" VerticalAlignment="Center" IsEnabled="{Binding HasPingHost}" ToolTip.Tip="Consecutive ping successes that bring it back up (1-100, default 3)" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="0,0,10,4">
+              <TextBlock Classes="lbl" Text="up" VerticalAlignment="Center" IsEnabled="{Binding HasPingHost}" ToolTip.Tip="Consecutive ping successes that bring it back up (1-100, default 3)" />
               <TextBox Classes="mono num" Width="34" Text="{Binding PingUpText}" Watermark="3" IsEnabled="{Binding HasPingHost}" />
-              <TextBlock Classes="lbl" Text="t/o" Margin="6,0,0,0" VerticalAlignment="Center" IsEnabled="{Binding HasPingHost}" ToolTip.Tip="Timeout — seconds to wait for each ping reply (1-60, default 3)" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="0,0,10,4">
+              <TextBlock Classes="lbl" Text="t/o" VerticalAlignment="Center" IsEnabled="{Binding HasPingHost}" ToolTip.Tip="Timeout — seconds to wait for each ping reply (1-60, default 3)" />
               <TextBox Classes="mono num" Width="34" Text="{Binding PingTimeoutText}" Watermark="3" IsEnabled="{Binding HasPingHost}" />
             </StackPanel>
           </WrapPanel>

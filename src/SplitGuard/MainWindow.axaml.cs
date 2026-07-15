@@ -44,6 +44,7 @@ public partial class MainWindow : Window, IDialogs
         ("segoe",       "Segoe UI Variable Text, Segoe UI"),           // modern sans (default)
         ("bahnschrift", "Bahnschrift, Segoe UI"),                      // condensed industrial
         ("georgia",     "Georgia, Cambria, serif"),                    // serif
+        ("candara",     "Candara, Segoe UI"),                          // humanist sans
         ("mono",        "Cascadia Mono, Consolas, Courier New, monospace"), // monospace
     };
     static readonly (string Name, double Scale)[] ZoomSteps =
@@ -52,6 +53,7 @@ public partial class MainWindow : Window, IDialogs
         ("1.1x", 1.1),
         ("1.2x", 1.2),
         ("1.3x", 1.3),
+        ("1.4x", 1.4),
     };
     // Fonts and layout metrics scale together — no transforms, so wrapping stays correct.
     static readonly (string Key, double Base)[] ZoomResources =
@@ -438,7 +440,11 @@ public partial class MainWindow : Window, IDialogs
             var w = region.Bounds.Width;
             if (w < 1) w = Bounds.Width;
             card.Measure(new Size(w, double.PositiveInfinity));
-            to = card.DesiredSize.Height;
+            // The region is now itself the rounded card, so its natural height is the inner
+            // content plus the region's own padding + border.
+            to = card.DesiredSize.Height
+                 + region.Padding.Top + region.Padding.Bottom
+                 + region.BorderThickness.Top + region.BorderThickness.Bottom;
         }
         TunnelCard.Tween(from, to, Motion.SlowMs,
             v => { if (cur() == gen) region.Height = v; },
