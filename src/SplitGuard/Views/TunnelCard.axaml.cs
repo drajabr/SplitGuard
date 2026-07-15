@@ -702,6 +702,7 @@ public partial class TunnelCard : UserControl
     void EndDrag(bool tapped)
     {
         var wasDragging = _dragging;
+        var wasArmed = _dragArmed; // false for editing-card presses (handled on press) and controls
         _dragArmed = false;
         _dragging = false;
         if (wasDragging)
@@ -714,7 +715,9 @@ public partial class TunnelCard : UserControl
                       () => { if (ReferenceEquals(RenderTransform, xf)) RenderTransform = null; });
             (DataContext as TunnelViewModel)?.Host.SaveTunnelOrder();
         }
-        else if (tapped && DataContext is TunnelViewModel { IsEditing: false } vm)
+        // Expand only if THIS press armed a tap on a collapsed card. Guarding on wasArmed stops a
+        // press that collapsed an editing card (CancelEdit on press) from re-expanding it on release.
+        else if (wasArmed && tapped && DataContext is TunnelViewModel { IsEditing: false } vm)
         {
             vm.BeginEditCommand.Execute(null); // a plain tap expands
         }
