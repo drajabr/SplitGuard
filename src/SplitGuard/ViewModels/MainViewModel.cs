@@ -264,7 +264,6 @@ public class MainViewModel : ObservableObject, ITunnelHost
         if (_config.Ui.Notifications) _dialogs.Notify(title, message, isError);
     }
 
-    public void AccentChanged(TunnelViewModel tunnel) => _store.Save(_config);
 
     // Persist the tunnel's on/off intent (set in the IsConnected setter) so it can be restored
     // at startup.
@@ -334,6 +333,10 @@ public class MainViewModel : ObservableObject, ITunnelHost
             foreach (var t in Tunnels.Where(t => !t.IsCustom && !t.IsExternal))
             {
                 t.SetConnectedState(true);
+                t.MarkEstablished(); // no real handshake in the demo — don't pulse "connecting"
+                // Fake a plausible throughput wave so the header sparkline renders.
+                for (int k = 0; k < TunnelViewModel.SparkCapacity; k++)
+                    t.PushRateSample(40_000 + 30_000 * Math.Sin(k / 4.0) + (k * 977 % 9000));
                 foreach (var p in t.Peers)
                 {
                     p.HasStats = true;

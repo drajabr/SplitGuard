@@ -28,11 +28,11 @@ public partial class MainWindow : Window, IDialogs
     // with cards lifted above the page; graphite = the muted dark; black = true black (OLED).
     static readonly ThemeDef[] Palettes =
     {
-        new("auto",     ThemeVariant.Default, null,      null,      null,      0.68, 0x33, 0x40),
-        new("white",    ThemeVariant.Light,  "#FFFFFF", "#FFFFFF", "#EEECE6", 0.60, 0x30, 0x3E),
-        new("light",    ThemeVariant.Light,  "#EFEDE8", "#FBFAF7", "#E5E3DC", 0.62, 0x34, 0x42),
-        new("graphite", ThemeVariant.Dark,   "#24272B", "#2E3339", "#1F2226", 0.70, 0x38, 0x48),
-        new("black",    ThemeVariant.Dark,   "#000000", "#141619", "#0C0D0F", 0.72, 0x44, 0x54),
+        new("auto",     ThemeVariant.Default, null,      null,      null,      0.68, 0x45, 0x40),
+        new("white",    ThemeVariant.Light,  "#FFFFFF", "#FFFFFF", "#EEECE6", 0.60, 0x42, 0x3E),
+        new("light",    ThemeVariant.Light,  "#E8E6DF", "#F6F4EF", "#DEDCD4", 0.62, 0x48, 0x42),
+        new("graphite", ThemeVariant.Dark,   "#24272B", "#2E3339", "#1F2226", 0.70, 0x4A, 0x48),
+        new("black",    ThemeVariant.Dark,   "#000000", "#141619", "#0C0D0F", 0.72, 0x56, 0x54),
     };
 
     // Accent hue is its own control, independent of the surface theme (see Views.Accents).
@@ -75,6 +75,10 @@ public partial class MainWindow : Window, IDialogs
         // window natively; only the hit-testable header controls capture the pointer.
         AddHandler(DragDrop.DragOverEvent, (_, e) =>
             e.DragEffects = e.Data.Contains(DataFormats.Files) ? DragDropEffects.Copy : DragDropEffects.None);
+        // "Drop to import" overlay while files hover anywhere over the window.
+        AddHandler(DragDrop.DragEnterEvent, (_, e) =>
+            DropOverlay.IsVisible = e.Data.Contains(DataFormats.Files));
+        AddHandler(DragDrop.DragLeaveEvent, (_, _) => DropOverlay.IsVisible = false);
         AddHandler(DragDrop.DropEvent, OnDrop);
         // Collapse the settings panel on any press outside it (tunnelled + handledEventsToo so it
         // still fires when a card or control handles the press first).
@@ -87,6 +91,7 @@ public partial class MainWindow : Window, IDialogs
 
     async void OnDrop(object? sender, DragEventArgs e)
     {
+        DropOverlay.IsVisible = false;
         if (DataContext is not MainViewModel vm) return;
         var files = e.Data.GetFiles() ?? Enumerable.Empty<IStorageItem>();
         foreach (var item in files.OfType<IStorageFile>())
@@ -112,6 +117,30 @@ public partial class MainWindow : Window, IDialogs
             MainScroll.Focus();
             e.Handled = true;
             return;
+        }
+        // Esc peels back one layer at a time: drop field focus, then close an open drawer,
+        // then collapse (cancel) the editing card.
+        if (e.Key == Key.Escape && !e.Handled)
+        {
+            if (FocusManager?.GetFocusedElement() is TextBox)
+            {
+                MainScroll.Focus();
+                e.Handled = true;
+                return;
+            }
+            if (_openDrawer != Drawer.None)
+            {
+                SetDrawer(Drawer.None);
+                e.Handled = true;
+                return;
+            }
+            var editing = vm?.Tunnels.FirstOrDefault(t => t.IsEditing);
+            if (editing is not null)
+            {
+                editing.CancelEditCommand.Execute(null);
+                e.Handled = true;
+                return;
+            }
         }
         if (ctrl && e.Key == Key.N && vm is not null)
         {
@@ -168,6 +197,35 @@ public partial class MainWindow : Window, IDialogs
         "150%" => "1.3x",
         _ => name ?? "1x",
     };
+
+    // Restore the last window size/position when the saved rect still lands on a visible
+    // screen (a monitor may have been unplugged since); otherwise keep the defaults.
+    public void RestoreWindowBounds(SplitGuard.Models.UiPrefs p)
+    {
+        if (p.WindowW < (int)MinWidth || p.WindowH < (int)MinHeight) return; // never saved (or nonsense)
+        Width = p.WindowW;
+        Height = p.WindowH;
+        var pos = new PixelPoint(p.WindowX, p.WindowY);
+        foreach (var s in Screens.All)
+        {
+            // The title bar's midpoint must be reachable so the window can always be dragged.
+            if (!s.WorkingArea.Contains(new PixelPoint(pos.X + p.WindowW / 2, pos.Y + 20))) continue;
+            Position = pos;
+            return;
+        }
+    }
+
+    // Capture the current bounds for persistence — only a Normal window's geometry is worth
+    // keeping (a maximized/minimized rect would restore wrong).
+    public void SaveWindowBounds(SplitGuard.Models.UiPrefs p)
+    {
+        if (WindowState != WindowState.Normal) return;
+        if (Bounds.Width < 1 || Bounds.Height < 1) return;
+        p.WindowW = (int)Bounds.Width;
+        p.WindowH = (int)Bounds.Height;
+        p.WindowX = Position.X;
+        p.WindowY = Position.Y;
+    }
 
     public void ApplyUiPrefs(SplitGuard.Models.UiPrefs prefs)
     {
@@ -315,6 +373,13 @@ public partial class MainWindow : Window, IDialogs
     void OnUpdateClick(object? sender, RoutedEventArgs e) =>
         (DataContext as MainViewModel)?.OnUpdateButtonClicked();
 
+    // Clicking a toast dismisses it immediately (it also auto-clears after a few seconds).
+    void OnToastPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (DataContext is MainViewModel vm) vm.StatusText = "";
+        e.Handled = true;
+    }
+
     // Bottom-bar Add actions. Each closes the open drawer first, then runs.
     void OnImportClick(object? sender, RoutedEventArgs e) { SetDrawer(Drawer.None); _ = ImportConfAsync(); }
     void OnNewTunnelClick(object? sender, RoutedEventArgs e) { SetDrawer(Drawer.None); (DataContext as MainViewModel)?.CreateEmptyTunnel(); }
@@ -433,16 +498,17 @@ public partial class MainWindow : Window, IDialogs
     }
 
     // Equal-width segmented option row; the current one wears the accent fill (Button.seg.sel).
-    // No label — the options are self-evident and it keeps the panel compact. The 5px inter-button
-    // gap is a per-button right margin, cancelled at the row's right edge by the negative margin.
+    // No label — the options are self-evident and it keeps the panel compact. Buttons split the
+    // full width evenly; a symmetric 2.5px margin on each button and on the row gives one uniform
+    // 5px gap between every button and at both borders.
     Control PickerGroup(string[] names, int current, Action<int> pick)
     {
-        var row = new UniformGrid { Rows = 1, Columns = names.Length, Margin = new Thickness(0, 0, -5, 0) };
+        var row = new UniformGrid { Rows = 1, Columns = names.Length, Margin = new Thickness(2.5, 0) };
         var buttons = new List<Button>();
         for (int i = 0; i < names.Length; i++)
         {
             int idx = i;
-            var b = new Button { Content = names[i], Margin = new Thickness(0, 0, 5, 0) };
+            var b = new Button { Content = names[i], Margin = new Thickness(2.5, 0) };
             b.Classes.Add("seg");
             if (i == current) b.Classes.Add("sel");
             b.Click += (_, _) =>
@@ -460,14 +526,14 @@ public partial class MainWindow : Window, IDialogs
     // truncates); the family name is a tooltip.
     Control FontGroup()
     {
-        var row = new UniformGrid { Rows = 1, Columns = FontSteps.Length, Margin = new Thickness(0, 0, -5, 0) };
+        var row = new UniformGrid { Rows = 1, Columns = FontSteps.Length, Margin = new Thickness(2.5, 0) };
         var buttons = new List<Button>();
         for (int i = 0; i < FontSteps.Length; i++)
         {
             int idx = i;
             var (name, family) = FontSteps[i];
             var sample = new TextBlock { Text = "Ag", FontFamily = new FontFamily(family), FontSize = 14 };
-            var b = new Button { Content = sample, Margin = new Thickness(0, 0, 5, 0) };
+            var b = new Button { Content = sample, Margin = new Thickness(2.5, 0) };
             b.Classes.Add("seg");
             ToolTip.SetTip(b, name);
             if (i == _fontIndex) b.Classes.Add("sel");
@@ -487,7 +553,7 @@ public partial class MainWindow : Window, IDialogs
     Control ThemeGroup()
     {
         var hair = this.FindResource("HairlineBrush") as IBrush ?? Brushes.Gray;
-        var row = new UniformGrid { Rows = 1, Columns = Palettes.Length, Margin = new Thickness(0, 0, -5, 0) };
+        var row = new UniformGrid { Rows = 1, Columns = Palettes.Length, Margin = new Thickness(2.5, 0) };
         var buttons = new List<Button>();
         for (int i = 0; i < Palettes.Length; i++)
         {
@@ -503,7 +569,7 @@ public partial class MainWindow : Window, IDialogs
                 };
             else
                 dot.Background = new SolidColorBrush(Color.Parse(pal.Page));
-            var b = new Button { Content = dot, Height = 26, Margin = new Thickness(0, 0, 5, 0) };
+            var b = new Button { Content = dot, Height = 26, Margin = new Thickness(2.5, 0) };
             b.Classes.Add("swatch");
             ToolTip.SetTip(b, pal.Name);
             if (i == _themeIndex) b.Classes.Add("sel");
@@ -521,7 +587,7 @@ public partial class MainWindow : Window, IDialogs
     // Accent picker: a color swatch per hue; the selected tile gets an accent ring (Button.swatch).
     Control AccentGroup()
     {
-        var row = new UniformGrid { Rows = 1, Columns = AccentSteps.Length, Margin = new Thickness(0, 0, -5, 0) };
+        var row = new UniformGrid { Rows = 1, Columns = AccentSteps.Length, Margin = new Thickness(2.5, 0) };
         var buttons = new List<Button>();
         for (int i = 0; i < AccentSteps.Length; i++)
         {
@@ -529,7 +595,7 @@ public partial class MainWindow : Window, IDialogs
             var (_, hex) = AccentSteps[i];
             var color = hex.Length > 0 ? Color.Parse(hex) : Color.Parse("#8A93A0"); // mono -> neutral chip
             var dot = new Border { Width = 15, Height = 15, CornerRadius = new CornerRadius(8), Background = new SolidColorBrush(color) };
-            var b = new Button { Content = dot, Height = 26, Margin = new Thickness(0, 0, 5, 0) };
+            var b = new Button { Content = dot, Height = 26, Margin = new Thickness(2.5, 0) };
             b.Classes.Add("swatch");
             if (i == _accentIndex) b.Classes.Add("sel");
             b.Click += (_, _) =>

@@ -34,12 +34,21 @@ public class App : Application
             _vm = new MainViewModel(window);
             window.DataContext = _vm;
             window.ApplyUiPrefs(_vm.Prefs);
+            window.RestoreWindowBounds(_vm.Prefs);
             desktop.MainWindow = window;
-            desktop.ShutdownRequested += (_, _) => _vm.OnExit();
+            desktop.ShutdownRequested += (_, _) =>
+            {
+                window.SaveWindowBounds(_vm.Prefs);
+                _vm.PersistPrefs();
+                _vm.OnExit();
+            };
 
             // Close hides to tray; tunnels and DNS rules stay maintained while the app runs.
+            // Snapshot the window bounds on the way out so a later launch reopens there.
             window.Closing += (_, e) =>
             {
+                window.SaveWindowBounds(_vm.Prefs);
+                _vm.PersistPrefs();
                 if (_exiting) return;
                 e.Cancel = true;
                 window.Hide();

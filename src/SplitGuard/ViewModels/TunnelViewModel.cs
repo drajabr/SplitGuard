@@ -28,7 +28,6 @@ public interface ITunnelHost
     void TunnelSaved(TunnelViewModel tunnel, bool connectionChanged);
     void RequestDelete(TunnelViewModel tunnel);
     void CopyText(string text);
-    void AccentChanged(TunnelViewModel tunnel);
     void CustomActiveChanged(TunnelViewModel tunnel);
     void ReportError(TunnelViewModel tunnel, string message);
 }
@@ -248,10 +247,15 @@ public class TunnelViewModel : ObservableObject
         }
     }
 
+    // Demo-harness seeding only: fake tunnels come up "established" so the connecting
+    // pulse (ShowConnecting) doesn't run forever on cards that never handshake.
+    public void MarkEstablished() => IsEstablished = true;
+
     void ResetEstablishment()
     {
         _isEstablished = false;
         _everEstablished = false;
+        RateHistory.Clear(); // the sparkline restarts with the next connection
         // Live readouts are meaningless once the tunnel is down (or reconnecting with
         // fresh counters); clear them so the collapsed view never shows a frozen
         // handshake/RTT/totals as if it were current.
@@ -317,28 +321,6 @@ public class TunnelViewModel : ObservableObject
 
     public bool ShowInterfaceSection => !IsExternal && !IsCustom;
     public string AddPeerLabel => IsCustom ? "+ Add DNS rule" : "+ Add peer";
-
-    // Optional per-card accent hue (null = follow the global accent). Cycled by clicking
-    // the header dot while editing; the view resolves the name to a color and overrides
-    // AccentBrush inside this card only.
-    public string? Accent
-    {
-        get => IsCustom ? Custom!.Accent : IsExternal ? External!.Accent : Config!.Accent;
-        set
-        {
-            if (IsCustom) Custom!.Accent = value;
-            else if (IsExternal) External!.Accent = value;
-            else Config!.Accent = value;
-            Raise();
-        }
-    }
-
-    public void CycleAccent()
-    {
-        Accent = Accents.Next(Accent);
-        Host.AccentChanged(this);
-    }
-
 
     string _warningText = "";
     public string WarningText { get => _warningText; set => Set(ref _warningText, value); }
@@ -725,6 +707,7 @@ public class TunnelViewModel : ObservableObject
         }
         UpRate = Format.Rate(up);
         DownRate = Format.Rate(down);
+        PushRateSample(up + down);
         if (IsConnected)
             IsEstablished = newest is not null && DateTime.UtcNow - newest < HandshakeFresh;
         // Refresh the collapsed-card detail so its per-peer handshake/RTT stay live.
@@ -734,4 +717,15 @@ public class TunnelViewModel : ObservableObject
     // Bumped every stats poll; the card watches it to rebuild the collapsed detail.
     int _statsTick;
     public int StatsTick { get => _statsTick; set => Set(ref _statsTick, value); }
+
+    // Rolling total-throughput samples (up+down Bps, one per stats poll) for the header
+    // sparkline; the card redraws it on StatsTick.
+    public const int SparkCapacity = 40;
+    public List<double> RateHistory { get; } = new();
+
+    public void PushRateSample(double bps)
+    {
+        RateHistory.Add(bps);
+        if (RateHistory.Count > SparkCapacity) RateHistory.RemoveAt(0);
+    }
 }

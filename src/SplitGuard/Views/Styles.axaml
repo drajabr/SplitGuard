@@ -270,6 +270,18 @@
          white on green/blue/red, but dark on a near-white "mono" track (which otherwise hid it). -->
     <Setter Property="Fill" Value="{DynamicResource OnAccentBrush}" />
   </Style>
+  <!-- Adapter is up but no handshake yet (or it went stale): the track turns amber and softly
+       pulses until established, so "connecting" is visible without reading any text. -->
+  <Style Selector="ToggleButton.conn.connecting:checked /template/ Border#track">
+    <Setter Property="Background" Value="{DynamicResource WarningBrush}" />
+    <Style.Animations>
+      <Animation Duration="0:0:1.2" IterationCount="Infinite" Easing="{x:Static v:Motion.Standard}">
+        <KeyFrame Cue="0%"><Setter Property="Opacity" Value="1" /></KeyFrame>
+        <KeyFrame Cue="50%"><Setter Property="Opacity" Value="0.55" /></KeyFrame>
+        <KeyFrame Cue="100%"><Setter Property="Opacity" Value="1" /></KeyFrame>
+      </Animation>
+    </Style.Animations>
+  </Style>
 
   <!-- Accent swatch (appearance picker): a color dot on a soft filled tile; the selected one
        gets an accent ring. Same fill + radius as Button.seg so the two picker rows align. -->
@@ -380,6 +392,27 @@
   <Style Selector="Border.card.editing">
     <Setter Property="BorderBrush" Value="{DynamicResource AccentDimBrush}" />
   </Style>
+  <!-- Collapsed cards are click-to-expand; a slightly stronger border on hover signals it
+       (rides the card's BorderBrush transition). Editing cards keep their accent ring. -->
+  <Style Selector="Border.card:not(.editing):pointerover">
+    <Setter Property="BorderBrush" Value="{DynamicResource FieldBorderBrush}" />
+  </Style>
+
+  <!-- Dashed drop-target outline: the resting empty-state zone, and (with .active) the
+       accent-tinted overlay shown while a .conf is dragged over the window. -->
+  <Style Selector="Rectangle.dropzone">
+    <Setter Property="Stroke" Value="{DynamicResource FieldBorderBrush}" />
+    <Setter Property="StrokeThickness" Value="1.5" />
+    <Setter Property="StrokeDashArray" Value="4,3" />
+    <Setter Property="RadiusX" Value="11" />
+    <Setter Property="RadiusY" Value="11" />
+    <Setter Property="Fill" Value="Transparent" />
+  </Style>
+  <Style Selector="Rectangle.dropzone.active">
+    <Setter Property="Stroke" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="Fill" Value="{DynamicResource AccentDimBrush}" />
+    <Setter Property="Opacity" Value="0.55" />
+  </Style>
   <!-- Value chips (addresses, allowed IPs, domains): outlined like the input boxes.
        MinHeight (not Height): long values wrap to more lines and the chip grows,
        keeping the × inside the box, top-right. -->
@@ -418,21 +451,26 @@
     <Setter Property="ClipToBounds" Value="True" />
   </Style>
 
-  <!-- Bottom status bar: slides/fades in and out with the same easing. -->
-  <Style Selector="Border.statusbar">
-    <Setter Property="ClipToBounds" Value="True" />
-    <Setter Property="MaxHeight" Value="0" />
+  <!-- Transient toast: a small card floating bottom-right that slides up + fades in when a
+       status message fires and reverses out when it clears. -->
+  <Style Selector="Border.toast">
+    <Setter Property="Background" Value="{DynamicResource MenuSurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource HairlineBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="9" />
+    <Setter Property="Padding" Value="12,8" />
     <Setter Property="Opacity" Value="0" />
+    <Setter Property="RenderTransform" Value="translateY(10px)" />
     <Setter Property="Transitions">
       <Transitions>
-        <DoubleTransition Property="MaxHeight" Duration="{x:Static v:Motion.Slow}" Easing="{x:Static v:Motion.Standard}" />
         <DoubleTransition Property="Opacity" Duration="{x:Static v:Motion.Slow}" Easing="{x:Static v:Motion.Standard}" />
+        <TransformOperationsTransition Property="RenderTransform" Duration="{x:Static v:Motion.Slow}" Easing="{x:Static v:Motion.Standard}" />
       </Transitions>
     </Setter>
   </Style>
-  <Style Selector="Border.statusbar.shown">
-    <Setter Property="MaxHeight" Value="80" />
+  <Style Selector="Border.toast.shown">
     <Setter Property="Opacity" Value="1" />
+    <Setter Property="RenderTransform" Value="translateY(0px)" />
   </Style>
 
   <!-- Peers are no longer boxed; a single top hairline separates each one (and the first

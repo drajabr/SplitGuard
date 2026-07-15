@@ -112,25 +112,53 @@
       </Border>
     </Border>
 
-    <!-- Transient status bar (connect errors / failover); hidden until an event fires. -->
-    <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="0,1,0,0" Padding="14,6"
-            Classes="statusbar" Classes.shown="{Binding HasStatus}">
-      <TextBlock Text="{Binding StatusText}" Classes="oktext" Classes.errtext="{Binding !StatusOk}" />
-    </Border>
+    <!-- The list area is a Panel so overlays (drop-target highlight, toasts) can float over
+         the scroll content. -->
+    <Panel>
+      <ScrollViewer Name="MainScroll" Focusable="True" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Hidden">
+        <StackPanel Margin="14,8,14,12">
+          <ItemsControl ItemsSource="{Binding Tunnels}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <views:TunnelCard Margin="0,0,0,10" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </ScrollViewer>
 
-    <ScrollViewer Name="MainScroll" Focusable="True" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Hidden">
-      <StackPanel Margin="14,8,14,12">
-        <ItemsControl ItemsSource="{Binding Tunnels}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate>
-              <views:TunnelCard Margin="0,0,0,10" />
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-        <TextBlock Classes="muted" Margin="2,6" TextWrapping="Wrap"
-                   IsVisible="{Binding !Tunnels.Count}"
-                   Text="No tunnels yet. Drop a WireGuard .conf file anywhere in this window, or copy a config and press Ctrl+V. Domains you attach to a peer resolve through that peer's DNS while connected; everything else keeps using your normal system DNS." />
+      <!-- Empty state: an inviting dashed dropzone instead of a wall of text. -->
+      <Rectangle Classes="dropzone" IsVisible="{Binding !Tunnels.Count}"
+                 Margin="14,8,14,12" IsHitTestVisible="False" />
+      <StackPanel IsVisible="{Binding !Tunnels.Count}" VerticalAlignment="Center"
+                  HorizontalAlignment="Center" Spacing="10" Margin="40,0">
+        <TextBlock Classes="glyph" Text="&#xE8B5;" FontSize="34" Opacity="0.35" HorizontalAlignment="Center" />
+        <TextBlock FontSize="{DynamicResource Fs14}" HorizontalAlignment="Center"
+                   Text="Drop a WireGuard .conf here" />
+        <TextBlock Classes="muted" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="330"
+                   Text="or paste a config with Ctrl+V. Domains you attach to a peer resolve through that peer's DNS while connected; everything else keeps your normal system DNS." />
+        <Button Classes="primary" Content="Add tunnel" HorizontalAlignment="Center" Margin="0,4,0,0"
+                Click="OnAddToggleClick" />
       </StackPanel>
-    </ScrollViewer>
+
+      <!-- Drag-over feedback: shown while a .conf hovers anywhere over the window. -->
+      <Panel Name="DropOverlay" IsVisible="False" IsHitTestVisible="False" Margin="14,8,14,12">
+        <Rectangle Classes="dropzone active" />
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="8">
+          <TextBlock Classes="glyph accentfg" Text="&#xE896;" FontSize="30" HorizontalAlignment="Center" />
+          <TextBlock Classes="accentfg" FontSize="{DynamicResource Fs14}" HorizontalAlignment="Center" Text="Drop to import" />
+        </StackPanel>
+      </Panel>
+
+      <!-- Transient toast (connect errors / failover): floats bottom-right over the list,
+           slides+fades via the .shown class, auto-clears after a few seconds (VM timer),
+           click dismisses immediately. -->
+      <Border Classes="toast" Classes.shown="{Binding HasStatus}" IsHitTestVisible="{Binding HasStatus}"
+              HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="14,0,14,10"
+              MaxWidth="380" PointerPressed="OnToastPressed">
+        <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap"
+                   Classes="oktext" Classes.errtext="{Binding !StatusOk}" />
+      </Border>
+    </Panel>
   </DockPanel>
 </Window>

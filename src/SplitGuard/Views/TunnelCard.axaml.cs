@@ -75,7 +75,7 @@ public partial class TunnelCard : UserControl
                 _vm.RemovalAnimator = PlayRemove;
             }
             BuildDetail();
-            ApplyCardAccent();
+            UpdateSpark();
             // Initial state (no animation): show the right content at its natural height.
             var editing = _vm?.IsEditing ?? false;
             ExpandContent.IsVisible = editing;
@@ -84,8 +84,6 @@ public partial class TunnelCard : UserControl
             DetailPanel.Opacity = 1;
             Body.Height = double.NaN; // auto — sizes to content
         };
-        // Re-resolve a per-card "mono" accent when the app theme flips.
-        ActualThemeVariantChanged += (_, _) => ApplyCardAccent();
         // PointerPressed instead of Tapped: Tapped suppresses the second of two fast
         // clicks (double-tap detection), which made rapid expand/collapse feel dead.
         AddHandler(PointerPressedEvent, OnCardPressed, handledEventsToo: false);
@@ -205,10 +203,13 @@ public partial class TunnelCard : UserControl
             BuildDetail();
         // Keep the collapsed detail's per-peer handshake/RTT live; skip while editing
         // (the detail panel is hidden then).
-        if (e.PropertyName == nameof(TunnelViewModel.StatsTick) && _vm is { IsEditing: false })
-            BuildDetail();
-        if (e.PropertyName == nameof(TunnelViewModel.Accent))
-            ApplyCardAccent();
+        if (e.PropertyName == nameof(TunnelViewModel.StatsTick))
+        {
+            if (_vm is { IsEditing: false }) BuildDetail();
+            UpdateSpark();
+        }
+        if (e.PropertyName == nameof(TunnelViewModel.StatsVisible))
+            UpdateSpark();
         if (e.PropertyName == nameof(TunnelViewModel.IsEditing) && _vm is not null)
         {
             SwapBody(_vm.IsEditing);
@@ -286,23 +287,25 @@ public partial class TunnelCard : UserControl
         Tween(sv.Offset.Y, Math.Max(0, pt.Y - 12), AnimMs, v => sv.Offset = new Vector(sv.Offset.X, Math.Max(0, v)));
     }
 
-    // ---- per-card accent -------------------------------------------------------
+    // ---- header sparkline --------------------------------------------------------
 
-    void ApplyCardAccent()
+    // Redraw the rolling-throughput polyline: samples map left-to-right, y scaled to the
+    // window's own max so the shape always uses the full height (a flat idle line sits at
+    // the bottom). Hidden until there are at least two samples to connect.
+    void UpdateSpark()
     {
-        var name = _vm?.Accent;
-        if (string.IsNullOrEmpty(name))
+        var h = _vm?.RateHistory;
+        if (_vm is null || !_vm.StatsVisible || h is null || h.Count < 2)
         {
-            // Follow the global accent: drop any local override.
-            Resources.Remove("AccentBrush");
-            Resources.Remove("AccentDimBrush");
-            Resources.Remove("OnAccentBrush");
+            Spark.IsVisible = false;
             return;
         }
-        var color = Accents.Resolve(name, ActualThemeVariant == ThemeVariant.Dark);
-        Resources["AccentBrush"] = new SolidColorBrush(color);
-        Resources["AccentDimBrush"] = new SolidColorBrush(color, 0.4);
-        Resources["OnAccentBrush"] = new SolidColorBrush(Accents.On(color));
+        var max = Math.Max(h.Max(), 1.0);
+        var pts = new global::Avalonia.Points();
+        for (int i = 0; i < h.Count; i++)
+            pts.Add(new Point(i * 56.0 / (TunnelViewModel.SparkCapacity - 1), 13 - h[i] / max * 12));
+        Spark.Points = pts;
+        Spark.IsVisible = true;
     }
 
     // ---- expand/collapse: explicit height animation of a single region ----------

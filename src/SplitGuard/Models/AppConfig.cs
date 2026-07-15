@@ -18,7 +18,6 @@ public class AppConfig
 public class CustomDnsConfig
 {
     public List<CustomDnsRole> Roles { get; set; } = new();
-    public string? Accent { get; set; }
     // Whether its NRPT rules are currently applied (toggled by the card's activate button).
     public bool Active { get; set; } = true;
 }
@@ -47,6 +46,12 @@ public class UiPrefs
     // Keep the trigger-less "SplitGuardLaunch" scheduled task registered so opening the
     // app doesn't show a UAC prompt.
     public bool SkipUacLaunch { get; set; } = true;
+    // Last window size/position (client-window bounds), restored at startup when they still
+    // land on a visible screen. 0x0 = never saved (use the defaults).
+    public int WindowW { get; set; }
+    public int WindowH { get; set; }
+    public int WindowX { get; set; }
+    public int WindowY { get; set; }
 }
 
 public class TunnelConfig
@@ -56,8 +61,6 @@ public class TunnelConfig
     public ushort ListenPort { get; set; }
     public List<string> Addresses { get; set; } = new();
     public List<PeerConfig> Peers { get; set; } = new();
-    // Optional per-card accent hue name (null = use the global accent).
-    public string? Accent { get; set; }
     // Whether the user last had this tunnel turned on; restored at startup (mirrors
     // CustomDnsConfig.Active). Default false so existing configs never auto-connect.
     public bool Connected { get; set; }
@@ -99,7 +102,6 @@ public class ExternalRuleConfig
     public string AdapterName { get; set; } = "";
     public string? Dns { get; set; }
     public List<string> Domains { get; set; } = new();
-    public string? Accent { get; set; }
 }
 
 public class PinnedDnsRef
