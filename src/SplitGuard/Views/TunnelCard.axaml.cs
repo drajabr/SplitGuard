@@ -457,6 +457,10 @@ public partial class TunnelCard : UserControl
         if (_vm is null) return;
 
         IBrush accent = this.TryFindResource("AccentBrush", out var ao) && ao is IBrush ab ? ab : Brushes.LimeGreen;
+        // Theme-aware syntax brushes (fall back to the fixed palette if unset) so IPs/domains keep
+        // contrast on light themes instead of washing out.
+        IBrush ipBrush = this.TryFindResource("SynIpBrush", out var ipo) && ipo is IBrush ipb ? ipb : Syntax.IpBrush;
+        IBrush domainBrush = this.TryFindResource("SynDomainBrush", out var dmo) && dmo is IBrush dmb ? dmb : Syntax.DomainBrush;
 
         TextBlock Mono(string text, IBrush brush)
         {
@@ -533,7 +537,7 @@ public partial class TunnelCard : UserControl
         Control DnsValue(PeerViewModel peer)
         {
             var dns = peer.Dns.Trim();
-            if (!peer.IsPinned) return Pill(dns, Syntax.IpBrush);
+            if (!peer.IsPinned) return Pill(dns, ipBrush);
 
             var pin = new TextBlock { Text = "", FontSize = 11, Foreground = accent, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center };
             pin.Classes.Add("glyph");
@@ -602,7 +606,7 @@ public partial class TunnelCard : UserControl
                 var routePills = new List<Control>();
                 foreach (var a in activeRoutes) routePills.Add(Pill($"{a} · active", accent));
                 foreach (var ip in p.AllowedIpValues.Where(ip => !activeRoutes.Contains(Models.WireGuardConf.CanonicalCidr(ip))))
-                    routePills.Add(Pill(ip, Syntax.IpBrush));
+                    routePills.Add(Pill(ip, ipBrush));
                 if (routePills.Count > 0) LabeledRow("routes", routePills);
             }
 
@@ -610,13 +614,13 @@ public partial class TunnelCard : UserControl
             {
                 var content = new List<Control>();
                 if (p.HasDns) content.Add(DnsValue(p));
-                foreach (var d in p.DomainValues) content.Add(Pill(d, Syntax.DomainBrush));
+                foreach (var d in p.DomainValues) content.Add(Pill(d, domainBrush));
                 LabeledRow("dns", content);
             }
         }
 
         if (DetailPanel.Children.Count == 0)
-            LabeledRow("", new List<Control> { Mono("no peers configured", Syntax.IpBrush) });
+            LabeledRow("", new List<Control> { Mono("no peers configured", ipBrush) });
     }
 
     // ---- press / tap-to-expand / drag-to-reorder --------------------------------

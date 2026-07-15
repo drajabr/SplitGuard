@@ -279,6 +279,13 @@ public partial class MainWindow : Window, IDialogs
         var lightFill = EffectiveVariant() == ThemeVariant.Light;
         resources["FieldFillBrush"] = new SolidColorBrush(Color.FromArgb(lightFill ? (byte)0x14 : (byte)0x1E, 0x80, 0x80, 0x80));
         resources["FieldFillHoverBrush"] = new SolidColorBrush(Color.FromArgb(lightFill ? (byte)0x20 : (byte)0x2E, 0x80, 0x80, 0x80));
+        // Syntax palette (IPs, domains, keys, numbers) as a THEME-AWARE global: the fixed mid-tones
+        // washed out on the bright themes, so light themes get darker, more saturated variants and
+        // dark themes the brighter ones. Consumed by the collapsed detail and the edit-field chips.
+        resources["SynIpBrush"]     = new SolidColorBrush(Color.Parse(lightFill ? "#1F6FB0" : "#57A9E0"));
+        resources["SynDomainBrush"] = new SolidColorBrush(Color.Parse(lightFill ? "#2E7D32" : "#6FC06F"));
+        resources["SynKeyBrush"]    = new SolidColorBrush(Color.Parse(lightFill ? "#6A3FA0" : "#B08BE0"));
+        resources["SynNumBrush"]    = new SolidColorBrush(Color.Parse(lightFill ? "#B26A00" : "#E0A040"));
         // Menus/popups need an opaque backing (cards may be translucent overlays under "auto").
         var menuBg = t.Surface is not null
             ? Color.Parse(t.Surface)
@@ -508,7 +515,7 @@ public partial class MainWindow : Window, IDialogs
         for (int i = 0; i < names.Length; i++)
         {
             int idx = i;
-            var b = new Button { Content = names[i], Margin = new Thickness(2.5, 0) };
+            var b = new Button { Content = names[i], Height = 26, Margin = new Thickness(2.5, 0) };
             b.Classes.Add("seg");
             if (i == current) b.Classes.Add("sel");
             b.Click += (_, _) =>
@@ -533,7 +540,7 @@ public partial class MainWindow : Window, IDialogs
             int idx = i;
             var (name, family) = FontSteps[i];
             var sample = new TextBlock { Text = "Ag", FontFamily = new FontFamily(family), FontSize = 14 };
-            var b = new Button { Content = sample, Margin = new Thickness(2.5, 0) };
+            var b = new Button { Content = sample, Height = 26, Margin = new Thickness(2.5, 0) };
             b.Classes.Add("seg");
             ToolTip.SetTip(b, name);
             if (i == _fontIndex) b.Classes.Add("sel");
@@ -595,8 +602,16 @@ public partial class MainWindow : Window, IDialogs
         {
             int idx = i;
             var (_, hex) = AccentSteps[i];
-            var color = hex.Length > 0 ? Color.Parse(hex) : Color.Parse("#8A93A0"); // mono -> neutral fill
-            var box = new Border { CornerRadius = new CornerRadius(5), Background = new SolidColorBrush(color) };
+            var box = new Border { CornerRadius = new CornerRadius(5) };
+            if (hex.Length > 0)
+                box.Background = new SolidColorBrush(Color.Parse(hex));
+            else // "mono" tracks the theme's black/white — show it as a split black/white box
+                box.Background = new LinearGradientBrush
+                {
+                    StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
+                    EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
+                    GradientStops = { new GradientStop(Color.Parse("#FFFFFF"), 0.5), new GradientStop(Color.Parse("#111111"), 0.5) },
+                };
             var b = new Button { Content = box, Height = 26, Margin = new Thickness(2.5, 0) };
             b.Classes.Add("swatch");
             if (i == _accentIndex) b.Classes.Add("sel");
