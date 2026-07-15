@@ -79,6 +79,10 @@ public partial class MainWindow : Window, IDialogs
         // Collapse the settings panel on any press outside it (tunnelled + handledEventsToo so it
         // still fires when a card or control handles the press first).
         AddHandler(PointerPressedEvent, OnWindowPointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
+        // Under the "auto" theme, an OS light<->dark flip must re-resolve every variant-dependent
+        // resource (field fills, menu foregrounds, the mono accent). Re-running ApplyTheme sets the
+        // same RequestedThemeVariant, so this can't loop — the event only fires on a real change.
+        ActualThemeVariantChanged += (_, _) => ApplyTheme();
     }
 
     async void OnDrop(object? sender, DragEventArgs e)
@@ -116,8 +120,12 @@ public partial class MainWindow : Window, IDialogs
             return;
         }
         // Ctrl+O opens the file picker to import a .conf (mirrors the Add drawer's Import row).
-        if (ctrl && e.Key == Key.O && vm is not null)
+        // Not while typing in a field (same guard as Ctrl+V), and close any open drawer first so
+        // it isn't left hanging under the file dialog.
+        if (ctrl && e.Key == Key.O && !e.Handled && vm is not null
+            && FocusManager?.GetFocusedElement() is not TextBox)
         {
+            SetDrawer(Drawer.None);
             _ = ImportConfAsync();
             e.Handled = true;
             return;
@@ -151,8 +159,19 @@ public partial class MainWindow : Window, IDialogs
         base.OnKeyDown(e);
     }
 
+    // Saved zoom names from before the 1x..1.3x rename; without this map an upgrading user's
+    // "125%"/"150%" wouldn't match and would silently reset to 1x.
+    static string MigrateZoomName(string? name) => name switch
+    {
+        "100%" => "1x",
+        "125%" => "1.2x", // nearest new step
+        "150%" => "1.3x",
+        _ => name ?? "1x",
+    };
+
     public void ApplyUiPrefs(SplitGuard.Models.UiPrefs prefs)
     {
+        prefs.Zoom = MigrateZoomName(prefs.Zoom);
         _themeIndex = Math.Max(0, Array.FindIndex(Palettes, p => p.Name == prefs.Theme));
         _accentIndex = Math.Max(0, Array.FindIndex(AccentSteps, a => a.Name == prefs.Accent));
         _fontIndex = Math.Max(0, Array.FindIndex(FontSteps, s => s.Name == prefs.Font));
@@ -161,8 +180,10 @@ public partial class MainWindow : Window, IDialogs
         ApplyFont();
         ApplyZoom();
         BuildSettingsPanel();
-        // Reconcile the run-at-boot registry entry with the (possibly default-on) pref.
-        try { StartupService.Set(prefs.StartOnBoot); } catch { }
+        // Reconcile the run-at-boot registry entry with the (possibly default-on) pref — never
+        // from the UI-review harness, which must not point the Run key at a dev binary.
+        if (!Services.RuleStore.DemoMode)
+            try { StartupService.Set(prefs.StartOnBoot); } catch { }
     }
 
     void ApplyFont()
@@ -194,21 +215,19 @@ public partial class MainWindow : Window, IDialogs
         resources["DimOpacity"] = t.Dim;
         resources["HairlineBrush"] = new SolidColorBrush(Color.FromArgb(t.Hair, 0x80, 0x80, 0x80));
         resources["FieldBorderBrush"] = new SolidColorBrush(Color.FromArgb(t.Field, 0x80, 0x80, 0x80));
-        // Soft neutral fill behind borderless fields; a touch stronger on hover.
-        resources["FieldFillBrush"] = new SolidColorBrush(Color.FromArgb(t.Name == "light" ? (byte)0x14 : (byte)0x1E, 0x80, 0x80, 0x80));
-        resources["FieldFillHoverBrush"] = new SolidColorBrush(Color.FromArgb(t.Name == "light" ? (byte)0x20 : (byte)0x2E, 0x80, 0x80, 0x80));
+        // Soft neutral fill behind borderless fields; a touch stronger on hover. Keyed on the
+        // EFFECTIVE variant (not the palette name) so "white" and a light-OS "auto" get the
+        // lighter wash too, not just the palette literally named "light".
+        var lightFill = EffectiveVariant() == ThemeVariant.Light;
+        resources["FieldFillBrush"] = new SolidColorBrush(Color.FromArgb(lightFill ? (byte)0x14 : (byte)0x1E, 0x80, 0x80, 0x80));
+        resources["FieldFillHoverBrush"] = new SolidColorBrush(Color.FromArgb(lightFill ? (byte)0x20 : (byte)0x2E, 0x80, 0x80, 0x80));
         // Menus/popups need an opaque backing (cards may be translucent overlays under "auto").
         var menuBg = t.Surface is not null
             ? Color.Parse(t.Surface)
             : (EffectiveVariant() == ThemeVariant.Light ? Color.Parse("#FBFBFB") : Color.Parse("#2B2F34"));
         resources["MenuSurfaceBrush"] = new SolidColorBrush(menuBg);
-        // The header bubble around logo+menu: the opaque theme surface where defined, else a
-        // clear neutral overlay so the pill reads on the OS-adaptive title bar.
-        resources["BubbleBrush"] = new SolidColorBrush(t.Surface is not null
-            ? Color.Parse(t.Surface)
-            : Color.FromArgb(0x30, 0x80, 0x80, 0x80));
-        // Keys consumed by the Fluent MenuFlyoutPresenter/MenuItem (used by the menu bar and the
-        // Windows tray menu). Surface follows the theme; the hover shade is set in ApplyAccent.
+        // Keys consumed by the Fluent MenuFlyoutPresenter/MenuItem (the in-app menu bar is gone;
+        // these still back the TextBox context flyout). The hover shade is set in ApplyAccent.
         resources["MenuFlyoutPresenterBackground"] = new SolidColorBrush(menuBg);
         resources["MenuFlyoutPresenterBorderBrush"] = resources["HairlineBrush"];
         var menuFg = new SolidColorBrush(EffectiveVariant() == ThemeVariant.Light ? Color.Parse("#1B2420") : Color.Parse("#E4E9E6"));
@@ -360,19 +379,23 @@ public partial class MainWindow : Window, IDialogs
         if (DataContext is not MainViewModel sv) return;
         GeneralList.Children.Clear();
         GeneralList.Children.Add(ToggleRow("Custom DNS forwarding", () => sv.HasCustomDns, on => sv.ToggleCustomDns(on)));
+        // The registry/scheduled-task side effects are skipped in the UI-review harness — a demo
+        // session toggling a switch must never install the dev binary as a logon task (or delete
+        // the installed app's launch task). The pref writes are already no-ops there (Save gates).
         GeneralList.Children.Add(ToggleRow("Start on Windows startup", () => sv.Prefs.StartOnBoot, on =>
         {
-            StartupService.Set(on);
+            if (!Services.RuleStore.DemoMode) StartupService.Set(on);
             sv.Prefs.StartOnBoot = on; sv.PersistPrefs();
         }));
         GeneralList.Children.Add(ToggleRow("Skip UAC prompt on launch", () => sv.Prefs.SkipUacLaunch, on =>
         {
             sv.Prefs.SkipUacLaunch = on; sv.PersistPrefs();
-            _ = Task.Run(() =>
-            {
-                if (on) StartupService.RegisterLaunchTask();
-                else StartupService.UnregisterLaunchTask();
-            });
+            if (!Services.RuleStore.DemoMode)
+                _ = Task.Run(() =>
+                {
+                    if (on) StartupService.RegisterLaunchTask();
+                    else StartupService.UnregisterLaunchTask();
+                });
         }));
         GeneralList.Children.Add(ToggleRow("Notifications", () => sv.Prefs.Notifications, on => { sv.Prefs.Notifications = on; sv.PersistPrefs(); }));
         // Turning on the update check runs one now, so a found update surfaces the header arrow.

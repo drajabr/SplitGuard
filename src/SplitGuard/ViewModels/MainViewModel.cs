@@ -123,17 +123,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
         Raise(nameof(UpdateTooltip));
         Raise(nameof(UpdateHighlight));
         Raise(nameof(UpdateVisible));
-        Raise(nameof(UpdateActionText));
     }
-
-    // The About menu's update line: install the downloaded update, show progress, or check.
-    public string UpdateActionText => _update switch
-    {
-        UpdateStatus.Ready => $"Install update {_pendingUpdate?.Tag}",
-        UpdateStatus.Checking => "Checking for updates…",
-        UpdateStatus.Downloading => $"Downloading {_pendingUpdate?.Tag}…",
-        _ => "Check for updates",
-    };
 
     public string CurrentVersionText => $"v{UpdateService.CurrentVersion}";
 
@@ -183,15 +173,19 @@ public class MainViewModel : ObservableObject, ITunnelHost
     // success so a hidden-to-tray app still tells the user).
     public async Task CheckForUpdatesAsync(bool manual)
     {
+        // The UI-review harness must never hit GitHub or fetch a real installer.
+        if (RuleStore.DemoMode) return;
         if (_update is UpdateStatus.Checking or UpdateStatus.Downloading) return;
+        // A downloaded update is already waiting — don't let a re-check (e.g. flipping the
+        // check-updates toggle) reset Ready and, on a network hiccup, silently discard it.
+        if (_update == UpdateStatus.Ready) return;
         SetUpdate(UpdateStatus.Checking);
         try
         {
             var info = await UpdateService.CheckAsync();
-            _config.Ui.LastUpdateCheck = DateTime.UtcNow.ToString("o");
-            PersistPrefs();
             if (info is null)
             {
+                StampUpdateCheck();
                 if (manual) { SetUpdate(UpdateStatus.UpToDate); RevertUpdateLater(UpdateStatus.UpToDate); }
                 else SetUpdate(UpdateStatus.Idle);
                 return;
@@ -205,6 +199,9 @@ public class MainViewModel : ObservableObject, ITunnelHost
                 if (_update == UpdateStatus.Downloading) Raise(nameof(UpdateTooltip));
             }));
             _installerPath = await UpdateService.DownloadAsync(info, progress);
+            // Stamp only after the download landed: a mid-stream failure must not arm the
+            // once-a-day gate, or the user silently loses a day of "update available".
+            StampUpdateCheck();
             SetUpdate(UpdateStatus.Ready);
             if (!manual) Notify("Update available", $"SplitGuard {info.Tag} is ready to install.", false);
         }
@@ -214,6 +211,12 @@ public class MainViewModel : ObservableObject, ITunnelHost
             RevertUpdateLater(UpdateStatus.Error);
             if (manual) { StatusText = $"Update check failed: {ex.Message}"; StatusOk = false; }
         }
+    }
+
+    void StampUpdateCheck()
+    {
+        _config.Ui.LastUpdateCheck = DateTime.UtcNow.ToString("o");
+        PersistPrefs();
     }
 
     void InstallUpdate()

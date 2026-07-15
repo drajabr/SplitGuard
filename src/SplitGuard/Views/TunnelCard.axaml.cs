@@ -101,13 +101,15 @@ public partial class TunnelCard : UserControl
         IfaceGrid.SizeChanged += (_, _) => UpdateAddressLayout();
         AddrList.SizeChanged += (_, _) => UpdateAddressLayout();
 
-        // Fade a card in the first time it appears; fade + collapse it on removal.
+        // Fade a card in the first time it appears; fade + collapse it on removal. Only Opacity
+        // gets a XAML transition — a Height DoubleTransition can't animate from the unset (NaN)
+        // auto height (every lerp frame is NaN, so the collapse held for the full duration and
+        // snapped); PlayRemove drives the height with the shared code tween instead.
         ClipToBounds = true;
         Opacity = 0;
         Transitions = new Transitions
         {
             new DoubleTransition { Property = OpacityProperty, Duration = TimeSpan.FromMilliseconds(AnimMs), Easing = Motion.Standard },
-            new DoubleTransition { Property = HeightProperty, Duration = TimeSpan.FromMilliseconds(AnimMs), Easing = Motion.Standard },
         };
         AttachedToVisualTree += (_, _) =>
         {
@@ -368,13 +370,13 @@ public partial class TunnelCard : UserControl
         TweenBodyToContent(e.PreviousSize.Height);
     }
 
-    // Fade + collapse the card, then run the real removal.
+    // Fade + collapse the card, then run the real removal. The height is driven by the shared
+    // code tween (a XAML Height transition would lerp from the unset NaN auto height and snap).
     bool PlayRemove(Action complete)
     {
         _appeared = true; // don't re-trigger the appear fade
-        Height = Bounds.Height;      // fix height so we can shrink it
-        Opacity = 0;
-        Dispatcher.UIThread.Post(() => Height = 0, DispatcherPriority.Render);
+        Opacity = 0;      // fades via the Opacity transition
+        Motion.Tween(Bounds.Height, 0, AnimMs, v => Height = v);
         DispatcherTimer.RunOnce(complete, TimeSpan.FromMilliseconds(AnimMs + Motion.CushionMs));
         return true;
     }

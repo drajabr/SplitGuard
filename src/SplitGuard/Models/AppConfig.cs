@@ -36,7 +36,7 @@ public class UiPrefs
     public string Theme { get; set; } = "auto";
     public string Accent { get; set; } = "green";
     public string Font { get; set; } = "mono";
-    public string Zoom { get; set; } = "100%";
+    public string Zoom { get; set; } = "1x";
     public bool StartOnBoot { get; set; } = true;
     public bool Notifications { get; set; } = true;
     public bool CustomDnsEnabled { get; set; } = true;

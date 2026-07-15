@@ -345,6 +345,13 @@
     <Setter Property="BorderThickness" Value="0" />
     <Setter Property="CornerRadius" Value="6" />
     <Setter Property="Opacity" Value="{DynamicResource DimOpacity}" />
+    <!-- The dim->full label fade lives on the Button itself (the presenter transition only
+         covers presenter properties), so hover fades the text in step with the fill. -->
+    <Setter Property="Transitions">
+      <Transitions>
+        <DoubleTransition Property="Opacity" Duration="{x:Static v:Motion.Fast}" Easing="{x:Static v:Motion.Standard}" />
+      </Transitions>
+    </Setter>
   </Style>
   <Style Selector="Button.quiet:pointerover">
     <Setter Property="Opacity" Value="1" />

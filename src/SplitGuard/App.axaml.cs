@@ -28,11 +28,6 @@ public class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
-        // Cascading submenus (Appearance → Theme, etc.) default to a heavy 400ms hover delay,
-        // which is what made the menus feel sluggish. 140ms reads snappy without opening on a
-        // pass-through. (In-app menu only; the OS-drawn tray menu is unaffected.)
-        Avalonia.Controls.Platform.DefaultMenuInteractionHandler.MenuShowDelay = TimeSpan.FromMilliseconds(140);
-
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var window = new MainWindow();
