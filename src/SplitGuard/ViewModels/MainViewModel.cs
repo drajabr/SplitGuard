@@ -351,7 +351,8 @@ public class MainViewModel : ObservableObject, ITunnelHost
                 t.StatsTick++;
             }
             RefreshPins();
-            Tunnels.FirstOrDefault(t => !t.IsCustom && !t.IsExternal)?.BeginEditCommand.Execute(null);
+            // Start with every card collapsed — a card expands only when clicked, same as the
+            // real app. (Previously the demo force-opened the first card's edit panel.)
         }
     }
 
