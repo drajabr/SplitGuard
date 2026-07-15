@@ -10,8 +10,8 @@ namespace SplitGuard.Views;
 
 public partial class PeerBlock : UserControl
 {
-    const int RevealMs = 200;      // match TunnelCard.AnimMs
-    const double RevealShift = 8;
+    const int RevealMs = Motion.SlowMs;            // structural reveal (shared token)
+    const double RevealShift = Motion.RevealShift;
 
     PeerViewModel? _vm;
     readonly TranslateTransform _shift = new(0, 0);

@@ -330,7 +330,7 @@ public partial class MainWindow : Window, IDialogs
             SettingsCard.Measure(new Size(w, double.PositiveInfinity));
             to = SettingsCard.DesiredSize.Height;
         }
-        TunnelCard.Tween(from, to, 200,
+        TunnelCard.Tween(from, to, Motion.SlowMs,
             v => { if (_setAnimGen == gen) SettingsRegion.Height = v; },
             () => { if (_setAnimGen == gen && open) SettingsRegion.Height = double.NaN; });
     }

@@ -106,8 +106,8 @@ public partial class TunnelCard : UserControl
         Opacity = 0;
         Transitions = new Transitions
         {
-            new DoubleTransition { Property = OpacityProperty, Duration = TimeSpan.FromMilliseconds(AnimMs), Easing = new CubicEaseOut() },
-            new DoubleTransition { Property = HeightProperty, Duration = TimeSpan.FromMilliseconds(AnimMs), Easing = new CubicEaseOut() },
+            new DoubleTransition { Property = OpacityProperty, Duration = TimeSpan.FromMilliseconds(AnimMs), Easing = Motion.Standard },
+            new DoubleTransition { Property = HeightProperty, Duration = TimeSpan.FromMilliseconds(AnimMs), Easing = Motion.Standard },
         };
         AttachedToVisualTree += (_, _) =>
         {
@@ -261,25 +261,10 @@ public partial class TunnelCard : UserControl
             });
     }
 
-    // Simple CubicEaseOut tween driven by a timer — reliable for any target (transforms,
-    // scroll offset) without the Animation/RunAsync quirks that crashed on transforms.
-    // Render priority: default (background) ticks starve behind the heavy relayout a
-    // collapse triggers (the VM rebuilds every peer), so the whole duration elapsed
-    // before the first frame — the collapse snapped instead of animating.
+    // Thin forwarder to the shared Motion.Tween, so the whole app has one tween loop and one
+    // easing curve. Kept because callers here and in MainWindow/PeerBlock reference TunnelCard.Tween.
     internal static void Tween(double from, double to, int ms, Action<double> apply, Action? done = null)
-    {
-        if (Math.Abs(to - from) < 0.5) { apply(to); done?.Invoke(); return; }
-        var sw = Stopwatch.StartNew();
-        DispatcherTimer? timer = null;
-        timer = new DispatcherTimer(TimeSpan.FromMilliseconds(15), DispatcherPriority.Render, (_, _) =>
-        {
-            var p = Math.Min(1, sw.Elapsed.TotalMilliseconds / ms);
-            var e = 1 - Math.Pow(1 - p, 3);
-            apply(from + (to - from) * e);
-            if (p >= 1) { timer!.Stop(); done?.Invoke(); }
-        });
-        timer.Start();
-    }
+        => Motion.Tween(from, to, ms, apply, done);
 
     // Slide a pane in horizontally — used for the raw <-> fields swap.
     void SlideIn(Control pane, double fromX)
@@ -320,8 +305,8 @@ public partial class TunnelCard : UserControl
 
     // ---- expand/collapse: explicit height animation of a single region ----------
 
-    const int AnimMs = 200;
-    const double RevealShift = 8; // px the incoming pane content slides up from as it fades in
+    const int AnimMs = Motion.SlowMs;              // structural motion (expand/collapse/reveal)
+    const double RevealShift = Motion.RevealShift; // px the incoming pane slides up from as it fades in
     int _animGen; // cancels a stale animation finalize on rapid re-toggle
 
     static double NaturalHeight(Control content, double width)
@@ -390,7 +375,7 @@ public partial class TunnelCard : UserControl
         Height = Bounds.Height;      // fix height so we can shrink it
         Opacity = 0;
         Dispatcher.UIThread.Post(() => Height = 0, DispatcherPriority.Render);
-        DispatcherTimer.RunOnce(complete, TimeSpan.FromMilliseconds(AnimMs + 40));
+        DispatcherTimer.RunOnce(complete, TimeSpan.FromMilliseconds(AnimMs + Motion.CushionMs));
         return true;
     }
 

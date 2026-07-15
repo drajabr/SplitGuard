@@ -1,5 +1,6 @@
 <Styles xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:v="clr-namespace:SplitGuard.Views">
 
   <!-- Fields read as soft filled rows (no visible outline); the 1.5px border is reserved
        transparently at rest so the accent focus-ring can fade in without shifting the text
@@ -20,8 +21,8 @@
   <Style Selector="TextBox /template/ Border#PART_BorderElement">
     <Setter Property="Transitions">
       <Transitions>
-        <BrushTransition Property="Background" Duration="0:0:0.13" Easing="CubicEaseOut" />
-        <BrushTransition Property="BorderBrush" Duration="0:0:0.13" Easing="CubicEaseOut" />
+        <BrushTransition Property="Background" Duration="{x:Static v:Motion.Fast}" Easing="{x:Static v:Motion.Standard}" />
+        <BrushTransition Property="BorderBrush" Duration="{x:Static v:Motion.Fast}" Easing="{x:Static v:Motion.Standard}" />
       </Transitions>
     </Setter>
   </Style>
@@ -94,9 +95,10 @@
   <Style Selector="Button /template/ ContentPresenter">
     <Setter Property="Transitions">
       <Transitions>
-        <BrushTransition Property="Background" Duration="0:0:0.13" Easing="CubicEaseOut" />
-        <BrushTransition Property="Foreground" Duration="0:0:0.13" Easing="CubicEaseOut" />
-        <BrushTransition Property="BorderBrush" Duration="0:0:0.13" Easing="CubicEaseOut" />
+        <BrushTransition Property="Background" Duration="{x:Static v:Motion.Fast}" Easing="{x:Static v:Motion.Standard}" />
+        <BrushTransition Property="Foreground" Duration="{x:Static v:Motion.Fast}" Easing="{x:Static v:Motion.Standard}" />
+        <BrushTransition Property="BorderBrush" Duration="{x:Static v:Motion.Fast}" Easing="{x:Static v:Motion.Standard}" />
+        <DoubleTransition Property="Opacity" Duration="{x:Static v:Motion.Fast}" Easing="{x:Static v:Motion.Standard}" />
       </Transitions>
     </Setter>
   </Style>
@@ -118,7 +120,7 @@
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="Transitions">
       <Transitions>
-        <BrushTransition Property="Foreground" Duration="0:0:0.13" Easing="CubicEaseOut" />
+        <BrushTransition Property="Foreground" Duration="{x:Static v:Motion.Fast}" Easing="{x:Static v:Motion.Standard}" />
       </Transitions>
     </Setter>
   </Style>
@@ -223,7 +225,7 @@
                    HorizontalAlignment="Left" VerticalAlignment="Center" Margin="3,0">
             <Ellipse.Transitions>
               <Transitions>
-                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.14" Easing="CubicEaseOut" />
+                <TransformOperationsTransition Property="RenderTransform" Duration="{x:Static v:Motion.Base}" Easing="{x:Static v:Motion.Standard}" />
               </Transitions>
             </Ellipse.Transitions>
           </Ellipse>
@@ -235,8 +237,8 @@
     <Setter Property="Opacity" Value="0.45" />
     <Setter Property="Transitions">
       <Transitions>
-        <BrushTransition Property="Background" Duration="0:0:0.15" Easing="CubicEaseOut" />
-        <DoubleTransition Property="Opacity" Duration="0:0:0.15" Easing="CubicEaseOut" />
+        <BrushTransition Property="Background" Duration="{x:Static v:Motion.Base}" Easing="{x:Static v:Motion.Standard}" />
+        <DoubleTransition Property="Opacity" Duration="{x:Static v:Motion.Base}" Easing="{x:Static v:Motion.Standard}" />
       </Transitions>
     </Setter>
   </Style>
@@ -346,7 +348,7 @@
     <Setter Property="ClipToBounds" Value="True" />
     <Setter Property="Transitions">
       <Transitions>
-        <BrushTransition Property="BorderBrush" Duration="0:0:0.15" Easing="CubicEaseOut" />
+        <BrushTransition Property="BorderBrush" Duration="{x:Static v:Motion.Base}" Easing="{x:Static v:Motion.Standard}" />
       </Transitions>
     </Setter>
   </Style>
@@ -370,7 +372,7 @@
   <Style Selector="Border.item">
     <Setter Property="Transitions">
       <Transitions>
-        <BrushTransition Property="Background" Duration="0:0:0.13" Easing="CubicEaseOut" />
+        <BrushTransition Property="Background" Duration="{x:Static v:Motion.Fast}" Easing="{x:Static v:Motion.Standard}" />
       </Transitions>
     </Setter>
   </Style>
@@ -398,8 +400,8 @@
     <Setter Property="Opacity" Value="0" />
     <Setter Property="Transitions">
       <Transitions>
-        <DoubleTransition Property="MaxHeight" Duration="0:0:0.20" Easing="CubicEaseOut" />
-        <DoubleTransition Property="Opacity" Duration="0:0:0.20" Easing="CubicEaseOut" />
+        <DoubleTransition Property="MaxHeight" Duration="{x:Static v:Motion.Slow}" Easing="{x:Static v:Motion.Standard}" />
+        <DoubleTransition Property="Opacity" Duration="{x:Static v:Motion.Slow}" Easing="{x:Static v:Motion.Standard}" />
       </Transitions>
     </Setter>
   </Style>
