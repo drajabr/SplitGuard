@@ -567,7 +567,7 @@ public partial class MainWindow : Window, IDialogs
         {
             int idx = i;
             var pal = Palettes[i];
-            var box = new Border { CornerRadius = new CornerRadius(5), BorderBrush = hair, BorderThickness = new Thickness(1) };
+            var box = new Border { CornerRadius = new CornerRadius(4), BorderBrush = hair, BorderThickness = new Thickness(1) };
             if (pal.Page is null)
                 box.Background = new LinearGradientBrush
                 {
@@ -602,7 +602,7 @@ public partial class MainWindow : Window, IDialogs
         {
             int idx = i;
             var (_, hex) = AccentSteps[i];
-            var box = new Border { CornerRadius = new CornerRadius(5) };
+            var box = new Border { CornerRadius = new CornerRadius(4) };
             if (hex.Length > 0)
                 box.Background = new SolidColorBrush(Color.Parse(hex));
             else // "mono" tracks the theme's black/white — show it as a split black/white box

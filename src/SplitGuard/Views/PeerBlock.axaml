@@ -4,7 +4,7 @@
              xmlns:vm="clr-namespace:SplitGuard.ViewModels"
              xmlns:views="clr-namespace:SplitGuard.Views"
              x:Class="SplitGuard.Views.PeerBlock">
-  <Border Classes="peerblock" Margin="12,0,12,6">
+  <Border Classes="peerblock" Margin="12,4,12,8">
     <StackPanel>
       <!-- Header (always visible; clicking its empty space toggles the body, like the
            tunnel card): name on the left, live status on the right. -->

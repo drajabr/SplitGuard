@@ -480,7 +480,7 @@ public partial class TunnelCard : UserControl
             return new Border
             {
                 Background = bg,
-                CornerRadius = new Avalonia.CornerRadius(5),
+                CornerRadius = new Avalonia.CornerRadius(6),
                 Padding = new Avalonia.Thickness(7, 2),
                 Margin = new Avalonia.Thickness(0, 0, 5, 4),
                 Child = tb,
@@ -550,7 +550,7 @@ public partial class TunnelCard : UserControl
             return new Border
             {
                 Background = bg,
-                CornerRadius = new Avalonia.CornerRadius(5),
+                CornerRadius = new Avalonia.CornerRadius(6),
                 Padding = new Avalonia.Thickness(7, 2),
                 Margin = new Avalonia.Thickness(0, 0, 5, 4),
                 Child = row,

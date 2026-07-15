@@ -84,7 +84,7 @@
   <Style Selector="Button">
     <Setter Property="MinHeight" Value="{DynamicResource CtrlH}" />
     <Setter Property="Padding" Value="10,3" />
-    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="CornerRadius" Value="6" />
     <Setter Property="FontSize" Value="{DynamicResource Fs12}" />
     <Setter Property="VerticalAlignment" Value="Center" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -143,7 +143,7 @@
     <Setter Property="BorderThickness" Value="0" />
     <Setter Property="Padding" Value="7,3" />
     <Setter Property="MinHeight" Value="0" />
-    <Setter Property="CornerRadius" Value="5" />
+    <Setter Property="CornerRadius" Value="6" />
     <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
   </Style>
   <!-- Fix the weird link hover: a subtle rounded fill (not Fluent gray) that keeps the
@@ -162,7 +162,7 @@
     <Setter Property="BorderThickness" Value="0" />
     <Setter Property="Padding" Value="8,3" />
     <Setter Property="MinHeight" Value="0" />
-    <Setter Property="CornerRadius" Value="5" />
+    <Setter Property="CornerRadius" Value="6" />
   </Style>
   <Style Selector="Button.hdr:pointerover /template/ ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource FieldFillHoverBrush}" />
@@ -188,7 +188,7 @@
   <Style Selector="Button.actionrow">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />
-    <Setter Property="CornerRadius" Value="7" />
+    <Setter Property="CornerRadius" Value="6" />
     <Setter Property="Padding" Value="10,8" />
     <Setter Property="MinHeight" Value="0" />
     <Setter Property="HorizontalAlignment" Value="Stretch" />
@@ -210,6 +210,9 @@
     <Setter Property="MinHeight" Value="0" />
     <Setter Property="CornerRadius" Value="6" />
     <Setter Property="FontSize" Value="{DynamicResource Fs11}" />
+    <!-- Fill the UniformGrid cell so font/scale boxes expand to the width like the swatches. -->
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
   </Style>
   <Style Selector="Button.seg:pointerover /template/ ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource FieldFillHoverBrush}" />
@@ -292,7 +295,7 @@
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="2" />
     <Setter Property="BorderBrush" Value="Transparent" />
-    <Setter Property="CornerRadius" Value="7" />
+    <Setter Property="CornerRadius" Value="6" />
     <Setter Property="Padding" Value="0" />
     <Setter Property="MinHeight" Value="0" />
     <Setter Property="HorizontalAlignment" Value="Stretch" />
@@ -333,7 +336,7 @@
     <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
     <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
     <Setter Property="BorderThickness" Value="0" />
-    <Setter Property="CornerRadius" Value="7" />
+    <Setter Property="CornerRadius" Value="6" />
     <Setter Property="Padding" Value="16,3" />
   </Style>
   <Style Selector="Button.primary /template/ ContentPresenter">
@@ -474,12 +477,12 @@
     <Setter Property="RenderTransform" Value="translateY(0px)" />
   </Style>
 
-  <!-- Peers are no longer boxed; a single top hairline separates each one (and the first
-       from the interface section above it). -->
+  <!-- Each peer is its own hairline-boxed card inside the tunnel card. -->
   <Style Selector="Border.peerblock">
-    <Setter Property="BorderBrush" Value="{DynamicResource SeparatorBrush}" />
-    <Setter Property="BorderThickness" Value="0,1,0,0" />
-    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="BorderBrush" Value="{DynamicResource HairlineBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="9" />
+    <Setter Property="Padding" Value="12,0,2,4" />
   </Style>
 
   <Style Selector="TextBlock.lbl">
