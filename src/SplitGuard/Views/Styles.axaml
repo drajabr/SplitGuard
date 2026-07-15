@@ -183,6 +183,24 @@
     <Setter Property="Background" Value="{DynamicResource ItemBrush}" />
   </Style>
 
+  <!-- Full-width action row in the Add drawer: left-aligned label with its shortcut flushed
+       right; a soft rounded hover fill (fades via the universal button transition). -->
+  <Style Selector="Button.actionrow">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="7" />
+    <Setter Property="Padding" Value="10,8" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+  </Style>
+  <Style Selector="Button.actionrow:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource FieldFillHoverBrush}" />
+  </Style>
+  <Style Selector="Button.actionrow:pressed /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource FieldFillBrush}" />
+  </Style>
+
   <!-- Segmented option buttons inside the appearance menu: soft filled, borderless; the
        selected one fills with the accent. -->
   <Style Selector="Button.seg">

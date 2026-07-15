@@ -115,6 +115,13 @@ public partial class MainWindow : Window, IDialogs
             e.Handled = true;
             return;
         }
+        // Ctrl+O opens the file picker to import a .conf (mirrors the Add drawer's Import row).
+        if (ctrl && e.Key == Key.O && vm is not null)
+        {
+            _ = ImportConfAsync();
+            e.Handled = true;
+            return;
+        }
         if (ctrl && e.Key == Key.E && vm is not null)
         {
             vm.Tunnels.FirstOrDefault(t => t.IsEditing)?.ToggleTextModeCommand.Execute(null);
@@ -289,50 +296,62 @@ public partial class MainWindow : Window, IDialogs
     void OnUpdateClick(object? sender, RoutedEventArgs e) =>
         (DataContext as MainViewModel)?.OnUpdateButtonClicked();
 
-    // Bottom-bar Add menu.
-    void OnImportClick(object? sender, RoutedEventArgs e) => _ = ImportConfAsync();
-    void OnNewTunnelClick(object? sender, RoutedEventArgs e) => (DataContext as MainViewModel)?.CreateEmptyTunnel();
-    void OnRescanClick(object? sender, RoutedEventArgs e) => (DataContext as MainViewModel)?.RescanExternals();
+    // Bottom-bar Add actions. Each closes the open drawer first, then runs.
+    void OnImportClick(object? sender, RoutedEventArgs e) { SetDrawer(Drawer.None); _ = ImportConfAsync(); }
+    void OnNewTunnelClick(object? sender, RoutedEventArgs e) { SetDrawer(Drawer.None); (DataContext as MainViewModel)?.CreateEmptyTunnel(); }
+    void OnRescanClick(object? sender, RoutedEventArgs e) { SetDrawer(Drawer.None); (DataContext as MainViewModel)?.RescanExternals(); }
 
-    // ---- settings panel: a bottom-bar expander that grows upward over the list ----
+    // ---- bottom-bar drawers: Settings and Add each grow their own card upward over the list;
+    // only one is open at a time, and any outside press closes it. --------------------------------
 
-    bool _settingsOpen;
-    int _setAnimGen; // cancels a stale expand/collapse finalize on rapid re-toggle
+    enum Drawer { None, Settings, Add }
+    Drawer _openDrawer = Drawer.None;
+    int _setGen, _addGen; // per-region guards cancelling a stale expand/collapse finalize
 
-    void OnSettingsToggleClick(object? sender, RoutedEventArgs e) => SetSettingsOpen(!_settingsOpen);
+    void OnSettingsToggleClick(object? sender, RoutedEventArgs e) =>
+        SetDrawer(_openDrawer == Drawer.Settings ? Drawer.None : Drawer.Settings);
+    void OnAddToggleClick(object? sender, RoutedEventArgs e) =>
+        SetDrawer(_openDrawer == Drawer.Add ? Drawer.None : Drawer.Add);
 
-    // Collapse when a press lands outside the panel and its toggle (a tunnel card, the list, the
-    // title bar). Tunnelled + handledEventsToo so it still fires when a child handles the press.
+    // Collapse the open drawer when a press lands outside both drawers and both toggles (a tunnel
+    // card, the list, the title bar). Tunnelled + handledEventsToo so it fires even when a child
+    // handles the press first.
     void OnWindowPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (!_settingsOpen) return;
+        if (_openDrawer == Drawer.None) return;
         for (var el = e.Source as Visual; el is not null; el = el.GetVisualParent())
-            if (ReferenceEquals(el, SettingsRegion) || ReferenceEquals(el, SettingsToggle)) return;
-        SetSettingsOpen(false);
+            if (ReferenceEquals(el, SettingsRegion) || ReferenceEquals(el, SettingsToggle)
+                || ReferenceEquals(el, AddRegion) || ReferenceEquals(el, AddToggle)) return;
+        SetDrawer(Drawer.None);
     }
 
-    // Animate SettingsRegion.Height between 0 and the panel's natural height with the same tween
-    // the cards use (200ms CubicEaseOut). Rebuild the panel on open so its toggle/selection state
-    // is fresh (e.g. after a tray-menu change). Released to Auto once open so it follows content.
-    void SetSettingsOpen(bool open)
+    // Drive both regions to match the requested drawer (the other collapses). Settings rebuilds on
+    // open so its state is fresh (e.g. after a tray toggle); the Add card is static.
+    void SetDrawer(Drawer which)
     {
-        _settingsOpen = open;
-        SettingsChevron.Text = open ? "" : ""; // down = click to close; up = opens upward
-        if (open) BuildSettingsPanel();
+        _openDrawer = which;
+        if (which == Drawer.Settings) BuildSettingsPanel();
+        AnimateRegion(SettingsRegion, SettingsCard, SettingsChevron, which == Drawer.Settings, ++_setGen, () => _setGen);
+        AnimateRegion(AddRegion, AddCard, AddChevron, which == Drawer.Add, ++_addGen, () => _addGen);
+    }
 
-        var gen = ++_setAnimGen;
-        var from = SettingsRegion.Bounds.Height;
+    // Tween a region's Height between 0 and its card's natural height (shared Slow token), then
+    // release to Auto when open so it follows content. gen/cur guard against rapid re-toggle.
+    void AnimateRegion(Border region, Control card, TextBlock chevron, bool open, int gen, Func<int> cur)
+    {
+        chevron.Text = open ? "" : ""; // down = click to close; up = opens upward
+        var from = region.Bounds.Height;
         double to = 0;
         if (open)
         {
-            var w = SettingsRegion.Bounds.Width;
+            var w = region.Bounds.Width;
             if (w < 1) w = Bounds.Width;
-            SettingsCard.Measure(new Size(w, double.PositiveInfinity));
-            to = SettingsCard.DesiredSize.Height;
+            card.Measure(new Size(w, double.PositiveInfinity));
+            to = card.DesiredSize.Height;
         }
         TunnelCard.Tween(from, to, Motion.SlowMs,
-            v => { if (_setAnimGen == gen) SettingsRegion.Height = v; },
-            () => { if (_setAnimGen == gen && open) SettingsRegion.Height = double.NaN; });
+            v => { if (cur() == gen) region.Height = v; },
+            () => { if (cur() == gen && open) region.Height = double.NaN; });
     }
 
     // (Re)build the two columns. General = toggles with side effects; Appearance = inline pickers.

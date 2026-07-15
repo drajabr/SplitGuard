@@ -61,18 +61,12 @@
           </DockPanel>
         </Button>
         <Border Grid.Column="1" Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,5" />
-        <Button Grid.Column="2" Name="AddButton" Classes="hdr" Padding="12,6" ToolTip.Tip="Add a tunnel">
+        <Button Grid.Column="2" Name="AddToggle" Classes="hdr" Padding="12,6" Click="OnAddToggleClick" ToolTip.Tip="Add a tunnel">
           <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
             <TextBlock Classes="glyph accentfg" Text="&#xE710;" FontSize="{DynamicResource Fs14}" />
             <TextBlock Text="Add" Classes="setlabel" />
+            <TextBlock Name="AddChevron" Classes="glyph" Text="&#xE70E;" FontSize="{DynamicResource Fs12}" Opacity="0.6" VerticalAlignment="Center" />
           </StackPanel>
-          <Button.Flyout>
-            <MenuFlyout Placement="TopEdgeAlignedRight">
-              <MenuItem Header="Import configuration…" Click="OnImportClick" />
-              <MenuItem Header="New empty tunnel" Click="OnNewTunnelClick" />
-              <MenuItem Header="Rescan external tunnels" Click="OnRescanClick" />
-            </MenuFlyout>
-          </Button.Flyout>
         </Button>
       </Grid>
     </Border>
@@ -88,6 +82,33 @@
           <Border Grid.Column="1" Width="1" Background="{DynamicResource SeparatorBrush}" Margin="14,0" />
           <StackPanel Grid.Column="2" Name="AppearanceList" Spacing="9" VerticalAlignment="Center" />
         </Grid>
+      </Border>
+    </Border>
+
+    <!-- Expandable Add drawer, mirroring the settings panel: grows upward over the list. Each row
+         is an action with its keyboard shortcut flushed right, like a menu accelerator. -->
+    <Border DockPanel.Dock="Bottom" Name="AddRegion" ClipToBounds="True" Height="0">
+      <Border Name="AddCard" Classes="card" Background="{DynamicResource SurfaceBrush}"
+              Margin="14,0,14,8" Padding="6">
+        <StackPanel Spacing="1">
+          <Button Classes="actionrow" Click="OnImportClick">
+            <DockPanel>
+              <TextBlock DockPanel.Dock="Right" Classes="muted" Text="Ctrl+O" VerticalAlignment="Center" />
+              <TextBlock Text="Import configuration…" Classes="setlabel" />
+            </DockPanel>
+          </Button>
+          <Button Classes="actionrow" Click="OnNewTunnelClick">
+            <DockPanel>
+              <TextBlock DockPanel.Dock="Right" Classes="muted" Text="Ctrl+N" VerticalAlignment="Center" />
+              <TextBlock Text="New empty tunnel" Classes="setlabel" />
+            </DockPanel>
+          </Button>
+          <Button Classes="actionrow" Click="OnRescanClick">
+            <DockPanel>
+              <TextBlock Text="Rescan external tunnels" Classes="setlabel" />
+            </DockPanel>
+          </Button>
+        </StackPanel>
       </Border>
     </Border>
 
