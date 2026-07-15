@@ -45,7 +45,7 @@
 
     <!-- Bottom bar: Settings expander (left) + Add (right), one card at the page bottom. Same
          side inset (14) and radius (card = 11) as the tunnel cards so it lines up with them. -->
-    <Border DockPanel.Dock="Bottom" Classes="card" Background="{DynamicResource SurfaceBrush}"
+    <Border DockPanel.Dock="Bottom" Classes="card" Background="{DynamicResource MenuSurfaceBrush}"
             Margin="14,0,14,12" Padding="5">
       <Grid ColumnDefinitions="*,Auto,Auto">
         <Button Grid.Column="0" Name="SettingsToggle" Classes="hdr" Click="OnSettingsToggleClick"
@@ -75,8 +75,8 @@
          list. Its Height is animated 0 <-> content by the code-behind (same tween as the cards);
          collapsed it clips to nothing. -->
     <Border DockPanel.Dock="Bottom" Name="SettingsRegion" ClipToBounds="True"
-            Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource HairlineBrush}"
-            BorderThickness="1" CornerRadius="11" Margin="14,0,14,8" Padding="12,8" Height="0">
+            Background="{DynamicResource MenuSurfaceBrush}" BorderBrush="{DynamicResource HairlineBrush}"
+            BorderThickness="1" CornerRadius="11" Margin="14,8,14,8" Padding="12,8" Height="0">
       <Grid Name="SettingsCard" ColumnDefinitions="1.3*,Auto,1*">
         <StackPanel Grid.Column="0" Name="GeneralList" Spacing="1" VerticalAlignment="Center" />
         <Border Grid.Column="1" Width="1" Background="{DynamicResource SeparatorBrush}" Margin="14,0" />
@@ -87,8 +87,8 @@
     <!-- Expandable Add drawer, mirroring the settings panel: grows upward over the list. Each row
          is an action with its keyboard shortcut flushed right, like a menu accelerator. -->
     <Border DockPanel.Dock="Bottom" Name="AddRegion" ClipToBounds="True"
-            Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource HairlineBrush}"
-            BorderThickness="1" CornerRadius="11" Margin="14,0,14,8" Padding="6" Height="0">
+            Background="{DynamicResource MenuSurfaceBrush}" BorderBrush="{DynamicResource HairlineBrush}"
+            BorderThickness="1" CornerRadius="11" Margin="14,8,14,8" Padding="6" Height="0">
         <StackPanel Name="AddCard" Spacing="1">
           <Button Classes="actionrow" Click="OnImportClick">
             <DockPanel>
@@ -111,8 +111,9 @@
     </Border>
 
     <!-- The list area is a Panel so overlays (drop-target highlight, toasts) can float over
-         the scroll content. -->
-    <Panel>
+         the scroll content. ClipToBounds so a full list's content can never bleed down over the
+         bottom drawers (the Panel is the fill child, drawn on top of the docked drawers). -->
+    <Panel ClipToBounds="True">
       <ScrollViewer Name="MainScroll" Focusable="True" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Hidden">
         <StackPanel Margin="14,8,14,12">
           <ItemsControl ItemsSource="{Binding Tunnels}">
