@@ -28,11 +28,11 @@ public partial class MainWindow : Window, IDialogs
     // with cards lifted above the page; graphite = the muted dark; black = true black (OLED).
     static readonly ThemeDef[] Palettes =
     {
-        new("auto",     ThemeVariant.Default, null,      null,      null,      0.68, 0x45, 0x40),
-        new("white",    ThemeVariant.Light,  "#FFFFFF", "#FFFFFF", "#EEECE6", 0.60, 0x42, 0x3E),
-        new("light",    ThemeVariant.Light,  "#DEDBD2", "#ECE9E2", "#D3D0C6", 0.62, 0x48, 0x42),
-        new("graphite", ThemeVariant.Dark,   "#24272B", "#2E3339", "#1F2226", 0.70, 0x4A, 0x48),
-        new("black",    ThemeVariant.Dark,   "#000000", "#141619", "#0C0D0F", 0.72, 0x56, 0x54),
+        new("auto",     ThemeVariant.Default, null,      null,      null,      0.76, 0x45, 0x40),
+        new("white",    ThemeVariant.Light,  "#FFFFFF", "#FFFFFF", "#EEECE6", 0.70, 0x42, 0x3E),
+        new("light",    ThemeVariant.Light,  "#DEDBD2", "#ECE9E2", "#D3D0C6", 0.72, 0x48, 0x42),
+        new("graphite", ThemeVariant.Dark,   "#24272B", "#2E3339", "#1F2226", 0.78, 0x4A, 0x48),
+        new("black",    ThemeVariant.Dark,   "#000000", "#141619", "#0C0D0F", 0.80, 0x56, 0x54),
     };
 
     // Accent hue is its own control, independent of the surface theme (see Views.Accents).
@@ -294,6 +294,13 @@ public partial class MainWindow : Window, IDialogs
     void ApplyTheme()
     {
         var t = Palettes[_themeIndex];
+        // The variant must be requested BEFORE resolving "auto" below: switching light->auto on a
+        // dark OS used to resolve against the STALE ActualThemeVariant (still Light), and although
+        // the assignment re-entered ApplyTheme via ActualThemeVariantChanged with the fresh value,
+        // the outer call then finished and overwrote everything with the stale palette — the
+        // "auto needs two clicks" bug. Requesting first makes both passes read the fresh variant
+        // (the re-entrant inner pass writes the same values the outer one will).
+        Avalonia.Application.Current!.RequestedThemeVariant = t.Variant;
         // "auto" is not its own palette — it simply IS the white palette when the OS is light and
         // the black palette when the OS is dark. Resolve to that concrete palette here, keeping
         // Variant=Default so RequestedThemeVariant follows the OS and ActualThemeVariantChanged
@@ -304,7 +311,6 @@ public partial class MainWindow : Window, IDialogs
             t = Palettes.First(p => p.Name == (osLight ? "white" : "black")) with { Variant = ThemeVariant.Default };
         }
         var resources = Avalonia.Application.Current!.Resources;
-        Avalonia.Application.Current!.RequestedThemeVariant = t.Variant;
 
         if (t.Page is null) ClearValue(BackgroundProperty);
         else Background = new SolidColorBrush(Color.Parse(t.Page));
@@ -328,25 +334,26 @@ public partial class MainWindow : Window, IDialogs
         resources["SynKeyBrush"]    = new SolidColorBrush(Color.Parse(lightFill ? "#6A3FA0" : "#B08BE0"));
         resources["SynNumBrush"]    = new SolidColorBrush(Color.Parse(lightFill ? "#B26A00" : "#E0A040"));
         // One elevation shadow shared by every floating surface — the bottom bar, the Settings/Add
-        // drawers, and the tunnel + peer cards — so they all read as the same layer. Dark themes
-        // need a heavier shadow to register (a card sits on the darkest element, the page, so a
-        // faint one is invisible dark-on-dark); light themes a soft grey one. Kept short: the blur
-        // reach must stay under the cards' 14px side inset, or the scroll viewport clips the
-        // overflow into a hard vertical edge.
-        var shadow = BoxShadows.Parse(lightFill ? "0 2 7 0 #40000000" : "0 2 10 0 #A6000000");
+        // drawers, and the tunnel + peer cards — so they all read as the same layer. Blur-dominant
+        // (tiny offset) so the SIDES fade too, not just the bottom. Light themes: a soft grey
+        // shadow. Dark themes: a subtle WHITE glow — a black shadow is invisible on an
+        // already-dark page. Reach (offset+blur+spread) must stay under the cards' 14px side
+        // inset and the 16px stack gap, or the fade gets cut into a hard edge.
+        var shadow = BoxShadows.Parse(lightFill ? "0 1 8 0 #46000000" : "0 0 9 1 #2EFFFFFF");
         resources["FloatShadow"] = shadow;
         resources["CardShadow"] = shadow;
         // The title strip's cast shadow: an overlay gradient at the top of the view (a real
         // BoxShadow on the docked strip would be painted over by the list, which renders after
         // it). Drawn above the scrolling content, so cards visibly slide under the strip.
+        // Matches the elevation language: grey shade on light themes, white bleed on dark.
         resources["TopShadeBrush"] = new LinearGradientBrush
         {
             StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
             EndPoint = new RelativePoint(0, 1, RelativeUnit.Relative),
             GradientStops =
             {
-                new GradientStop(Color.Parse(lightFill ? "#30000000" : "#8C000000"), 0),
-                new GradientStop(Color.Parse("#00000000"), 1),
+                new GradientStop(Color.Parse(lightFill ? "#30000000" : "#20FFFFFF"), 0),
+                new GradientStop(Color.Parse(lightFill ? "#00000000" : "#00FFFFFF"), 1),
             },
         };
         // Menus/popups need an opaque backing (cards may be translucent overlays under "auto").

@@ -506,7 +506,7 @@ public partial class TunnelCard : UserControl
             grid.Children.Add(nm);
             var st = new TextBlock
             {
-                Text = stats, Opacity = 0.5,
+                Text = stats, Opacity = 0.65,
                 HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
                 TextAlignment = Avalonia.Media.TextAlignment.Right,
             };

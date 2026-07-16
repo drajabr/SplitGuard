@@ -8,7 +8,7 @@
         MinWidth="520" MinHeight="420"
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaChromeHints="PreferSystemChrome"
-        ExtendClientAreaTitleBarHeightHint="46"
+        ExtendClientAreaTitleBarHeightHint="38"
         FontFamily="Segoe UI Variable Text, Segoe UI"
         RenderOptions.TextRenderingMode="SubpixelAntialias"
         DragDrop.AllowDrop="True">
@@ -20,7 +20,7 @@
          corners at the top of ListHost. -->
     <Panel DockPanel.Dock="Top">
       <Border Background="{DynamicResource MenuSurfaceBrush}" IsHitTestVisible="False" />
-      <Border Padding="14,8,146,8">
+      <Border Padding="14,5,146,5">
         <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
           <Image Name="LogoImage" Source="avares://SplitGuard/Assets/app.ico" Width="24" Height="24"
                  VerticalAlignment="Center" IsHitTestVisible="False" />
