@@ -106,7 +106,9 @@ public partial class TunnelCard : UserControl
         // gets a XAML transition — a Height DoubleTransition can't animate from the unset (NaN)
         // auto height (every lerp frame is NaN, so the collapse held for the full duration and
         // snapped); PlayRemove drives the height with the shared code tween instead.
-        ClipToBounds = true;
+        // NB: ClipToBounds is left OFF here so the card's elevation shadow isn't swallowed; the
+        // animated region is clipped by the inner Border.body, and PlayRemove turns clipping on
+        // for the shrink (the shadow is fading out then anyway).
         Opacity = 0;
         Transitions = new Transitions
         {
@@ -366,8 +368,17 @@ public partial class TunnelCard : UserControl
     // Only reacts while the body is in auto mode: a non-NaN Height means an animation is
     // already driving it (and re-triggering off its own frames would loop). The first
     // layout (0 → natural) is skipped — cards appear via the opacity fade, not a grow.
+    // A peer block drives its own clipped height curtain on expand/collapse; while it does, the
+    // outer body must NOT also start a follow tween (two tweens on the same height fight and the
+    // collapse snaps). The peer brackets its animation with these, and the auto-height body just
+    // tracks the peer's size frame by frame.
+    int _suppressBodySize;
+    internal void BeginBodySuppression() => _suppressBodySize++;
+    internal void EndBodySuppression() { if (_suppressBodySize > 0) _suppressBodySize--; }
+
     void OnBodyContentSizeChanged(object? sender, SizeChangedEventArgs e)
     {
+        if (_suppressBodySize > 0) return;
         if (sender is Control { IsVisible: false }) return;
         if (!double.IsNaN(Body.Height)) return;
         if (_postTween.IsRunning && _postTween.ElapsedMilliseconds < 150) return;
@@ -381,6 +392,7 @@ public partial class TunnelCard : UserControl
     bool PlayRemove(Action complete)
     {
         _appeared = true; // don't re-trigger the appear fade
+        ClipToBounds = true; // clip content to the shrinking height (shadow is fading out anyway)
         Opacity = 0;      // fades via the Opacity transition
         Motion.Tween(Bounds.Height, 0, AnimMs, v => Height = v);
         DispatcherTimer.RunOnce(complete, TimeSpan.FromMilliseconds(AnimMs + Motion.CushionMs));

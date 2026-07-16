@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -21,6 +22,7 @@ public partial class PeerBlock : UserControl
     {
         InitializeComponent();
         PeerBody.RenderTransform = _shift;
+        PeerBody.ClipToBounds = true; // clip its own animated-height curtain
 
         DataContextChanged += (_, _) =>
         {
@@ -33,6 +35,7 @@ public partial class PeerBlock : UserControl
             var exp = _vm?.IsExpanded ?? false;
             PeerBody.IsVisible = exp;
             PeerBody.Opacity = exp ? 1 : 0;
+            PeerBody.Height = exp ? double.NaN : 0;
             _shift.Y = 0;
         };
 
@@ -55,31 +58,52 @@ public partial class PeerBlock : UserControl
             AnimateReveal(_vm.IsExpanded);
     }
 
-    // The OUTER tunnel card owns the height motion (it animates via ExpandContent.SizeChanged
-    // once IsVisible flips). Expand: flip IsVisible so the card grows, and fade/slide the body
-    // in over the same window. Collapse: flip IsVisible off immediately so the card shrinks at
-    // the exact same rate it grew — no separate fade-out pass (that made collapse feel ~2x
-    // slower than expand).
+    // The peer body runs its own clipped height curtain, symmetric both ways: expand grows its
+    // Height 0 -> content (fading/sliding the content in), collapse shrinks content -> 0 (content
+    // clipped away as it closes) then hides. The outer tunnel card's body is auto-height, so it
+    // tracks the peer frame by frame; suppression stops it starting a competing follow tween
+    // (which is what made collapse blank-then-snap instead of animating).
     void AnimateReveal(bool expand)
     {
         var gen = ++_revealGen;
+        var card = this.FindAncestorOfType<TunnelCard>();
+        card?.BeginBodySuppression();
+        // Unconditional: every started tween fires done() exactly once (Motion.Tween guarantees
+        // it, even on a zero-delta short-circuit), so decrementing here — regardless of whether
+        // this generation is still current — keeps the suppression counter balanced when a rapid
+        // re-toggle supersedes an in-flight reveal. The final-state restore stays gen-guarded.
+        void Release() => card?.EndBodySuppression();
+
         if (expand)
         {
             PeerBody.IsVisible = true;
+            var w = PeerBody.Bounds.Width;
+            if (w < 1) w = 360;
+            PeerBody.Height = double.NaN;
+            PeerBody.Measure(new Size(w, double.PositiveInfinity));
+            var to = PeerBody.DesiredSize.Height;
+            PeerBody.Height = 0;
             PeerBody.Opacity = 0;
             _shift.Y = RevealShift;
-            TunnelCard.Tween(0, 1, RevealMs, v =>
-            {
-                if (_revealGen != gen) return;
-                PeerBody.Opacity = v;
-                _shift.Y = RevealShift * (1 - v);
-            });
+            TunnelCard.Tween(0, to, RevealMs,
+                v =>
+                {
+                    if (_revealGen != gen) return;
+                    PeerBody.Height = v;
+                    var f = to > 0.5 ? v / to : 1;
+                    PeerBody.Opacity = f;
+                    _shift.Y = RevealShift * (1 - f);
+                },
+                () => { if (_revealGen == gen) { PeerBody.Height = double.NaN; PeerBody.Opacity = 1; _shift.Y = 0; } Release(); });
         }
         else
         {
-            PeerBody.Opacity = 0;
+            var from = PeerBody.Bounds.Height;
+            PeerBody.Height = from;
             _shift.Y = 0;
-            PeerBody.IsVisible = false; // card shrinks now, same 200ms as the grow
+            TunnelCard.Tween(from, 0, RevealMs,
+                v => { if (_revealGen == gen) { PeerBody.Height = v; PeerBody.Opacity = from > 0.5 ? v / from : 0; } },
+                () => { if (_revealGen == gen) { PeerBody.IsVisible = false; PeerBody.Height = 0; } Release(); });
         }
     }
 

@@ -313,6 +313,9 @@ public partial class MainWindow : Window, IDialogs
         // Elevation shadow for the floating bottom cluster: dark themes need a much heavier
         // shadow to register against an already-dark page; light themes a soft grey one.
         resources["FloatShadow"] = BoxShadows.Parse(lightFill ? "0 3 14 0 #40000000" : "0 5 22 0 #B0000000");
+        // Subtler version for the stacked tunnel/peer cards — enough to lift them off the page
+        // like the settings panel without turning a list of them into noise.
+        resources["CardShadow"] = BoxShadows.Parse(lightFill ? "0 2 8 0 #1F000000" : "0 3 12 0 #66000000");
         // Menus/popups need an opaque backing (cards may be translucent overlays under "auto").
         var menuBg = t.Surface is not null
             ? Color.Parse(t.Surface)

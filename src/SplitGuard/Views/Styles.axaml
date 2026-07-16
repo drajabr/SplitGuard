@@ -387,7 +387,9 @@
     <Setter Property="BorderBrush" Value="{DynamicResource HairlineBrush}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="11" />
-    <Setter Property="ClipToBounds" Value="True" />
+    <!-- No ClipToBounds here: it would swallow the elevation shadow. The animated region
+         is clipped by the inner Border.body; the header/footer are inset from the corners. -->
+    <Setter Property="BoxShadow" Value="{DynamicResource CardShadow}" />
     <Setter Property="Transitions">
       <Transitions>
         <BrushTransition Property="BorderBrush" Duration="{x:Static v:Motion.Base}" Easing="{x:Static v:Motion.Standard}" />
@@ -489,12 +491,14 @@
     <Setter Property="RenderTransform" Value="translateY(0px)" />
   </Style>
 
-  <!-- Each peer is its own hairline-boxed card inside the tunnel card. -->
+  <!-- Each peer is its own hairline-boxed card inside the tunnel card; a soft shadow lifts it
+       off the tunnel-card surface, matching the tunnel/settings cards. -->
   <Style Selector="Border.peerblock">
     <Setter Property="BorderBrush" Value="{DynamicResource HairlineBrush}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="9" />
     <Setter Property="Padding" Value="12,0,2,4" />
+    <Setter Property="BoxShadow" Value="{DynamicResource CardShadow}" />
   </Style>
 
   <Style Selector="TextBlock.lbl">
