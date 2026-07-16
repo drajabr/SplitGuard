@@ -52,7 +52,7 @@
       <ScrollViewer Name="MainScroll" Focusable="True" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Hidden">
         <!-- Top/bottom margins reserve the floating title bar's and bottom bar's footprints so
              the first/last cards can rest clear of them; scrolling slides cards behind both. -->
-        <StackPanel Margin="14,8,14,70">
+        <StackPanel Margin="14,14,14,70">
           <ItemsControl ItemsSource="{Binding Tunnels}">
             <ItemsControl.ItemTemplate>
               <DataTemplate>
@@ -68,7 +68,7 @@
 
       <!-- Empty state: an inviting dashed dropzone instead of a wall of text. -->
       <Rectangle Classes="dropzone" IsVisible="{Binding !Tunnels.Count}"
-                 Margin="14,8,14,70" IsHitTestVisible="False" />
+                 Margin="14,14,14,70" IsHitTestVisible="False" />
       <StackPanel IsVisible="{Binding !Tunnels.Count}" VerticalAlignment="Center"
                   HorizontalAlignment="Center" Spacing="10" Margin="40,0,40,58">
         <TextBlock Classes="glyph" Text="&#xE8B5;" FontSize="34" Opacity="0.35" HorizontalAlignment="Center" />
@@ -81,7 +81,7 @@
       </StackPanel>
 
       <!-- Drag-over feedback: shown while a .conf hovers anywhere over the window. -->
-      <Panel Name="DropOverlay" IsVisible="False" IsHitTestVisible="False" Margin="14,8,14,70">
+      <Panel Name="DropOverlay" IsVisible="False" IsHitTestVisible="False" Margin="14,14,14,70">
         <Rectangle Classes="dropzone active" />
         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="8">
           <TextBlock Classes="glyph accentfg" Text="&#xE896;" FontSize="30" HorizontalAlignment="Center" />
@@ -172,11 +172,6 @@
           </Grid>
         </Border>
       </StackPanel>
-
-      <!-- Title strip depth: a soft shade falling from the strip's bottom edge, drawn OVER the
-           content so scrolling cards slide visibly under the strip. Decoration — not hit-testable. -->
-      <Rectangle Height="10" VerticalAlignment="Top" Fill="{DynamicResource TopShadeBrush}"
-                 IsHitTestVisible="False" />
 
       <!-- Transient toast (connect errors / failover): floats bottom-right above the bar,
            slides+fades via the .shown class, auto-clears after a few seconds (VM timer),

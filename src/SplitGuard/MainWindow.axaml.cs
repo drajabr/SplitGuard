@@ -342,20 +342,6 @@ public partial class MainWindow : Window, IDialogs
         var shadow = BoxShadows.Parse(lightFill ? "0 1 12 0 #3C000000" : "0 0 12 1 #4AFFFFFF");
         resources["FloatShadow"] = shadow;
         resources["CardShadow"] = shadow;
-        // The title strip's cast shadow: an overlay gradient at the top of the view (a real
-        // BoxShadow on the docked strip would be painted over by the list, which renders after
-        // it). Drawn above the scrolling content, so cards visibly slide under the strip.
-        // Matches the elevation language: grey shade on light themes, white bleed on dark.
-        resources["TopShadeBrush"] = new LinearGradientBrush
-        {
-            StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
-            EndPoint = new RelativePoint(0, 1, RelativeUnit.Relative),
-            GradientStops =
-            {
-                new GradientStop(Color.Parse(lightFill ? "#30000000" : "#20FFFFFF"), 0),
-                new GradientStop(Color.Parse(lightFill ? "#00000000" : "#00FFFFFF"), 1),
-            },
-        };
         // Menus/popups need an opaque backing (cards may be translucent overlays under "auto").
         var menuBg = t.Surface is not null
             ? Color.Parse(t.Surface)
