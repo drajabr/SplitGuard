@@ -7,34 +7,11 @@
         Width="520" Height="700"
         MinWidth="520" MinHeight="420"
         ExtendClientAreaToDecorationsHint="True"
-        ExtendClientAreaChromeHints="PreferSystemChrome"
-        ExtendClientAreaTitleBarHeightHint="46"
+        ExtendClientAreaChromeHints="NoChrome"
         FontFamily="Segoe UI Variable Text, Segoe UI"
         RenderOptions.TextRenderingMode="SubpixelAntialias"
         DragDrop.AllowDrop="True">
   <DockPanel>
-    <!-- Title strip inside the extended-client title bar. No background, so empty areas (and
-         the non-hit-testable logo/title/version) fall through to the OS caption and drag the
-         window natively. Left padding 14 lines the logo up with the cards below; right padding
-         reserves the OS caption buttons. Only the update button captures the pointer. -->
-    <Border DockPanel.Dock="Top" Padding="14,8,146,8">
-      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-        <Image Name="LogoImage" Source="avares://SplitGuard/Assets/app.ico" Width="24" Height="24"
-               VerticalAlignment="Center" IsHitTestVisible="False" />
-        <TextBlock Text="SplitGuard" FontSize="{DynamicResource Fs17}" FontWeight="SemiBold"
-                   VerticalAlignment="Center" IsHitTestVisible="False" />
-        <TextBlock Text="{Binding CurrentVersionText}" FontSize="{DynamicResource Fs11}" Opacity="0.5"
-                   VerticalAlignment="Bottom" Margin="0,0,0,3" IsHitTestVisible="False" />
-        <!-- Update affordance: hidden until a check/download is happening or an update is ready
-             (accent glyph). First click downloads, a second installs. -->
-        <Button Classes="hdr" Name="UpdateButton" Click="OnUpdateClick" VerticalAlignment="Center"
-                IsVisible="{Binding UpdateVisible}" ToolTip.Tip="{Binding UpdateTooltip}">
-          <TextBlock Classes="glyph updicon" Classes.hot="{Binding UpdateHighlight}"
-                     Text="{Binding UpdateGlyph}" FontSize="{DynamicResource Fs12}" />
-        </Button>
-      </StackPanel>
-    </Border>
-
     <Border DockPanel.Dock="Top" Background="{DynamicResource WarningBgBrush}" Padding="14,8" IsVisible="{Binding GpoWarning}">
       <StackPanel Orientation="Horizontal" Spacing="8">
         <TextBlock Classes="glyph" Foreground="{DynamicResource WarningBrush}" Text="&#xE7BA;" VerticalAlignment="Top" />
@@ -48,9 +25,9 @@
          shadow — content visibly slides underneath instead of being clipped dead against it. -->
     <Panel Name="ListHost" ClipToBounds="True">
       <ScrollViewer Name="MainScroll" Focusable="True" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Hidden">
-        <!-- Bottom margin reserves the floating bar's footprint so the last card can scroll
-             fully clear of it. -->
-        <StackPanel Margin="14,8,14,70">
+        <!-- Top/bottom margins reserve the floating title bar's and bottom bar's footprints so
+             the first/last cards can rest clear of them; scrolling slides cards behind both. -->
+        <StackPanel Margin="14,64,14,70">
           <ItemsControl ItemsSource="{Binding Tunnels}">
             <ItemsControl.ItemTemplate>
               <DataTemplate>
@@ -66,7 +43,7 @@
 
       <!-- Empty state: an inviting dashed dropzone instead of a wall of text. -->
       <Rectangle Classes="dropzone" IsVisible="{Binding !Tunnels.Count}"
-                 Margin="14,8,14,70" IsHitTestVisible="False" />
+                 Margin="14,64,14,70" IsHitTestVisible="False" />
       <StackPanel IsVisible="{Binding !Tunnels.Count}" VerticalAlignment="Center"
                   HorizontalAlignment="Center" Spacing="10" Margin="40,0,40,58">
         <TextBlock Classes="glyph" Text="&#xE8B5;" FontSize="34" Opacity="0.35" HorizontalAlignment="Center" />
@@ -79,7 +56,7 @@
       </StackPanel>
 
       <!-- Drag-over feedback: shown while a .conf hovers anywhere over the window. -->
-      <Panel Name="DropOverlay" IsVisible="False" IsHitTestVisible="False" Margin="14,8,14,70">
+      <Panel Name="DropOverlay" IsVisible="False" IsHitTestVisible="False" Margin="14,64,14,70">
         <Rectangle Classes="dropzone active" />
         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="8">
           <TextBlock Classes="glyph accentfg" Text="&#xE896;" FontSize="30" HorizontalAlignment="Center" />
@@ -170,6 +147,42 @@
           </Grid>
         </Border>
       </StackPanel>
+
+      <!-- Floating title bar: a themed card like the bottom bar, with our own caption buttons
+           (the OS chrome is disabled via NoChrome). Content scrolls behind it; empty areas drag
+           the window (code-behind BeginMoveDrag, double-click maximizes). -->
+      <Border Name="TitleBar" Classes="card float" Background="{DynamicResource MenuSurfaceBrush}"
+              VerticalAlignment="Top" Margin="14,8,14,0" Padding="10,5"
+              PointerPressed="OnTitleBarPressed">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+            <Button Classes="cap" Click="OnMinimizeClick" ToolTip.Tip="Minimize">
+              <TextBlock Classes="glyph" Text="&#xE921;" FontSize="{DynamicResource Fs11}" />
+            </Button>
+            <Button Classes="cap" Click="OnMaximizeClick" ToolTip.Tip="Maximize">
+              <TextBlock Name="MaxGlyph" Classes="glyph" Text="&#xE922;" FontSize="{DynamicResource Fs11}" />
+            </Button>
+            <Button Classes="cap close" Click="OnCloseClick" ToolTip.Tip="Close">
+              <TextBlock Classes="glyph" Text="&#xE8BB;" FontSize="{DynamicResource Fs11}" />
+            </Button>
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+            <Image Name="LogoImage" Source="avares://SplitGuard/Assets/app.ico" Width="24" Height="24"
+                   VerticalAlignment="Center" IsHitTestVisible="False" />
+            <TextBlock Text="SplitGuard" FontSize="{DynamicResource Fs17}" FontWeight="SemiBold"
+                       VerticalAlignment="Center" IsHitTestVisible="False" />
+            <TextBlock Text="{Binding CurrentVersionText}" FontSize="{DynamicResource Fs11}" Opacity="0.5"
+                       VerticalAlignment="Bottom" Margin="0,0,0,3" IsHitTestVisible="False" />
+            <!-- Update affordance: hidden until a check/download is happening or an update is
+                 ready (accent glyph). First click downloads, a second installs. -->
+            <Button Classes="hdr" Name="UpdateButton" Click="OnUpdateClick" VerticalAlignment="Center"
+                    IsVisible="{Binding UpdateVisible}" ToolTip.Tip="{Binding UpdateTooltip}">
+              <TextBlock Classes="glyph updicon" Classes.hot="{Binding UpdateHighlight}"
+                         Text="{Binding UpdateGlyph}" FontSize="{DynamicResource Fs12}" />
+            </Button>
+          </StackPanel>
+        </DockPanel>
+      </Border>
 
       <!-- Transient toast (connect errors / failover): floats bottom-right above the bar,
            slides+fades via the .shown class, auto-clears after a few seconds (VM timer),

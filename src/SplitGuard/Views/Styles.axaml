@@ -172,6 +172,37 @@
     <Setter Property="Background" Value="{DynamicResource FieldFillBrush}" />
   </Style>
 
+  <!-- Caption buttons (min / max / close) in the floating title bar: quiet glyphs that pick up
+       a soft fill on hover; close goes the conventional red. -->
+  <Style Selector="Button.cap">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="9,6" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="CornerRadius" Value="6" />
+  </Style>
+  <Style Selector="Button.cap TextBlock">
+    <Setter Property="Opacity" Value="0.65" />
+  </Style>
+  <Style Selector="Button.cap:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource FieldFillHoverBrush}" />
+  </Style>
+  <Style Selector="Button.cap:pointerover TextBlock">
+    <Setter Property="Opacity" Value="1" />
+  </Style>
+  <Style Selector="Button.cap:pressed /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource FieldFillBrush}" />
+  </Style>
+  <Style Selector="Button.cap.close:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="#C42B1C" />
+  </Style>
+  <Style Selector="Button.cap.close:pointerover TextBlock">
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+  <Style Selector="Button.cap.close:pressed /template/ ContentPresenter">
+    <Setter Property="Background" Value="#A22516" />
+  </Style>
+
   <!-- Floating Add control: centered at the page bottom, borderless, icon over label. -->
   <Style Selector="Button.addbtn">
     <Setter Property="Background" Value="Transparent" />
@@ -532,7 +563,8 @@
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
   <Style Selector="TextBlock.glyph">
-    <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+    <!-- Fluent first (Win11-native, has the full Chrome* caption set); MDL2 fallback for Win10. -->
+    <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets" />
     <Setter Property="FontSize" Value="{DynamicResource Fs14}" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
