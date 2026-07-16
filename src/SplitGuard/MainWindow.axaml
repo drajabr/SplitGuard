@@ -153,7 +153,7 @@
                 </StackPanel>
                 <!-- Fill child: trims with an ellipsis instead of running under the chevron.
                      Deliberately smaller than the muted default — it's a hint, not a label. -->
-                <TextBlock Classes="muted" Text="Startup · Notifications · Updates · Appearance"
+                <TextBlock Classes="muted" Text="System · Updates · Appearance"
                            FontSize="{DynamicResource Fs11}" TextTrimming="CharacterEllipsis"
                            VerticalAlignment="Center" Margin="8,0,0,0" />
               </DockPanel>
