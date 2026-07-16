@@ -321,9 +321,11 @@ public partial class MainWindow : Window, IDialogs
         resources["SynNumBrush"]    = new SolidColorBrush(Color.Parse(lightFill ? "#B26A00" : "#E0A040"));
         // One elevation shadow shared by every floating surface — the bottom bar, the Settings/Add
         // drawers, and the tunnel + peer cards — so they all read as the same layer. Dark themes
-        // need a heavy shadow to register at all (a card sits on the darkest element, the page, so
-        // a faint one is invisible dark-on-dark); light themes a soft grey one.
-        var shadow = BoxShadows.Parse(lightFill ? "0 3 14 0 #38000000" : "0 4 20 0 #A6000000");
+        // need a heavier shadow to register (a card sits on the darkest element, the page, so a
+        // faint one is invisible dark-on-dark); light themes a soft grey one. Kept short: the blur
+        // reach must stay under the cards' 14px side inset, or the scroll viewport clips the
+        // overflow into a hard vertical edge.
+        var shadow = BoxShadows.Parse(lightFill ? "0 2 7 0 #38000000" : "0 2 10 0 #A6000000");
         resources["FloatShadow"] = shadow;
         resources["CardShadow"] = shadow;
         // Menus/popups need an opaque backing (cards may be translucent overlays under "auto").
