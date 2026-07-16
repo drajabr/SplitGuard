@@ -32,7 +32,7 @@ public partial class MainWindow : Window, IDialogs
         new("white",    ThemeVariant.Light,  "#FFFFFF", "#FFFFFF", "#EEECE6", 0.70, 0x42, 0x3E),
         new("light",    ThemeVariant.Light,  "#DEDBD2", "#ECE9E2", "#D3D0C6", 0.72, 0x48, 0x42),
         new("graphite", ThemeVariant.Dark,   "#24272B", "#2E3339", "#1F2226", 0.78, 0x4A, 0x48),
-        new("black",    ThemeVariant.Dark,   "#000000", "#141619", "#0C0D0F", 0.80, 0x56, 0x54),
+        new("black",    ThemeVariant.Dark,   "#000000", "#0F1113", "#090A0C", 0.80, 0x56, 0x54),
     };
 
     // Accent hue is its own control, independent of the surface theme (see Views.Accents).
@@ -314,6 +314,10 @@ public partial class MainWindow : Window, IDialogs
 
         if (t.Page is null) ClearValue(BackgroundProperty);
         else Background = new SolidColorBrush(Color.Parse(t.Page));
+        // Light themes: Fluent's default foreground is a softened ~89% black that reads dull on
+        // the bright pages — force a crisp near-black. Dark themes keep the theme default.
+        if (EffectiveVariant() == ThemeVariant.Light) Foreground = new SolidColorBrush(Color.Parse("#17191B"));
+        else ClearValue(ForegroundProperty);
         // Opaque surfaces when the palette defines them; transparent overlays under "auto".
         resources["SurfaceBrush"] = new SolidColorBrush(t.Surface is null ? Color.Parse("#00FFFFFF") : Color.Parse(t.Surface));
         resources["ItemBrush"] = new SolidColorBrush(t.Item is null ? Color.FromArgb(0x14, 0x80, 0x80, 0x80) : Color.Parse(t.Item));
