@@ -150,21 +150,18 @@ public class App : Application
     int _trayStatusCol = 6;  // longest status (status field, right-aligned)
 
     // "office        23 ms" — name left, status right-aligned in the trailing column.
-    // RTT when a healthcheck is running; otherwise the last handshake as "14s";
-    // "connecting…" until established; "external" for official-client adapters.
+    // Connected + established: the ping RTT, else the last handshake as "14s". Anything else
+    // (disconnected, connecting, external, no stats yet) is just "…".
     string TrayItemText(TunnelViewModel t) =>
         t.Name.PadRight(_trayNameCol) + TrayStatus(t).PadLeft(_trayStatusCol);
 
     static string TrayStatus(TunnelViewModel t)
     {
-        if (t.IsExternal) return t.IsConnected ? "external · up" : "external";
-        if (t.IsCustom) return t.IsConnected ? "active" : "off";
-        if (!t.IsConnected) return "off";
-        if (!t.IsEstablished) return "connecting…";
-        // Ping RTT when a healthcheck is enabled/running; otherwise the last handshake as "14s".
+        if (!t.IsConnected || t.IsExternal || !t.IsEstablished) return "…";
         var rtt = t.Peers.Select(p => p.PingText).FirstOrDefault(s => !string.IsNullOrEmpty(s));
-        return !string.IsNullOrEmpty(rtt) ? rtt : ShortAgo(t.Peers.Select(p => p.HandshakeText)
-            .FirstOrDefault(s => !string.IsNullOrEmpty(s)) ?? "");
+        if (!string.IsNullOrEmpty(rtt)) return rtt;
+        var hs = ShortAgo(t.Peers.Select(p => p.HandshakeText).FirstOrDefault(s => !string.IsNullOrEmpty(s)) ?? "");
+        return string.IsNullOrEmpty(hs) ? "…" : hs;
     }
 
     // "handshake 14s ago" → "14s" for the tray's terse right column.
