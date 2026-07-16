@@ -97,38 +97,6 @@ public partial class MainWindow : Window, IDialogs
         LayoutUpdated += (_, _) => UpdateClusterFade();
     }
 
-    // ---- floating title bar: custom caption buttons + window drag ---------------
-
-    // Empty title-bar area drags the window (native move loop, so OS snap still works);
-    // a double-click toggles maximize. Presses on the bar's buttons never reach here
-    // unhandled thanks to the source walk.
-    void OnTitleBarPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
-        for (var el = e.Source as Visual; el is not null && el != TitleBar; el = el.GetVisualParent())
-            if (el is Button) return;
-        if (e.ClickCount == 2)
-        {
-            WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
-            e.Handled = true;
-            return;
-        }
-        BeginMoveDrag(e);
-    }
-
-    void OnMinimizeClick(object? sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
-    void OnMaximizeClick(object? sender, RoutedEventArgs e) =>
-        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
-    void OnCloseClick(object? sender, RoutedEventArgs e) => Close(); // hides to tray (App.Closing)
-
-    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
-    {
-        base.OnPropertyChanged(change);
-        // Maximize button doubles as restore; the glyph tracks the actual state.
-        if (change.Property == WindowStateProperty && MaxGlyph is not null)
-            MaxGlyph.Text = WindowState == WindowState.Maximized ? "\uE923" : "\uE922";
-    }
-
     bool _clusterHover;
     const double ListBottomPad = 70; // the scroll content's reserved bottom margin (XAML)
 
