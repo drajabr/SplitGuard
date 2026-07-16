@@ -104,13 +104,21 @@ public partial class MainWindow : Window, IDialogs
     {
         // An expanded drawer is something the user explicitly opened — it never auto-hides.
         // Only the bare bar yields to content scrolling behind it.
-        if (_openDrawer != Drawer.None) { BottomCluster.Opacity = 1; return; }
-        // Where the cards actually end, in ListHost coordinates: the reserved bottom margin is
-        // part of the scroll extent but holds no content, so subtract it back out.
-        var cardsBottom = MainScroll.Extent.Height - ListBottomPad - MainScroll.Offset.Y;
-        var clusterTop = ListHost.Bounds.Height - BottomCluster.Bounds.Height;
-        var overlap = cardsBottom > clusterTop + 1;
-        BottomCluster.Opacity = !overlap || _clusterHover ? 1 : 0;
+        double op = 1;
+        if (_openDrawer == Drawer.None)
+        {
+            // Where the cards actually end, in ListHost coordinates: the reserved bottom margin
+            // is part of the scroll extent but holds no content, so subtract it back out.
+            var cardsBottom = MainScroll.Extent.Height - ListBottomPad - MainScroll.Offset.Y;
+            var clusterTop = ListHost.Bounds.Height - BottomCluster.Bounds.Height;
+            var overlap = cardsBottom > clusterTop + 1;
+            op = !overlap || _clusterHover ? 1 : 0;
+        }
+        // Fade the shadow-casting Borders themselves, never their parent StackPanel — an opacity
+        // layer on the parent clips the children's BoxShadows to the panel's bounds.
+        BottomBar.Opacity = op;
+        SettingsRegion.Opacity = op;
+        AddRegion.Opacity = op;
     }
 
     async void OnDrop(object? sender, DragEventArgs e)
@@ -325,7 +333,7 @@ public partial class MainWindow : Window, IDialogs
         // faint one is invisible dark-on-dark); light themes a soft grey one. Kept short: the blur
         // reach must stay under the cards' 14px side inset, or the scroll viewport clips the
         // overflow into a hard vertical edge.
-        var shadow = BoxShadows.Parse(lightFill ? "0 2 7 0 #38000000" : "0 2 10 0 #A6000000");
+        var shadow = BoxShadows.Parse(lightFill ? "0 2 7 0 #40000000" : "0 2 10 0 #A6000000");
         resources["FloatShadow"] = shadow;
         resources["CardShadow"] = shadow;
         // Menus/popups need an opaque backing (cards may be translucent overlays under "auto").

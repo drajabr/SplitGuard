@@ -393,6 +393,10 @@
     <Setter Property="Transitions">
       <Transitions>
         <BrushTransition Property="BorderBrush" Duration="{x:Static v:Motion.Base}" Easing="{x:Static v:Motion.Standard}" />
+        <!-- Fades (card appear/remove, the bottom cluster's yield-to-content) are applied to the
+             shadow-casting Border itself: an opacity layer on an ancestor clips descendant
+             BoxShadows to the ancestor's bounds. -->
+        <DoubleTransition Property="Opacity" Duration="{x:Static v:Motion.Slow}" Easing="{x:Static v:Motion.Standard}" />
       </Transitions>
     </Setter>
   </Style>
@@ -409,6 +413,13 @@
   </Style>
   <Style Selector="Border.drawer.open">
     <Setter Property="BoxShadow" Value="{DynamicResource FloatShadow}" />
+  </Style>
+  <Style Selector="Border.drawer">
+    <Setter Property="Transitions">
+      <Transitions>
+        <DoubleTransition Property="Opacity" Duration="{x:Static v:Motion.Slow}" Easing="{x:Static v:Motion.Standard}" />
+      </Transitions>
+    </Setter>
   </Style>
   <!-- Collapsed cards are click-to-expand; a slightly stronger border on hover signals it
        (rides the card's BorderBrush transition). Editing cards keep their accent ring. -->

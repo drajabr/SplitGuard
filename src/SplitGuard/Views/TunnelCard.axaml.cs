@@ -101,21 +101,19 @@ public partial class TunnelCard : UserControl
         IfaceGrid.SizeChanged += (_, _) => UpdateAddressLayout();
         AddrList.SizeChanged += (_, _) => UpdateAddressLayout();
 
-        // Fade a card in the first time it appears; fade + collapse it on removal. Only Opacity
-        // gets a XAML transition — a Height DoubleTransition can't animate from the unset (NaN)
-        // auto height (every lerp frame is NaN, so the collapse held for the full duration and
-        // snapped); PlayRemove drives the height with the shared code tween instead.
+        // Fade a card in the first time it appears; fade + collapse it on removal. The fade lives
+        // on CardShell (the shadow-casting Border, whose Opacity transition comes from the
+        // Border.card style) and NEVER on this UserControl: an opacity layer on an ancestor clips
+        // descendant BoxShadows to the ancestor's bounds, which cut every card shadow to a 1px rim.
+        // Height-wise, a XAML Height DoubleTransition can't animate from the unset (NaN) auto
+        // height, so PlayRemove drives the height with the shared code tween instead.
         // NB: ClipToBounds is left OFF here so the card's elevation shadow isn't swallowed; the
         // animated region is clipped by the inner Border.body, and PlayRemove turns clipping on
         // for the shrink (the shadow is fading out then anyway).
-        Opacity = 0;
-        Transitions = new Transitions
-        {
-            new DoubleTransition { Property = OpacityProperty, Duration = TimeSpan.FromMilliseconds(AnimMs), Easing = Motion.Standard },
-        };
+        CardShell.Opacity = 0;
         AttachedToVisualTree += (_, _) =>
         {
-            if (!_appeared) { _appeared = true; Opacity = 1; }
+            if (!_appeared) { _appeared = true; CardShell.Opacity = 1; }
             Dispatcher.UIThread.Post(UpdateAddressLayout, DispatcherPriority.Loaded);
             // First-render reconcile: a freshly attached card's auto-sized body can come
             // up collapsed to its header (the detail measured 0 before the first layout
@@ -368,7 +366,7 @@ public partial class TunnelCard : UserControl
     {
         _appeared = true; // don't re-trigger the appear fade
         ClipToBounds = true; // clip content to the shrinking height (shadow is fading out anyway)
-        Opacity = 0;      // fades via the Opacity transition
+        CardShell.Opacity = 0; // fades via the Border.card style's Opacity transition
         Motion.Tween(Bounds.Height, 0, AnimMs, v => Height = v);
         DispatcherTimer.RunOnce(complete, TimeSpan.FromMilliseconds(AnimMs + Motion.CushionMs));
         return true;
@@ -654,7 +652,7 @@ public partial class TunnelCard : UserControl
         _dragging = true;
         _dragXf = new TranslateTransform();
         RenderTransform = _dragXf;
-        Opacity = 0.9;
+        CardShell.Opacity = 0.9; // on the shadow-casting Border, not this UserControl (see ctor)
         if (this.GetVisualParent() is Control container) container.ZIndex = 1; // float above siblings
         DragTo(e);
     }
@@ -695,7 +693,7 @@ public partial class TunnelCard : UserControl
         if (wasDragging)
         {
             var xf = _dragXf; _dragXf = null;
-            Opacity = 1;
+            CardShell.Opacity = 1;
             if (this.GetVisualParent() is Control container) container.ZIndex = 0;
             if (xf is not null) // settle into the final slot
                 Tween(xf.Y, 0, AnimMs, v => xf.Y = v,

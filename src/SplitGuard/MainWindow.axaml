@@ -54,7 +54,10 @@
           <ItemsControl ItemsSource="{Binding Tunnels}">
             <ItemsControl.ItemTemplate>
               <DataTemplate>
-                <views:TunnelCard Margin="0,0,0,10" />
+                <!-- Gap must exceed the elevation shadow's bottom reach (offset+blur), or two
+                     stacked cards' shadows fill the whole gap edge-to-edge and read as a hard
+                     clipped band instead of a fade. -->
+                <views:TunnelCard Margin="0,0,0,16" />
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
@@ -90,12 +93,10 @@
            itself can round its background and cast a shadow without clipping either. The whole
            cluster fades out while cards scroll behind it (code-behind), hover brings it back;
            the transparent background makes the full rect hover-sensitive. -->
+      <!-- The yield-to-content fade targets the three child Borders individually (never this
+           StackPanel): an opacity layer on the parent would clip the children's BoxShadows to
+           the panel's bounds. The transparent background keeps the full rect hover-sensitive. -->
       <StackPanel Name="BottomCluster" VerticalAlignment="Bottom" Background="Transparent">
-        <StackPanel.Transitions>
-          <Transitions>
-            <DoubleTransition Property="Opacity" Duration="{x:Static views:Motion.Slow}" Easing="{x:Static views:Motion.Standard}" />
-          </Transitions>
-        </StackPanel.Transitions>
         <!-- Expandable Add drawer: each row is an action with its keyboard shortcut flushed
              right, like a menu accelerator. -->
         <Border Name="AddRegion" Classes="drawer"
@@ -137,9 +138,9 @@
           </Panel>
         </Border>
 
-        <!-- Bottom bar: Settings expander (left) + Add (right), icon-only. Same side inset (14)
-             and radius (card = 11) as the tunnel cards so it lines up with them. -->
-        <Border Classes="card float" Background="{DynamicResource MenuSurfaceBrush}"
+        <!-- Bottom bar: Settings expander (left) + Add (right). Same side inset (14) and radius
+             (card = 11) as the tunnel cards so it lines up with them. -->
+        <Border Name="BottomBar" Classes="card float" Background="{DynamicResource MenuSurfaceBrush}"
                 Margin="14,0,14,12" Padding="5">
           <Grid ColumnDefinitions="*,Auto,Auto">
             <Button Grid.Column="0" Name="SettingsToggle" Classes="hdr" Click="OnSettingsToggleClick"

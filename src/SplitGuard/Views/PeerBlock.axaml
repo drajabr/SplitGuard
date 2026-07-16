@@ -3,7 +3,8 @@
              xmlns:sys="clr-namespace:System;assembly=System.Runtime"
              xmlns:vm="clr-namespace:SplitGuard.ViewModels"
              xmlns:views="clr-namespace:SplitGuard.Views"
-             x:Class="SplitGuard.Views.PeerBlock">
+             x:Class="SplitGuard.Views.PeerBlock"
+             ClipToBounds="False">
   <Border Classes="peerblock" Margin="12,4,12,8">
     <StackPanel>
       <!-- Header (always visible; clicking its empty space toggles the body, like the

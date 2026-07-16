@@ -4,8 +4,9 @@
              xmlns:vm="clr-namespace:SplitGuard.ViewModels"
              xmlns:views="clr-namespace:SplitGuard.Views"
              xmlns:ae="using:AvaloniaEdit"
-             x:Class="SplitGuard.Views.TunnelCard">
-  <Border Classes="card" Classes.editing="{Binding IsEditing}" Background="{DynamicResource SurfaceBrush}">
+             x:Class="SplitGuard.Views.TunnelCard"
+             ClipToBounds="False">
+  <Border Name="CardShell" Classes="card" Classes.editing="{Binding IsEditing}" Background="{DynamicResource SurfaceBrush}">
     <StackPanel>
       <DockPanel Name="HeaderRow" Background="Transparent" Margin="12,5" Height="{DynamicResource HeaderH}">
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
