@@ -88,6 +88,26 @@ public partial class MainWindow : Window, IDialogs
         // resource (field fills, menu foregrounds, the mono accent). Re-running ApplyTheme sets the
         // same RequestedThemeVariant, so this can't loop — the event only fires on a real change.
         ActualThemeVariantChanged += (_, _) => ApplyTheme();
+        // The floating cluster yields to content: while cards extend behind it, it fades out so
+        // nothing is obscured, and fades back when the pointer enters its area (or the overlap
+        // clears — short list, scrolled to the end, drawer closed).
+        MainScroll.ScrollChanged += (_, _) => UpdateClusterFade();
+        BottomCluster.PointerEntered += (_, _) => { _clusterHover = true; UpdateClusterFade(); };
+        BottomCluster.PointerExited += (_, _) => { _clusterHover = false; UpdateClusterFade(); };
+        LayoutUpdated += (_, _) => UpdateClusterFade();
+    }
+
+    bool _clusterHover;
+    const double ListBottomPad = 70; // the scroll content's reserved bottom margin (XAML)
+
+    void UpdateClusterFade()
+    {
+        // Where the cards actually end, in ListHost coordinates: the reserved bottom margin is
+        // part of the scroll extent but holds no content, so subtract it back out.
+        var cardsBottom = MainScroll.Extent.Height - ListBottomPad - MainScroll.Offset.Y;
+        var clusterTop = ListHost.Bounds.Height - BottomCluster.Bounds.Height;
+        var overlap = cardsBottom > clusterTop + 1;
+        BottomCluster.Opacity = !overlap || _clusterHover ? 1 : 0;
     }
 
     async void OnDrop(object? sender, DragEventArgs e)
@@ -287,6 +307,9 @@ public partial class MainWindow : Window, IDialogs
         resources["SynDomainBrush"] = new SolidColorBrush(Color.Parse(lightFill ? "#2E7D32" : "#6FC06F"));
         resources["SynKeyBrush"]    = new SolidColorBrush(Color.Parse(lightFill ? "#6A3FA0" : "#B08BE0"));
         resources["SynNumBrush"]    = new SolidColorBrush(Color.Parse(lightFill ? "#B26A00" : "#E0A040"));
+        // Elevation shadow for the floating bottom cluster: dark themes need a much heavier
+        // shadow to register against an already-dark page; light themes a soft grey one.
+        resources["FloatShadow"] = BoxShadows.Parse(lightFill ? "0 3 14 0 #40000000" : "0 5 22 0 #B0000000");
         // Menus/popups need an opaque backing (cards may be translucent overlays under "auto").
         var menuBg = t.Surface is not null
             ? Color.Parse(t.Surface)
@@ -448,9 +471,25 @@ public partial class MainWindow : Window, IDialogs
                  + region.Padding.Top + region.Padding.Bottom
                  + region.BorderThickness.Top + region.BorderThickness.Bottom;
         }
+        // The vertical margins ride the height animation (closed = zero footprint, open = 8px
+        // gaps), so the open drawer always hugs the bar and a closed one leaves no dead space.
+        var m0 = region.Margin.Top;
+        double m1 = open ? 8 : 0;
         TunnelCard.Tween(from, to, Motion.SlowMs,
-            v => { if (cur() == gen) region.Height = v; },
-            () => { if (cur() == gen && open) region.Height = double.NaN; });
+            v =>
+            {
+                if (cur() != gen) return;
+                region.Height = v;
+                var f = Math.Abs(to - from) < 0.5 ? 1 : Math.Clamp((v - from) / (to - from), 0, 1);
+                var m = m0 + (m1 - m0) * f;
+                region.Margin = new Thickness(14, m, 14, m);
+            },
+            () =>
+            {
+                if (cur() != gen) return;
+                if (open) region.Height = double.NaN;
+                region.Margin = new Thickness(14, m1, 14, m1);
+            });
     }
 
     // (Re)build the two columns. General = toggles with side effects; Appearance = inline pickers.
@@ -490,8 +529,6 @@ public partial class MainWindow : Window, IDialogs
         AppearanceList.Children.Add(AccentGroup());
         AppearanceList.Children.Add(FontGroup());
         AppearanceList.Children.Add(PickerGroup(System.Array.ConvertAll(ZoomSteps, s => s.Name), _zoomIndex, SelectZoom));
-
-        RefreshSettingsSummary();
     }
 
     // "label [ switch ]" row: a pill switch (shared look with the connect toggle) flushed right.
@@ -505,7 +542,7 @@ public partial class MainWindow : Window, IDialogs
         Grid.SetColumn(tb, 0);
         var sw = new ToggleButton { IsChecked = get(), VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right };
         sw.Classes.Add("pill");
-        sw.Click += (_, _) => { set(sw.IsChecked == true); RefreshSettingsSummary(); };
+        sw.Click += (_, _) => set(sw.IsChecked == true);
         Grid.SetColumn(sw, 1);
         grid.Children.Add(tb);
         grid.Children.Add(sw);
@@ -634,20 +671,7 @@ public partial class MainWindow : Window, IDialogs
         return row;
     }
 
-    // Collapsed-bar summary: how many of the five toggles are on, plus the current theme.
-    void RefreshSettingsSummary()
-    {
-        if (DataContext is not MainViewModel sv) return;
-        int n = 0;
-        if (sv.HasCustomDns) n++;
-        if (sv.Prefs.StartOnBoot) n++;
-        if (sv.Prefs.SkipUacLaunch) n++;
-        if (sv.Prefs.Notifications) n++;
-        if (sv.Prefs.CheckUpdates) n++;
-        SettingsSummary.Text = $"·  {n} on  ·  {Palettes[_themeIndex].Name}";
-    }
-
-    void SelectTheme(int i) { _themeIndex = i; ApplyTheme(); Persist(p => p.Theme = Palettes[i].Name); RefreshSettingsSummary(); }
+    void SelectTheme(int i) { _themeIndex = i; ApplyTheme(); Persist(p => p.Theme = Palettes[i].Name); }
     void SelectAccent(int i) { _accentIndex = i; ApplyAccent(); Persist(p => p.Accent = AccentSteps[i].Name); }
     void SelectFont(int i) { _fontIndex = i; ApplyFont(); Persist(p => p.Font = FontSteps[i].Name); }
     void SelectZoom(int i) { _zoomIndex = i; ApplyZoom(); Persist(p => p.Zoom = ZoomSteps[i].Name); }

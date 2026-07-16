@@ -403,10 +403,10 @@
        open — a closed (zero-height) region must paint nothing at all. -->
   <Style Selector="Border.float">
     <Setter Property="ClipToBounds" Value="False" />
-    <Setter Property="BoxShadow" Value="0 3 16 0 #55000000" />
+    <Setter Property="BoxShadow" Value="{DynamicResource FloatShadow}" />
   </Style>
   <Style Selector="Border.drawer.open">
-    <Setter Property="BoxShadow" Value="0 3 16 0 #55000000" />
+    <Setter Property="BoxShadow" Value="{DynamicResource FloatShadow}" />
   </Style>
   <!-- Collapsed cards are click-to-expand; a slightly stronger border on hover signals it
        (rides the card's BorderBrush transition). Editing cards keep their accent ring. -->
