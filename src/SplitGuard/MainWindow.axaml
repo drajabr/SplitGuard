@@ -43,79 +43,14 @@
       </StackPanel>
     </Border>
 
-    <!-- Bottom bar: Settings expander (left) + Add (right), one card at the page bottom. Same
-         side inset (14) and radius (card = 11) as the tunnel cards so it lines up with them. -->
-    <Border DockPanel.Dock="Bottom" Classes="card" Background="{DynamicResource MenuSurfaceBrush}"
-            Margin="14,0,14,12" Padding="5">
-      <Grid ColumnDefinitions="*,Auto,Auto">
-        <Button Grid.Column="0" Name="SettingsToggle" Classes="hdr" Click="OnSettingsToggleClick"
-                HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="8,6">
-          <DockPanel>
-            <TextBlock DockPanel.Dock="Right" Name="SettingsChevron" Classes="glyph" Text="&#xE70E;"
-                       FontSize="{DynamicResource Fs12}" Opacity="0.6" VerticalAlignment="Center" />
-            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-              <TextBlock Classes="glyph accentfg" Text="&#xE713;" FontSize="{DynamicResource Fs14}" />
-              <TextBlock Text="Settings" Classes="setlabel" />
-              <TextBlock Name="SettingsSummary" Classes="muted" />
-            </StackPanel>
-          </DockPanel>
-        </Button>
-        <Border Grid.Column="1" Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,5" />
-        <Button Grid.Column="2" Name="AddToggle" Classes="hdr" Padding="12,6" Click="OnAddToggleClick" ToolTip.Tip="Add a tunnel">
-          <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
-            <TextBlock Classes="glyph accentfg" Text="&#xE710;" FontSize="{DynamicResource Fs14}" />
-            <TextBlock Text="Add" Classes="setlabel" />
-            <TextBlock Name="AddChevron" Classes="glyph" Text="&#xE70E;" FontSize="{DynamicResource Fs12}" Opacity="0.6" VerticalAlignment="Center" />
-          </StackPanel>
-        </Button>
-      </Grid>
-    </Border>
-
-    <!-- Expandable settings panel, docked just above the bottom bar so it grows upward over the
-         list. Its Height is animated 0 <-> content by the code-behind (same tween as the cards);
-         collapsed it clips to nothing. -->
-    <Border DockPanel.Dock="Bottom" Name="SettingsRegion" ClipToBounds="True"
-            Background="{DynamicResource MenuSurfaceBrush}" BorderBrush="{DynamicResource HairlineBrush}"
-            BorderThickness="1" CornerRadius="11" Margin="14,8,14,8" Padding="12,8" Height="0">
-      <Grid Name="SettingsCard" ColumnDefinitions="1.3*,Auto,1*">
-        <StackPanel Grid.Column="0" Name="GeneralList" Spacing="1" VerticalAlignment="Center" />
-        <Border Grid.Column="1" Width="1" Background="{DynamicResource SeparatorBrush}" Margin="14,0" />
-        <StackPanel Grid.Column="2" Name="AppearanceList" Spacing="9" VerticalAlignment="Center" />
-      </Grid>
-    </Border>
-
-    <!-- Expandable Add drawer, mirroring the settings panel: grows upward over the list. Each row
-         is an action with its keyboard shortcut flushed right, like a menu accelerator. -->
-    <Border DockPanel.Dock="Bottom" Name="AddRegion" ClipToBounds="True"
-            Background="{DynamicResource MenuSurfaceBrush}" BorderBrush="{DynamicResource HairlineBrush}"
-            BorderThickness="1" CornerRadius="11" Margin="14,8,14,8" Padding="6" Height="0">
-        <StackPanel Name="AddCard" Spacing="1">
-          <Button Classes="actionrow" Click="OnImportClick">
-            <DockPanel>
-              <TextBlock DockPanel.Dock="Right" Classes="muted" Text="Ctrl+O" VerticalAlignment="Center" />
-              <TextBlock Text="Import configuration…" Classes="setlabel" />
-            </DockPanel>
-          </Button>
-          <Button Classes="actionrow" Click="OnNewTunnelClick">
-            <DockPanel>
-              <TextBlock DockPanel.Dock="Right" Classes="muted" Text="Ctrl+N" VerticalAlignment="Center" />
-              <TextBlock Text="New empty tunnel" Classes="setlabel" />
-            </DockPanel>
-          </Button>
-          <Button Classes="actionrow" Click="OnRescanClick">
-            <DockPanel>
-              <TextBlock Text="Rescan external tunnels" Classes="setlabel" />
-            </DockPanel>
-          </Button>
-        </StackPanel>
-    </Border>
-
-    <!-- The list area is a Panel so overlays (drop-target highlight, toasts) can float over
-         the scroll content. ClipToBounds so a full list's content can never bleed down over the
-         bottom drawers (the Panel is the fill child, drawn on top of the docked drawers). -->
+    <!-- Everything below the title is one layered Panel: the list scrolls the FULL height, and
+         the bottom cluster (Add drawer, Settings drawer, bottom bar) floats on top of it with a
+         shadow — content visibly slides underneath instead of being clipped dead against it. -->
     <Panel ClipToBounds="True">
       <ScrollViewer Name="MainScroll" Focusable="True" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Hidden">
-        <StackPanel Margin="14,8,14,12">
+        <!-- Bottom margin reserves the floating bar's footprint so the last card can scroll
+             fully clear of it. -->
+        <StackPanel Margin="14,8,14,70">
           <ItemsControl ItemsSource="{Binding Tunnels}">
             <ItemsControl.ItemTemplate>
               <DataTemplate>
@@ -128,9 +63,9 @@
 
       <!-- Empty state: an inviting dashed dropzone instead of a wall of text. -->
       <Rectangle Classes="dropzone" IsVisible="{Binding !Tunnels.Count}"
-                 Margin="14,8,14,12" IsHitTestVisible="False" />
+                 Margin="14,8,14,70" IsHitTestVisible="False" />
       <StackPanel IsVisible="{Binding !Tunnels.Count}" VerticalAlignment="Center"
-                  HorizontalAlignment="Center" Spacing="10" Margin="40,0">
+                  HorizontalAlignment="Center" Spacing="10" Margin="40,0,40,58">
         <TextBlock Classes="glyph" Text="&#xE8B5;" FontSize="34" Opacity="0.35" HorizontalAlignment="Center" />
         <TextBlock FontSize="{DynamicResource Fs14}" HorizontalAlignment="Center"
                    Text="Drop a WireGuard .conf here" />
@@ -141,7 +76,7 @@
       </StackPanel>
 
       <!-- Drag-over feedback: shown while a .conf hovers anywhere over the window. -->
-      <Panel Name="DropOverlay" IsVisible="False" IsHitTestVisible="False" Margin="14,8,14,12">
+      <Panel Name="DropOverlay" IsVisible="False" IsHitTestVisible="False" Margin="14,8,14,70">
         <Rectangle Classes="dropzone active" />
         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="8">
           <TextBlock Classes="glyph accentfg" Text="&#xE896;" FontSize="30" HorizontalAlignment="Center" />
@@ -149,11 +84,85 @@
         </StackPanel>
       </Panel>
 
-      <!-- Transient toast (connect errors / failover): floats bottom-right over the list,
+      <!-- Floating bottom cluster. Drawers grow upward (bottom-anchored stack); their Height is
+           animated 0 <-> content by the code-behind. Clipping lives on an INNER panel so the
+           Border itself can round its background and cast a shadow without clipping either. -->
+      <StackPanel VerticalAlignment="Bottom">
+        <!-- Expandable Add drawer: each row is an action with its keyboard shortcut flushed
+             right, like a menu accelerator. -->
+        <Border Name="AddRegion" Classes="drawer"
+                Background="{DynamicResource MenuSurfaceBrush}" BorderBrush="{DynamicResource HairlineBrush}"
+                BorderThickness="1" CornerRadius="11" Margin="14,8,14,8" Height="0">
+          <Panel ClipToBounds="True">
+            <StackPanel Name="AddCard" Spacing="1" Margin="6" VerticalAlignment="Bottom">
+              <Button Classes="actionrow" Click="OnImportClick">
+                <DockPanel>
+                  <TextBlock DockPanel.Dock="Right" Classes="muted" Text="Ctrl+O" VerticalAlignment="Center" />
+                  <TextBlock Text="Import configuration…" Classes="setlabel" />
+                </DockPanel>
+              </Button>
+              <Button Classes="actionrow" Click="OnNewTunnelClick">
+                <DockPanel>
+                  <TextBlock DockPanel.Dock="Right" Classes="muted" Text="Ctrl+N" VerticalAlignment="Center" />
+                  <TextBlock Text="New empty tunnel" Classes="setlabel" />
+                </DockPanel>
+              </Button>
+              <Button Classes="actionrow" Click="OnRescanClick">
+                <DockPanel>
+                  <TextBlock Text="Rescan external tunnels" Classes="setlabel" />
+                </DockPanel>
+              </Button>
+            </StackPanel>
+          </Panel>
+        </Border>
+
+        <!-- Expandable settings panel, same mechanism. -->
+        <Border Name="SettingsRegion" Classes="drawer"
+                Background="{DynamicResource MenuSurfaceBrush}" BorderBrush="{DynamicResource HairlineBrush}"
+                BorderThickness="1" CornerRadius="11" Margin="14,8,14,8" Height="0">
+          <Panel ClipToBounds="True">
+            <Grid Name="SettingsCard" ColumnDefinitions="1.3*,Auto,1*" Margin="12,8" VerticalAlignment="Bottom">
+              <StackPanel Grid.Column="0" Name="GeneralList" Spacing="1" VerticalAlignment="Center" />
+              <Border Grid.Column="1" Width="1" Background="{DynamicResource SeparatorBrush}" Margin="14,0" />
+              <StackPanel Grid.Column="2" Name="AppearanceList" Spacing="9" VerticalAlignment="Center" />
+            </Grid>
+          </Panel>
+        </Border>
+
+        <!-- Bottom bar: Settings expander (left) + Add (right). Same side inset (14) and radius
+             (card = 11) as the tunnel cards so it lines up with them. -->
+        <Border Classes="card float" Background="{DynamicResource MenuSurfaceBrush}"
+                Margin="14,0,14,12" Padding="5">
+          <Grid ColumnDefinitions="*,Auto,Auto">
+            <Button Grid.Column="0" Name="SettingsToggle" Classes="hdr" Click="OnSettingsToggleClick"
+                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="8,6">
+              <DockPanel>
+                <TextBlock DockPanel.Dock="Right" Name="SettingsChevron" Classes="glyph" Text="&#xE70E;"
+                           FontSize="{DynamicResource Fs12}" Opacity="0.6" VerticalAlignment="Center" />
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                  <TextBlock Classes="glyph accentfg" Text="&#xE713;" FontSize="{DynamicResource Fs14}" />
+                  <TextBlock Text="Settings" Classes="setlabel" />
+                  <TextBlock Name="SettingsSummary" Classes="muted" />
+                </StackPanel>
+              </DockPanel>
+            </Button>
+            <Border Grid.Column="1" Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,5" />
+            <Button Grid.Column="2" Name="AddToggle" Classes="hdr" Padding="12,6" Click="OnAddToggleClick" ToolTip.Tip="Add a tunnel">
+              <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+                <TextBlock Classes="glyph accentfg" Text="&#xE710;" FontSize="{DynamicResource Fs14}" />
+                <TextBlock Text="Add" Classes="setlabel" />
+                <TextBlock Name="AddChevron" Classes="glyph" Text="&#xE70E;" FontSize="{DynamicResource Fs12}" Opacity="0.6" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+          </Grid>
+        </Border>
+      </StackPanel>
+
+      <!-- Transient toast (connect errors / failover): floats bottom-right above the bar,
            slides+fades via the .shown class, auto-clears after a few seconds (VM timer),
            click dismisses immediately. -->
       <Border Classes="toast" Classes.shown="{Binding HasStatus}" IsHitTestVisible="{Binding HasStatus}"
-              HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="14,0,14,10"
+              HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="14,0,14,70"
               MaxWidth="380" PointerPressed="OnToastPressed">
         <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap"
                    Classes="oktext" Classes.errtext="{Binding !StatusOk}" />

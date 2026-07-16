@@ -397,6 +397,17 @@
   <Style Selector="Border.card.editing">
     <Setter Property="BorderBrush" Value="{DynamicResource AccentDimBrush}" />
   </Style>
+  <!-- Floating bottom cluster: an elevated layer the list scrolls beneath. The shadow is what
+       sells the elevation; ClipToBounds must stay off or it would swallow the shadow (clipping
+       for the drawers lives on an inner panel instead). Drawers only wear the shadow while
+       open — a closed (zero-height) region must paint nothing at all. -->
+  <Style Selector="Border.float">
+    <Setter Property="ClipToBounds" Value="False" />
+    <Setter Property="BoxShadow" Value="0 3 16 0 #55000000" />
+  </Style>
+  <Style Selector="Border.drawer.open">
+    <Setter Property="BoxShadow" Value="0 3 16 0 #55000000" />
+  </Style>
   <!-- Collapsed cards are click-to-expand; a slightly stronger border on hover signals it
        (rides the card's BorderBrush transition). Editing cards keep their accent ring. -->
   <Style Selector="Border.card:not(.editing):pointerover">

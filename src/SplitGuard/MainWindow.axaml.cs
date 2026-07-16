@@ -423,6 +423,9 @@ public partial class MainWindow : Window, IDialogs
     {
         _openDrawer = which;
         if (which == Drawer.Settings) BuildSettingsPanel();
+        // ".open" wears the floating shadow — a closed (zero-height) region must paint nothing.
+        SettingsRegion.Classes.Set("open", which == Drawer.Settings);
+        AddRegion.Classes.Set("open", which == Drawer.Add);
         AnimateRegion(SettingsRegion, SettingsCard, SettingsChevron, which == Drawer.Settings, ++_setGen, () => _setGen);
         AnimateRegion(AddRegion, AddCard, AddChevron, which == Drawer.Add, ++_addGen, () => _addGen);
     }
@@ -439,8 +442,8 @@ public partial class MainWindow : Window, IDialogs
             var w = region.Bounds.Width;
             if (w < 1) w = Bounds.Width;
             card.Measure(new Size(w, double.PositiveInfinity));
-            // The region is now itself the rounded card, so its natural height is the inner
-            // content plus the region's own padding + border.
+            // The region is the rounded card; its natural height is the inner content (whose
+            // Margin is the card's inset, included in DesiredSize) plus the region's border.
             to = card.DesiredSize.Height
                  + region.Padding.Top + region.Padding.Bottom
                  + region.BorderThickness.Top + region.BorderThickness.Bottom;
