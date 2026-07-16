@@ -30,7 +30,7 @@ public partial class MainWindow : Window, IDialogs
     {
         new("auto",     ThemeVariant.Default, null,      null,      null,      0.68, 0x45, 0x40),
         new("white",    ThemeVariant.Light,  "#FFFFFF", "#FFFFFF", "#EEECE6", 0.60, 0x42, 0x3E),
-        new("light",    ThemeVariant.Light,  "#E8E6DF", "#F6F4EF", "#DEDCD4", 0.62, 0x48, 0x42),
+        new("light",    ThemeVariant.Light,  "#DEDBD2", "#ECE9E2", "#D3D0C6", 0.62, 0x48, 0x42),
         new("graphite", ThemeVariant.Dark,   "#24272B", "#2E3339", "#1F2226", 0.70, 0x4A, 0x48),
         new("black",    ThemeVariant.Dark,   "#000000", "#141619", "#0C0D0F", 0.72, 0x56, 0x54),
     };
@@ -286,6 +286,15 @@ public partial class MainWindow : Window, IDialogs
     void ApplyTheme()
     {
         var t = Palettes[_themeIndex];
+        // "auto" is not its own palette — it simply IS the white palette when the OS is light and
+        // the black palette when the OS is dark. Resolve to that concrete palette here, keeping
+        // Variant=Default so RequestedThemeVariant follows the OS and ActualThemeVariantChanged
+        // keeps re-running this on a light/dark flip.
+        if (t.Variant == ThemeVariant.Default)
+        {
+            var osLight = ActualThemeVariant == ThemeVariant.Light;
+            t = Palettes.First(p => p.Name == (osLight ? "white" : "black")) with { Variant = ThemeVariant.Default };
+        }
         var resources = Avalonia.Application.Current!.Resources;
         Avalonia.Application.Current!.RequestedThemeVariant = t.Variant;
 
@@ -310,12 +319,13 @@ public partial class MainWindow : Window, IDialogs
         resources["SynDomainBrush"] = new SolidColorBrush(Color.Parse(lightFill ? "#2E7D32" : "#6FC06F"));
         resources["SynKeyBrush"]    = new SolidColorBrush(Color.Parse(lightFill ? "#6A3FA0" : "#B08BE0"));
         resources["SynNumBrush"]    = new SolidColorBrush(Color.Parse(lightFill ? "#B26A00" : "#E0A040"));
-        // Elevation shadow for the floating bottom cluster: dark themes need a much heavier
-        // shadow to register against an already-dark page; light themes a soft grey one.
-        resources["FloatShadow"] = BoxShadows.Parse(lightFill ? "0 3 14 0 #40000000" : "0 5 22 0 #B0000000");
-        // Subtler version for the stacked tunnel/peer cards — enough to lift them off the page
-        // like the settings panel without turning a list of them into noise.
-        resources["CardShadow"] = BoxShadows.Parse(lightFill ? "0 2 8 0 #1F000000" : "0 3 12 0 #66000000");
+        // One elevation shadow shared by every floating surface — the bottom bar, the Settings/Add
+        // drawers, and the tunnel + peer cards — so they all read as the same layer. Dark themes
+        // need a heavy shadow to register at all (a card sits on the darkest element, the page, so
+        // a faint one is invisible dark-on-dark); light themes a soft grey one.
+        var shadow = BoxShadows.Parse(lightFill ? "0 3 14 0 #38000000" : "0 4 20 0 #A6000000");
+        resources["FloatShadow"] = shadow;
+        resources["CardShadow"] = shadow;
         // Menus/popups need an opaque backing (cards may be translucent overlays under "auto").
         var menuBg = t.Surface is not null
             ? Color.Parse(t.Surface)

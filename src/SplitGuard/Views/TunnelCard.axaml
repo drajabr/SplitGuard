@@ -9,10 +9,6 @@
     <StackPanel>
       <DockPanel Name="HeaderRow" Background="Transparent" Margin="12,5" Height="{DynamicResource HeaderH}">
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-          <!-- Rolling total-throughput sparkline; points are rebuilt each stats tick. -->
-          <Polyline Name="Spark" Width="56" Height="14" Stroke="{DynamicResource AccentBrush}"
-                    StrokeThickness="1.3" Opacity="0.55" VerticalAlignment="Center"
-                    StrokeJoin="Round" StrokeLineCap="Round" IsVisible="False" />
           <StackPanel Orientation="Horizontal" Spacing="3" IsVisible="{Binding StatsVisible}">
             <TextBlock Classes="glyph accentfg" Text="&#xE74A;" FontSize="{DynamicResource Fs11}" />
             <TextBlock Classes="mono" Text="{Binding UpRate}" Opacity="0.75" />

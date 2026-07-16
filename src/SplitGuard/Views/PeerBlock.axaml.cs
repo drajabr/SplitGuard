@@ -76,14 +76,24 @@ public partial class PeerBlock : UserControl
 
         if (expand)
         {
+            // Compute the TRUE target height before animating, by forcing a real layout pass with
+            // the body at auto height — not a manual Measure at a guessed width. A manual measure
+            // could mis-wrap a row or miss the trailing "Remove peer" button (the glitch, which
+            // only showed when peers differed in height); reading the arranged Bounds.Height after
+            // a layout pass is exactly what the final layout will be, so there's no end-snap.
+            PeerBody.Opacity = 0;              // don't flash full-height content during the pass
             PeerBody.IsVisible = true;
-            var w = PeerBody.Bounds.Width;
-            if (w < 1) w = 360;
-            PeerBody.Height = double.NaN;
-            PeerBody.Measure(new Size(w, double.PositiveInfinity));
-            var to = PeerBody.DesiredSize.Height;
+            PeerBody.Height = double.NaN;       // auto -> real natural height at the real width
+            PeerBody.UpdateLayout();
+            var to = PeerBody.Bounds.Height;
+            if (to < 1)                          // layout not settled yet — fall back to a measure
+            {
+                var w = (PeerBody.Parent as Control)?.Bounds.Width ?? this.Bounds.Width;
+                if (w < 1) w = 360;
+                PeerBody.Measure(new Size(w, double.PositiveInfinity));
+                to = PeerBody.DesiredSize.Height;
+            }
             PeerBody.Height = 0;
-            PeerBody.Opacity = 0;
             _shift.Y = RevealShift;
             TunnelCard.Tween(0, to, RevealMs,
                 v =>

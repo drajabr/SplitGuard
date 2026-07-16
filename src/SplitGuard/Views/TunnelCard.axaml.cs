@@ -75,7 +75,6 @@ public partial class TunnelCard : UserControl
                 _vm.RemovalAnimator = PlayRemove;
             }
             BuildDetail();
-            UpdateSpark();
             // Initial state (no animation): show the right content at its natural height.
             var editing = _vm?.IsEditing ?? false;
             ExpandContent.IsVisible = editing;
@@ -211,10 +210,7 @@ public partial class TunnelCard : UserControl
         if (e.PropertyName == nameof(TunnelViewModel.StatsTick))
         {
             if (_vm is { IsEditing: false }) BuildDetail();
-            UpdateSpark();
         }
-        if (e.PropertyName == nameof(TunnelViewModel.StatsVisible))
-            UpdateSpark();
         if (e.PropertyName == nameof(TunnelViewModel.IsEditing) && _vm is not null)
         {
             SwapBody(_vm.IsEditing);
@@ -290,27 +286,6 @@ public partial class TunnelCard : UserControl
         var p = this.TranslatePoint(new Point(0, 0), content);
         if (p is not { } pt) return;
         Tween(sv.Offset.Y, Math.Max(0, pt.Y - 12), AnimMs, v => sv.Offset = new Vector(sv.Offset.X, Math.Max(0, v)));
-    }
-
-    // ---- header sparkline --------------------------------------------------------
-
-    // Redraw the rolling-throughput polyline: samples map left-to-right, y scaled to the
-    // window's own max so the shape always uses the full height (a flat idle line sits at
-    // the bottom). Hidden until there are at least two samples to connect.
-    void UpdateSpark()
-    {
-        var h = _vm?.RateHistory;
-        if (_vm is null || !_vm.StatsVisible || h is null || h.Count < 2)
-        {
-            Spark.IsVisible = false;
-            return;
-        }
-        var max = Math.Max(h.Max(), 1.0);
-        var pts = new global::Avalonia.Points();
-        for (int i = 0; i < h.Count; i++)
-            pts.Add(new Point(i * 56.0 / (TunnelViewModel.SparkCapacity - 1), 13 - h[i] / max * 12));
-        Spark.Points = pts;
-        Spark.IsVisible = true;
     }
 
     // ---- expand/collapse: explicit height animation of a single region ----------
