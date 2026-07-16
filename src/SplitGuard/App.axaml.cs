@@ -140,22 +140,20 @@ public class App : Application
             });
     }
 
-    // The right-hand status column, in characters: the longest name + gap + longest status, so
-    // every status ends flush at the same column. Recomputed in RebuildTrayMenu (a "\t" in an
-    // Avalonia native menu renders as a small tab gap, not a right-aligned accelerator column,
-    // so we pad with spaces ourselves). Proportional-font alignment isn't pixel-perfect but the
-    // statuses read as a right-hand column.
-    int _trayCol = 24;
+    // Two character columns, recomputed in RebuildTrayMenu: the name padded to the widest name
+    // plus a gap (left-aligned), then the status right-aligned in the widest-status column, so
+    // the RTT / handshake numbers all end flush at the right of the menu. (A "\t" in an Avalonia
+    // native menu renders as a small tab gap, not a right-aligned accelerator column, so we pad
+    // with spaces ourselves; proportional-font alignment isn't pixel-perfect but the numbers
+    // read as one right-hand column.)
+    int _trayNameCol = 12;   // longest name + gap (name field, left-aligned)
+    int _trayStatusCol = 6;  // longest status (status field, right-aligned)
 
-    // "office            23 ms" — name left, status flushed to the right column.
+    // "office        23 ms" — name left, status right-aligned in the trailing column.
     // RTT when a healthcheck is running; otherwise the last handshake as "14s";
     // "connecting…" until established; "external" for official-client adapters.
-    string TrayItemText(TunnelViewModel t)
-    {
-        var status = TrayStatus(t);
-        var pad = Math.Max(2, _trayCol - t.Name.Length - status.Length);
-        return t.Name + new string(' ', pad) + status;
-    }
+    string TrayItemText(TunnelViewModel t) =>
+        t.Name.PadRight(_trayNameCol) + TrayStatus(t).PadLeft(_trayStatusCol);
 
     static string TrayStatus(TunnelViewModel t)
     {
@@ -180,11 +178,14 @@ public class App : Application
         if (_tray is null || _vm is null) return;
         var menu = new NativeMenu();
         _trayItems.Clear();
-        // Size the status column to the widest (name + status) so nothing collides and the
-        // statuses right-align to a common trailing column.
+        // Size both columns to the widest name / status so the status column starts past the
+        // longest name (a 6-char gap keeps it clearly a right-hand column, not adjacent text).
         var rows = _vm.Tunnels.Where(t => !t.IsCustom).ToList();
-        _trayCol = rows.Count == 0 ? 24
-            : rows.Max(t => t.Name.Length + TrayStatus(t).Length) + 4;
+        if (rows.Count > 0)
+        {
+            _trayNameCol = rows.Max(t => t.Name.Length) + 6;
+            _trayStatusCol = Math.Max(3, rows.Max(t => TrayStatus(t).Length));
+        }
         foreach (var tunnel in _vm.Tunnels)
         {
             if (tunnel.IsCustom) continue; // the custom DNS card isn't a connection
