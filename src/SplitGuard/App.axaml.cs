@@ -140,23 +140,33 @@ public class App : Application
             });
     }
 
-    // "office        23 ms" (tab-aligned to the right column, like an accelerator).
+    // The right-hand status column, in characters: the longest name + gap + longest status, so
+    // every status ends flush at the same column. Recomputed in RebuildTrayMenu (a "\t" in an
+    // Avalonia native menu renders as a small tab gap, not a right-aligned accelerator column,
+    // so we pad with spaces ourselves). Proportional-font alignment isn't pixel-perfect but the
+    // statuses read as a right-hand column.
+    int _trayCol = 24;
+
+    // "office            23 ms" — name left, status flushed to the right column.
     // RTT when a healthcheck is running; otherwise the last handshake as "14s";
     // "connecting…" until established; "external" for official-client adapters.
-    static string TrayItemText(TunnelViewModel t)
+    string TrayItemText(TunnelViewModel t)
     {
-        string status;
-        if (t.IsExternal) status = t.IsConnected ? "external · up" : "external";
-        else if (t.IsCustom) status = t.IsConnected ? "active" : "off";
-        else if (!t.IsConnected) status = "off";
-        else if (!t.IsEstablished) status = "connecting…";
-        else
-        {
-            var rtt = t.Peers.Select(p => p.PingText).FirstOrDefault(s => !string.IsNullOrEmpty(s));
-            status = !string.IsNullOrEmpty(rtt) ? rtt : ShortAgo(t.Peers.Select(p => p.HandshakeText)
-                .FirstOrDefault(s => !string.IsNullOrEmpty(s)) ?? "");
-        }
-        return $"{t.Name}\t{status}";
+        var status = TrayStatus(t);
+        var pad = Math.Max(2, _trayCol - t.Name.Length - status.Length);
+        return t.Name + new string(' ', pad) + status;
+    }
+
+    static string TrayStatus(TunnelViewModel t)
+    {
+        if (t.IsExternal) return t.IsConnected ? "external · up" : "external";
+        if (t.IsCustom) return t.IsConnected ? "active" : "off";
+        if (!t.IsConnected) return "off";
+        if (!t.IsEstablished) return "connecting…";
+        // Ping RTT when a healthcheck is enabled/running; otherwise the last handshake as "14s".
+        var rtt = t.Peers.Select(p => p.PingText).FirstOrDefault(s => !string.IsNullOrEmpty(s));
+        return !string.IsNullOrEmpty(rtt) ? rtt : ShortAgo(t.Peers.Select(p => p.HandshakeText)
+            .FirstOrDefault(s => !string.IsNullOrEmpty(s)) ?? "");
     }
 
     // "handshake 14s ago" → "14s" for the tray's terse right column.
@@ -170,6 +180,11 @@ public class App : Application
         if (_tray is null || _vm is null) return;
         var menu = new NativeMenu();
         _trayItems.Clear();
+        // Size the status column to the widest (name + status) so nothing collides and the
+        // statuses right-align to a common trailing column.
+        var rows = _vm.Tunnels.Where(t => !t.IsCustom).ToList();
+        _trayCol = rows.Count == 0 ? 24
+            : rows.Max(t => t.Name.Length + TrayStatus(t).Length) + 4;
         foreach (var tunnel in _vm.Tunnels)
         {
             if (tunnel.IsCustom) continue; // the custom DNS card isn't a connection

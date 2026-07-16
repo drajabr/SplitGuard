@@ -151,9 +151,11 @@
                   <TextBlock Classes="glyph accentfg" Text="&#xE713;" FontSize="{DynamicResource Fs14}" />
                   <TextBlock Text="Settings" Classes="setlabel" />
                 </StackPanel>
-                <!-- Fill child: trims with an ellipsis instead of running under the chevron. -->
-                <TextBlock Classes="muted" Text="startup · notifications · updates · appearance"
-                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="8,0,0,0" />
+                <!-- Fill child: trims with an ellipsis instead of running under the chevron.
+                     Deliberately smaller than the muted default — it's a hint, not a label. -->
+                <TextBlock Classes="muted" Text="Startup · Notifications · Updates · Appearance"
+                           FontSize="{DynamicResource Fs11}" TextTrimming="CharacterEllipsis"
+                           VerticalAlignment="Center" Margin="8,0,0,0" />
               </DockPanel>
             </Button>
             <Border Grid.Column="1" Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,5" />
