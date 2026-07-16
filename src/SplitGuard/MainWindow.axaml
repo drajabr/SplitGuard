@@ -13,13 +13,11 @@
         RenderOptions.TextRenderingMode="SubpixelAntialias"
         DragDrop.AllowDrop="True">
   <DockPanel>
-    <!-- Title strip inside the extended-client title bar. The themed backing Border is
-         hit-test-invisible and the content strip has no background, so empty areas still fall
-         through to the OS caption and drag the window natively; only the update button captures
-         the pointer. The strip's surface color wraps into the view below via the two inverted
-         corners at the top of ListHost. -->
+    <!-- Title strip inside the extended-client title bar. No background of its own — the
+         window's page background shows through, so the strip is the same color as the view.
+         The strip content has no background either, so empty areas still fall through to the
+         OS caption and drag the window natively; only the update button captures the pointer. -->
     <Panel DockPanel.Dock="Top">
-      <Border Background="{DynamicResource MenuSurfaceBrush}" IsHitTestVisible="False" />
       <Border Padding="14,5,146,5">
         <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
           <Image Name="LogoImage" Source="avares://SplitGuard/Assets/app.ico" Width="24" Height="24"
