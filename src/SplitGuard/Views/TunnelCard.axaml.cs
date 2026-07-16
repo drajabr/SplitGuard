@@ -113,6 +113,12 @@ public partial class TunnelCard : UserControl
         CardShell.Opacity = 0;
         AttachedToVisualTree += (_, _) =>
         {
+            // The elevation glow must survive every container between the card and the scroll
+            // viewport (item ContentPresenter, items panel, ItemsPresenter, ItemsControl) — any
+            // of them clipping flattens the card's side glow while the bottom bar's glows free
+            // (its chain has none of these). The viewport itself keeps its clip: stop there.
+            for (var v = this.GetVisualParent(); v is Control c && c is not Avalonia.Controls.Presenters.ScrollContentPresenter; v = v.GetVisualParent())
+                c.ClipToBounds = false;
             if (!_appeared) { _appeared = true; CardShell.Opacity = 1; }
             Dispatcher.UIThread.Post(UpdateAddressLayout, DispatcherPriority.Loaded);
             // First-render reconcile: a freshly attached card's auto-sized body can come

@@ -339,7 +339,7 @@ public partial class MainWindow : Window, IDialogs
         // shadow. Dark themes: a subtle WHITE glow — a black shadow is invisible on an
         // already-dark page. Reach (offset+blur+spread) must stay under the cards' 14px side
         // inset and the 16px stack gap, or the fade gets cut into a hard edge.
-        var shadow = BoxShadows.Parse(lightFill ? "0 1 12 0 #3C000000" : "0 0 12 1 #2CFFFFFF");
+        var shadow = BoxShadows.Parse(lightFill ? "0 1 12 0 #3C000000" : "0 0 12 1 #4AFFFFFF");
         resources["FloatShadow"] = shadow;
         resources["CardShadow"] = shadow;
         // The title strip's cast shadow: an overlay gradient at the top of the view (a real
