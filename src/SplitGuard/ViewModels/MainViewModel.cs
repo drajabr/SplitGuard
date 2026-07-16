@@ -810,6 +810,13 @@ public class MainViewModel : ObservableObject, ITunnelHost
     public int ReorderableCount => Tunnels.Count(t => !t.IsCustom && !t.IsExternal);
 
     // Live reorder step during a drag: move `vm` to `toIndex`, clamped to the user-tunnel band
+    // Force every card to rebuild its collapsed detail (the built pills snapshot brush
+    // instances, so a theme/accent change doesn't recolor them on its own).
+    public void RefreshDetails()
+    {
+        foreach (var t in Tunnels) t.StatsTick++;
+    }
+
     // so it can never jump above the custom/external cards. No persistence — that waits for the
     // drop (SaveTunnelOrder), so a drag that's cancelled leaves the saved order untouched until
     // the pointer is released. Since OrderBy is stable, a later SortTunnels keeps this order.

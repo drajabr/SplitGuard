@@ -412,6 +412,13 @@ public partial class MainWindow : Window, IDialogs
             NotificationService.Register(iconPath);
         }
         catch { }
+
+        // The collapsed-detail pills are BUILT with brush INSTANCES snapshotted from the
+        // resources (BuildDetail can't use DynamicResource for the derived translucent pill
+        // fills), so replacing the resources above doesn't recolor already-built details.
+        // Poke every card to rebuild — otherwise disconnected tunnels (no stats ticks) keep
+        // the previous theme's syntax palette forever.
+        (DataContext as MainViewModel)?.RefreshDetails();
     }
 
     static Color Shade(Color c, double factor) =>
