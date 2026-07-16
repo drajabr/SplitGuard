@@ -1,4 +1,4 @@
-<Styles xmlns="https://github.com/avaloniaui"
+﻿<Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:v="clr-namespace:SplitGuard.Views">
 
@@ -130,7 +130,7 @@
   </Style>
   <Style Selector="ToggleButton.icon:checked /template/ ContentPresenter">
     <Setter Property="Background" Value="Transparent" />
-    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
   </Style>
   <!-- Chip remove (×): a destructive tap target, so give it a real minimum hit size — the
        background stays transparent so the chip's visual density is unchanged. -->
@@ -149,17 +149,17 @@
     <Setter Property="Padding" Value="7,3" />
     <Setter Property="MinHeight" Value="0" />
     <Setter Property="CornerRadius" Value="6" />
-    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
   </Style>
   <!-- Fix the weird link hover: a subtle rounded fill (not Fluent gray) that keeps the
        accent text (Fluent otherwise repaints the ContentPresenter fg on hover). -->
   <Style Selector="Button.link:pointerover /template/ ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource FieldFillHoverBrush}" />
-    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
   </Style>
   <Style Selector="Button.link:pressed /template/ ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource FieldFillBrush}" />
-    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
   </Style>
   <!-- Header action buttons (Add / Settings): subtle, pill-ish. -->
   <Style Selector="Button.hdr">
@@ -528,7 +528,7 @@
     <Setter Property="Opacity" Value="0.45" />
   </Style>
   <Style Selector="TextBlock.pinicon.pinned">
-    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
     <Setter Property="Opacity" Value="1" />
   </Style>
   <!-- Pinned but its tunnel is down: filled pin in the warning color. -->
@@ -551,7 +551,7 @@
   </Style>
 
   <Style Selector="TextBlock.accentfg">
-    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
   </Style>
 
   <!-- Header update button: dim by default, accented + full opacity once an update is ready. -->
@@ -560,7 +560,7 @@
   </Style>
   <Style Selector="TextBlock.updicon.hot">
     <Setter Property="Opacity" Value="1" />
-    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
   </Style>
 
   <Style Selector="TextBlock.synip">

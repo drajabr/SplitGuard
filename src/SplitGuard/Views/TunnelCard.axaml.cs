@@ -451,7 +451,8 @@ public partial class TunnelCard : UserControl
         DetailPanel.Children.Clear();
         if (_vm is null) return;
 
-        IBrush accent = this.TryFindResource("AccentBrush", out var ao) && ao is IBrush ab ? ab : Brushes.LimeGreen;
+        // Detail text is accent-as-TEXT — use the contrast-safe variant (theme-keyed).
+        IBrush accent = this.TryFindResource("AccentTextBrush", out var ao) && ao is IBrush ab ? ab : Brushes.LimeGreen;
         // Theme-aware syntax brushes (fall back to the fixed palette if unset) so IPs/domains keep
         // contrast on light themes instead of washing out.
         IBrush ipBrush = this.TryFindResource("SynIpBrush", out var ipo) && ipo is IBrush ipb ? ipb : Syntax.IpBrush;

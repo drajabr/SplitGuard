@@ -30,8 +30,11 @@ public partial class MainWindow : Window, IDialogs
     {
         new("auto",     ThemeVariant.Default, null,      null,      null,      0.76, 0x45, 0x40),
         new("white",    ThemeVariant.Light,  "#FFFFFF", "#FFFFFF", "#EEECE6", 0.70, 0x42, 0x3E),
-        new("light",    ThemeVariant.Light,  "#DEDBD2", "#ECE9E2", "#D3D0C6", 0.72, 0x48, 0x42),
-        new("graphite", ThemeVariant.Dark,   "#24272B", "#2E3339", "#1F2226", 0.78, 0x4A, 0x48),
+        // Cool neutral greys with a REAL tonal step between page and card (the old warm khaki
+        // sat page and surface ~4 luminance points apart and read muddy): near-white cards on a
+        // grey page (light), clearly-lifted cards on a near-black page (graphite).
+        new("light",    ThemeVariant.Light,  "#E2E4E7", "#F7F8FA", "#E9EBEE", 0.72, 0x4A, 0x44),
+        new("graphite", ThemeVariant.Dark,   "#17191C", "#282C31", "#1E2125", 0.78, 0x52, 0x50),
         new("black",    ThemeVariant.Dark,   "#000000", "#0F1113", "#090A0C", 0.80, 0x56, 0x54),
     };
 
@@ -338,10 +341,12 @@ public partial class MainWindow : Window, IDialogs
         // Syntax palette (IPs, domains, keys, numbers) as a THEME-AWARE global: the fixed mid-tones
         // washed out on the bright themes, so light themes get darker, more saturated variants and
         // dark themes the brighter ones. Consumed by the collapsed detail and the edit-field chips.
-        resources["SynIpBrush"]     = new SolidColorBrush(Color.Parse(lightFill ? "#1F6FB0" : "#57A9E0"));
-        resources["SynDomainBrush"] = new SolidColorBrush(Color.Parse(lightFill ? "#2E7D32" : "#6FC06F"));
+        // Light-theme variants sit clear of WCAG AA (>=4.7:1 on the card surfaces) — the old
+        // amber measured 3.5:1 and the blue/green hovered at the line.
+        resources["SynIpBrush"]     = new SolidColorBrush(Color.Parse(lightFill ? "#1C67A6" : "#57A9E0"));
+        resources["SynDomainBrush"] = new SolidColorBrush(Color.Parse(lightFill ? "#2A7430" : "#6FC06F"));
         resources["SynKeyBrush"]    = new SolidColorBrush(Color.Parse(lightFill ? "#6A3FA0" : "#B08BE0"));
-        resources["SynNumBrush"]    = new SolidColorBrush(Color.Parse(lightFill ? "#B26A00" : "#E0A040"));
+        resources["SynNumBrush"]    = new SolidColorBrush(Color.Parse(lightFill ? "#8F5600" : "#E0A040"));
         // One elevation shadow shared by every floating surface — the bottom bar, the Settings/Add
         // drawers, and the tunnel + peer cards — so they all read as the same layer. Blur-dominant
         // (tiny offset) so the SIDES fade too, not just the bottom. Light themes: a soft grey
@@ -378,14 +383,19 @@ public partial class MainWindow : Window, IDialogs
     // Accent hue: brushes, Fluent's SystemAccent (toggles/focus/selection), and the icon.
     void ApplyAccent()
     {
-        var (_, hex) = AccentSteps[_accentIndex];
+        var (name, hex) = AccentSteps[_accentIndex];
+        var dark = EffectiveVariant() == ThemeVariant.Dark;
         // "mono" = neutral accent that tracks the theme: white on dark, black on light.
         var color = hex.Length > 0
             ? Color.Parse(hex)
-            : (EffectiveVariant() == ThemeVariant.Dark ? Color.Parse("#FFFFFF") : Color.Parse("#1A1A1A"));
+            : (dark ? Color.Parse("#FFFFFF") : Color.Parse("#1A1A1A"));
         var resources = Avalonia.Application.Current!.Resources;
         resources["AccentBrush"] = new SolidColorBrush(color);
         resources["AccentDimBrush"] = new SolidColorBrush(color, 0.4);
+        // Accent as TEXT (names, links, active pills): raw mid-tone hues fail AA on the light
+        // themes, so text gets a per-hue darkened variant there; dark themes keep the raw hue.
+        resources["AccentTextBrush"] = new SolidColorBrush(
+            dark ? color : Color.Parse(Accents.TextOnLight(name)));
         // Text/glyphs on accent fills — mono's white accent needs dark text, not white.
         resources["OnAccentBrush"] = new SolidColorBrush(Accents.On(color));
         // Menu item hover/press = a soft shade of the accent (menu bar + tray menu share the

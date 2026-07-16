@@ -26,7 +26,7 @@
         <Grid VerticalAlignment="Center" ColumnDefinitions="Auto,Auto,*">
           <TextBox Grid.Column="0" MinWidth="60" MaxWidth="240" HorizontalAlignment="Left" VerticalAlignment="Center"
                    FontSize="{DynamicResource Fs17}" FontWeight="Bold"
-                   Foreground="{DynamicResource AccentBrush}" Text="{Binding Name}"
+                   Foreground="{DynamicResource AccentTextBrush}" Text="{Binding Name}"
                    Classes="plainname"
                    IsReadOnly="{Binding !NameEditable}" IsHitTestVisible="{Binding NameEditable}" />
           <Border Grid.Column="1" Background="{DynamicResource ItemBrush}" CornerRadius="4" Padding="6,2" Margin="10,0,0,0"

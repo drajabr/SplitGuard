@@ -1,0 +1,503 @@
+﻿<title>SplitGuard — Design System Spec</title>
+<style>
+  :root{
+    --paper:#ECE9E2; --panel:#E3E0D8; --panel2:#DAD7CD; --ink:#17191B; --muted:#585D54;
+    --line:rgba(23,25,27,.16); --accent:#3DAF7E; --accent-text:#1E7A54;
+    --pass:#1E7A54; --fail:#B04A42; --warn:#8F5600;
+    --mono:"Cascadia Mono",Consolas,ui-monospace,monospace;
+    --sans:"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#1C1F22; --panel:#24272B; --panel2:#2B2F34; --ink:#E8ECEF; --muted:#98A09A;
+      --line:rgba(232,236,239,.14); --accent:#3DAF7E; --accent-text:#4FBE8C;
+      --pass:#4FBE8C; --fail:#E08A82; --warn:#E0A040;
+    }
+  }
+  :root[data-theme="light"]{
+    --paper:#ECE9E2; --panel:#E3E0D8; --panel2:#DAD7CD; --ink:#17191B; --muted:#585D54;
+    --line:rgba(23,25,27,.16); --accent:#3DAF7E; --accent-text:#1E7A54;
+    --pass:#1E7A54; --fail:#B04A42; --warn:#8F5600;
+  }
+  :root[data-theme="dark"]{
+    --paper:#1C1F22; --panel:#24272B; --panel2:#2B2F34; --ink:#E8ECEF; --muted:#98A09A;
+    --line:rgba(232,236,239,.14); --accent:#3DAF7E; --accent-text:#4FBE8C;
+    --pass:#4FBE8C; --fail:#E08A82; --warn:#E0A040;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:var(--sans); font-size:15px; line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1100px; margin:0 auto; padding:48px 28px 96px}
+  .eyebrow{
+    font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted);
+    font-weight:600;
+  }
+  .eyebrow b{color:var(--accent-text); font-weight:600}
+  h1{
+    font-size:clamp(30px,4.6vw,46px); line-height:1.08; font-weight:650; letter-spacing:-.015em;
+    margin:.35em 0 .4em; text-wrap:balance;
+  }
+  .lede{max-width:62ch; color:var(--muted); font-size:16.5px; margin:0 0 8px}
+  h2{
+    font-size:21px; font-weight:650; letter-spacing:-.01em; margin:0 0 4px; text-wrap:balance;
+  }
+  h3{font-size:15px; font-weight:650; margin:22px 0 8px}
+  section{margin-top:72px}
+  .sechead{display:flex; align-items:baseline; gap:14px; border-bottom:1px solid var(--line); padding-bottom:14px; margin-bottom:22px}
+  .secno{font-family:var(--mono); font-size:12px; color:var(--accent-text); font-weight:600; white-space:nowrap}
+  .secsub{color:var(--muted); font-size:13.5px; margin-left:auto; text-align:right; max-width:40ch}
+  p{max-width:70ch}
+  p.note{color:var(--muted); font-size:13.5px; max-width:76ch}
+  code{font-family:var(--mono); font-size:.92em; background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:1px 5px}
+  a{color:var(--accent-text)}
+
+  table{border-collapse:collapse; width:100%; font-size:13.5px}
+  .tablewrap{overflow-x:auto; border:1px solid var(--line); border-radius:8px; background:var(--panel)}
+  th{
+    text-align:left; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted);
+    font-weight:600; padding:10px 14px; border-bottom:1px solid var(--line); white-space:nowrap;
+  }
+  td{padding:9px 14px; border-bottom:1px solid var(--line); vertical-align:middle; font-variant-numeric:tabular-nums}
+  tr:last-child td{border-bottom:none}
+  td.mono, .mono{font-family:var(--mono); font-size:12.5px}
+  td.num{text-align:right; font-family:var(--mono); font-size:12.5px}
+  .sw{display:inline-block; width:15px; height:15px; border-radius:4px; border:1px solid var(--line); vertical-align:-3px; margin-right:8px}
+  .chip{
+    display:inline-block; font-size:11px; font-weight:600; letter-spacing:.04em; border-radius:20px;
+    padding:2px 9px; vertical-align:1px;
+  }
+  .chip.pass{background:color-mix(in srgb,var(--pass) 16%,transparent); color:var(--pass)}
+  .chip.fail{background:color-mix(in srgb,var(--fail) 16%,transparent); color:var(--fail)}
+  .chip.large{background:color-mix(in srgb,var(--warn) 16%,transparent); color:var(--warn)}
+
+  .cols{display:grid; gap:22px}
+  .cols.c2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+  .cols.c3{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:18px 20px;
+  }
+  .card h3{margin-top:0}
+  ul{padding-left:20px; max-width:72ch}
+  li{margin:5px 0}
+  li::marker{color:var(--accent-text)}
+
+  /* ---------- product mocks: fixed palettes on purpose (they render the app, not the page) ---------- */
+  .mockrow{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:18px; margin-top:26px}
+  .mock{
+    --pg:#FFF; --sf:#FFF; --itm:#EEECE6; --fg:#17191B; --hairA:.26; --dimO:.70;
+    --ip:#1F6FB0; --dom:#2E7D32; --elev:0 1px 12px rgba(0,0,0,.24);
+    background:var(--pg); color:var(--fg);
+    border-radius:10px; border:1px solid rgba(128,128,128,.35);
+    padding:12px 12px 10px; font-size:11.5px; line-height:1.35;
+    min-width:0;
+  }
+  .mock .mtitle{display:flex; align-items:center; gap:6px; padding:0 2px 9px; font-weight:600; font-size:12px}
+  .mock .mtitle .logo{width:11px; height:11px; border-radius:50%; background:var(--acc,#3DAF7E); flex:none}
+  .mock .mtitle .ver{opacity:var(--dimO); font-weight:400; font-size:10px; font-family:var(--mono)}
+  .mock .mtitle .caps{margin-left:auto; opacity:var(--dimO); letter-spacing:2px; font-size:10px}
+  .mock .tcard{
+    background:var(--sf); border:1px solid rgba(128,128,128,var(--hairA)); border-radius:8px;
+    padding:9px 11px 10px; box-shadow:var(--elev); margin-bottom:11px;
+  }
+  .mock .thead{display:flex; align-items:center; gap:8px; margin-bottom:7px}
+  .mock .tname{color:var(--acc,#3DAF7E); font-weight:700; font-size:13px; font-family:var(--mono)}
+  .mock .taddr{color:var(--ip); font-family:var(--mono); font-size:10.5px}
+  .mock .knob{
+    margin-left:auto; width:26px; height:14px; border-radius:8px; background:var(--acc,#3DAF7E);
+    position:relative; flex:none;
+  }
+  .mock .knob::after{
+    content:""; position:absolute; right:2px; top:2px; width:10px; height:10px; border-radius:50%;
+    background:#fff;
+  }
+  .mock .prow{display:flex; gap:5px; align-items:center; margin:3px 0; flex-wrap:wrap}
+  .mock .plbl{opacity:var(--dimO); width:38px; flex:none; font-size:10.5px}
+  .mock .pill{
+    font-family:var(--mono); font-size:10px; border-radius:5px; padding:1px 6px;
+    background:color-mix(in srgb,var(--ip) 14%,transparent); color:var(--ip); white-space:nowrap;
+  }
+  .mock .pill.dom{background:color-mix(in srgb,var(--dom) 14%,transparent); color:var(--dom)}
+  .mock .pill.act{background:color-mix(in srgb,var(--acc,#3DAF7E) 16%,transparent); color:var(--acc,#3DAF7E)}
+  .mock .bar{
+    background:var(--sf); border:1px solid rgba(128,128,128,var(--hairA)); border-radius:8px;
+    box-shadow:var(--elev); display:flex; align-items:center; gap:7px; padding:6px 10px; font-size:11px;
+  }
+  .mock .bar .gear{color:var(--acc,#3DAF7E)}
+  .mock .bar .hint{opacity:var(--dimO); font-size:9.5px}
+  .mock .bar .add{margin-left:auto; color:var(--acc,#3DAF7E); font-weight:600}
+  .mock .mfoot{
+    display:flex; justify-content:space-between; margin-top:9px; padding:0 2px;
+    font-family:var(--mono); font-size:9.5px; opacity:var(--dimO);
+  }
+  /* per-theme palettes */
+  .mock.t-white {--pg:#FFFFFF; --sf:#FFFFFF; --itm:#EEECE6; --fg:#17191B; --hairA:.26; --dimO:.70; --ip:#1C67A6; --dom:#2A7430; --elev:0 1px 12px rgba(0,0,0,.24)}
+  .mock.t-light {--pg:#E2E4E7; --sf:#F7F8FA; --itm:#E9EBEE; --fg:#17191B; --hairA:.29; --dimO:.72; --ip:#1C67A6; --dom:#2A7430; --elev:0 1px 12px rgba(0,0,0,.24)}
+  .mock.t-graphite{--pg:#17191C; --sf:#282C31; --itm:#1E2125; --fg:#E8ECEF; --hairA:.32; --dimO:.78; --ip:#57A9E0; --dom:#6FC06F; --elev:0 0 12px 1px rgba(255,255,255,.29)}
+  .mock.t-black {--pg:#000000; --sf:#0F1113; --itm:#090A0C; --fg:#E8ECEF; --hairA:.34; --dimO:.80; --ip:#57A9E0; --dom:#6FC06F; --elev:0 0 12px 1px rgba(255,255,255,.29)}
+
+  /* accent switcher */
+  .accswitch{display:flex; align-items:center; gap:10px; margin-top:18px; flex-wrap:wrap}
+  .accswitch span{font-size:12.5px; color:var(--muted)}
+  .accbtn{
+    width:26px; height:26px; border-radius:7px; border:2px solid transparent; cursor:pointer; padding:0;
+    outline-offset:2px;
+  }
+  .accbtn:focus-visible{outline:2px solid var(--accent-text)}
+  .accbtn[aria-pressed="true"]{border-color:var(--ink)}
+  .accbtn.mono-acc{background:linear-gradient(135deg,#FFFFFF 50%,#111111 50%)}
+
+  .themetokens td:first-child{font-weight:600}
+  .kbd{
+    font-family:var(--mono); font-size:11.5px; border:1px solid var(--line); border-bottom-width:2px;
+    border-radius:5px; padding:1px 6px; background:var(--panel);
+  }
+  .lawlist li{margin:9px 0}
+  .lawlist b{font-weight:650}
+  .footer{margin-top:80px; padding-top:18px; border-top:1px solid var(--line); color:var(--muted); font-size:12.5px}
+  .rec{border-left:3px solid var(--accent); padding-left:16px; margin:14px 0}
+  .rec .rectag{font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--accent-text); font-weight:700}
+  .rec p{margin:4px 0 0}
+  @media (prefers-reduced-motion: no-preference){
+    .mock{transition:transform .16s cubic-bezier(.33,1,.68,1)}
+    .mock:hover{transform:translateY(-2px)}
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow"><b>SplitGuard</b> · design specification · v0.4.11 · 2026-07</div>
+    <h1>One surface language, five grounds.</h1>
+    <p class="lede">
+      Every surface in SplitGuard is the same object — a rounded card floating over a flat page —
+      re-lit by the theme and re-tinted by the accent. This sheet is the contract: the tokens, the
+      effects, the measured accessibility numbers, and the rules that keep it all one system.
+    </p>
+
+    <div class="mockrow" id="heromocks">
+      <div class="mock t-white" aria-label="white theme mock">
+        <div class="mtitle"><span class="logo"></span>SplitGuard <span class="ver">v0.4.11</span><span class="caps">— □ ✕</span></div>
+        <div class="tcard">
+          <div class="thead"><span class="tname">office</span><span class="taddr">10.7.0.2/32</span><span class="knob"></span></div>
+          <div class="prow"><span class="plbl">routes</span><span class="pill act">10.7.0.0/24 · active</span><span class="pill">192.168.10.0/24</span></div>
+          <div class="prow"><span class="plbl">dns</span><span class="pill">10.7.0.1</span><span class="pill dom">*.corp.example</span></div>
+        </div>
+        <div class="bar"><span class="gear">⚙</span>Settings <span class="hint">System · Updates · Appearance</span><span class="add">+ Add</span></div>
+        <div class="mfoot"><span>white</span><span>#FFFFFF</span></div>
+      </div>
+      <div class="mock t-light" aria-label="light theme mock">
+        <div class="mtitle"><span class="logo"></span>SplitGuard <span class="ver">v0.4.11</span><span class="caps">— □ ✕</span></div>
+        <div class="tcard">
+          <div class="thead"><span class="tname">office</span><span class="taddr">10.7.0.2/32</span><span class="knob"></span></div>
+          <div class="prow"><span class="plbl">routes</span><span class="pill act">10.7.0.0/24 · active</span><span class="pill">192.168.10.0/24</span></div>
+          <div class="prow"><span class="plbl">dns</span><span class="pill">10.7.0.1</span><span class="pill dom">*.corp.example</span></div>
+        </div>
+        <div class="bar"><span class="gear">⚙</span>Settings <span class="hint">System · Updates · Appearance</span><span class="add">+ Add</span></div>
+        <div class="mfoot"><span>light</span><span>#E2E4E7</span></div>
+      </div>
+      <div class="mock t-graphite" aria-label="graphite theme mock">
+        <div class="mtitle"><span class="logo"></span>SplitGuard <span class="ver">v0.4.11</span><span class="caps">— □ ✕</span></div>
+        <div class="tcard">
+          <div class="thead"><span class="tname">office</span><span class="taddr">10.7.0.2/32</span><span class="knob"></span></div>
+          <div class="prow"><span class="plbl">routes</span><span class="pill act">10.7.0.0/24 · active</span><span class="pill">192.168.10.0/24</span></div>
+          <div class="prow"><span class="plbl">dns</span><span class="pill">10.7.0.1</span><span class="pill dom">*.corp.example</span></div>
+        </div>
+        <div class="bar"><span class="gear">⚙</span>Settings <span class="hint">System · Updates · Appearance</span><span class="add">+ Add</span></div>
+        <div class="mfoot"><span>graphite</span><span>#17191C</span></div>
+      </div>
+      <div class="mock t-black" aria-label="black theme mock">
+        <div class="mtitle"><span class="logo"></span>SplitGuard <span class="ver">v0.4.11</span><span class="caps">— □ ✕</span></div>
+        <div class="tcard">
+          <div class="thead"><span class="tname">office</span><span class="taddr">10.7.0.2/32</span><span class="knob"></span></div>
+          <div class="prow"><span class="plbl">routes</span><span class="pill act">10.7.0.0/24 · active</span><span class="pill">192.168.10.0/24</span></div>
+          <div class="prow"><span class="plbl">dns</span><span class="pill">10.7.0.1</span><span class="pill dom">*.corp.example</span></div>
+        </div>
+        <div class="bar"><span class="gear">⚙</span>Settings <span class="hint">System · Updates · Appearance</span><span class="add">+ Add</span></div>
+        <div class="mfoot"><span>black</span><span>#000000</span></div>
+      </div>
+    </div>
+
+    <div class="accswitch" role="group" aria-label="accent switcher">
+      <span>Accent (recolors the mocks):</span>
+      <button class="accbtn" style="background:#3DAF7E" data-acc="#3DAF7E" aria-pressed="true" aria-label="green"></button>
+      <button class="accbtn" style="background:#D76D64" data-acc="#D76D64" aria-pressed="false" aria-label="red"></button>
+      <button class="accbtn" style="background:#4A93CF" data-acc="#4A93CF" aria-pressed="false" aria-label="blue"></button>
+      <button class="accbtn" style="background:#8E86C9" data-acc="#8E86C9" aria-pressed="false" aria-label="purple"></button>
+      <button class="accbtn mono-acc" data-acc="mono" aria-pressed="false" aria-label="mono"></button>
+      <span><b>auto</b> theme = <code>white</code> when the OS is light, <code>black</code> when dark. It is not a sixth palette.</span>
+    </div>
+  </header>
+
+  <!-- ================================================================ -->
+  <section>
+    <div class="sechead">
+      <span class="secno">§1</span><h2>Foundations</h2>
+      <span class="secsub">shape, rhythm, type, motion — the parts no theme may change</span>
+    </div>
+    <div class="cols c3">
+      <div class="card">
+        <h3>Shape</h3>
+        <ul>
+          <li><b>8&nbsp;px</b> — every floating surface: tunnel card, peer card, drawers, bottom bar, toast. Matches the Windows 11 window corner, so cards nest inside the frame.</li>
+          <li><b>6&nbsp;px</b> — every control: buttons, fields, chips, pills, segments.</li>
+          <li><b>4&nbsp;px</b> — micro elements: badges, inner swatches.</li>
+          <li>Hairline borders are always <code>1&nbsp;px</code> of mid-grey <code>#808080</code> at a per-theme alpha — never a colored stroke.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Rhythm</h3>
+        <ul>
+          <li><b>14&nbsp;px</b> side inset — the one gutter. Cards, bars, drawers, title content all align to it.</li>
+          <li><b>16&nbsp;px</b> stack gap between cards — must exceed the shadow reach (13&nbsp;px) so fades finish before the next card.</li>
+          <li><b>10&nbsp;px</b> under the title strip; <b>70&nbsp;px</b> reserved above the floating bottom bar.</li>
+          <li>Control height <code>26&nbsp;px</code>; header row <code>38&nbsp;px</code>.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Motion</h3>
+        <ul>
+          <li>One curve — <code>CubicEaseOut</code> — everywhere.</li>
+          <li><b>120&nbsp;ms</b> in-place feedback (hover, focus, fills).</li>
+          <li><b>160&nbsp;ms</b> one control moving (knob slide, border color).</li>
+          <li><b>200&nbsp;ms</b> a region growing/collapsing/revealing (cards, drawers, panes), entering content slides up <b>8&nbsp;px</b> as it fades in.</li>
+          <li>Co-triggered motions share one token so the composite reads as a single event.</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>Type</h3>
+    <div class="tablewrap"><table>
+      <tr><th>Role</th><th>Face</th><th>Notes</th></tr>
+      <tr><td>UI (default)</td><td class="mono">Segoe UI Variable Text → Segoe UI</td><td>User-switchable to Bahnschrift, Georgia, Candara, Cascadia Mono. The picker shows a real "Ag" specimen per face.</td></tr>
+      <tr><td>Data / values</td><td class="mono">Cascadia Mono → Consolas</td><td>IPs, keys, domains, stats, the raw-config editor. Values are data, data is mono.</td></tr>
+      <tr><td>Icons</td><td class="mono">Segoe Fluent Icons → Segoe MDL2 Assets</td><td>Fluent first — MDL2 lacks some Chrome-set glyphs on Win11 installs.</td></tr>
+      <tr><td>Scale</td><td class="mono">9 / 11 / 11.5 / 12 / 12.5 / 13 / 14 / 15 / 17</td><td>All sizes flow through zoom steps 1× / 1.1× / 1.2× / 1.3× — layout metrics scale with the type, no transforms.</td></tr>
+    </table></div>
+  </section>
+
+  <!-- ================================================================ -->
+  <section>
+    <div class="sechead">
+      <span class="secno">§2</span><h2>Themes — four grounds + auto</h2>
+      <span class="secsub">a theme re-lights the surfaces; it never reshapes them</span>
+    </div>
+    <p>
+      Each palette is five values tuned together: the <b>page</b> behind everything, the <b>surface</b> cards
+      are made of, the <b>item</b> fill for chips, the <b>hairline</b> alpha, and the <b>dim</b> opacity for
+      secondary text. The two light themes separate card-from-page by darkening the page; the two dark
+      themes by lightening the card.
+    </p>
+    <div class="tablewrap"><table class="themetokens">
+      <tr><th>Theme</th><th>Page</th><th>Surface</th><th>Item</th><th>Hairline α</th><th>Dim</th><th>Character</th></tr>
+      <tr><td>white</td>
+        <td class="mono"><span class="sw" style="background:#FFFFFF"></span>#FFFFFF</td>
+        <td class="mono"><span class="sw" style="background:#FFFFFF"></span>#FFFFFF</td>
+        <td class="mono"><span class="sw" style="background:#EEECE6"></span>#EEECE6</td>
+        <td class="num">0x42</td><td class="num">0.70</td><td>Crisp gallery white; cards read by border + shadow alone.</td></tr>
+      <tr><td>light</td>
+        <td class="mono"><span class="sw" style="background:#E2E4E7"></span>#E2E4E7</td>
+        <td class="mono"><span class="sw" style="background:#F7F8FA"></span>#F7F8FA</td>
+        <td class="mono"><span class="sw" style="background:#E9EBEE"></span>#E9EBEE</td>
+        <td class="num">0x4A</td><td class="num">0.72</td><td>Cool grey paper; near-white cards lift with a real tonal step.</td></tr>
+      <tr><td>graphite</td>
+        <td class="mono"><span class="sw" style="background:#17191C"></span>#17191C</td>
+        <td class="mono"><span class="sw" style="background:#282C31"></span>#282C31</td>
+        <td class="mono"><span class="sw" style="background:#1E2125"></span>#1E2125</td>
+        <td class="num">0x52</td><td class="num">0.78</td><td>The working dark — near-black page, clearly-lifted cards.</td></tr>
+      <tr><td>black</td>
+        <td class="mono"><span class="sw" style="background:#000000"></span>#000000</td>
+        <td class="mono"><span class="sw" style="background:#0F1113"></span>#0F1113</td>
+        <td class="mono"><span class="sw" style="background:#090A0C"></span>#090A0C</td>
+        <td class="num">0x56</td><td class="num">0.80</td><td>OLED true black; cards are the only light in the room.</td></tr>
+      <tr><td>auto</td><td colspan="5" class="mono">= white (OS light) | black (OS dark)</td><td>Resolves to a real palette — never its own half-theme. Re-resolves live on OS flips.</td></tr>
+    </table></div>
+    <p class="note">
+      Rule: title strip and page share one color (the strip has no surface of its own). Drawers, bars and
+      menus use the surface color (<code>MenuSurfaceBrush</code>), always opaque. Field fills and hovers are
+      mid-grey at theme-keyed alphas, so they work on every ground without per-theme colors.
+    </p>
+  </section>
+
+  <!-- ================================================================ -->
+  <section>
+    <div class="sechead">
+      <span class="secno">§3</span><h2>Elevation &amp; effects</h2>
+      <span class="secsub">light casts shadow · dark emits glow</span>
+    </div>
+    <div class="cols c2">
+      <div class="card">
+        <h3>Light themes — umbra</h3>
+        <p class="mono" style="font-size:13px">box-shadow: 0 1 12 0 #3C000000</p>
+        <p class="note">A black shadow reads naturally on bright paper. Blur-dominant (offset 1) so the
+        <em>sides</em> fade too, not just the bottom.</p>
+      </div>
+      <div class="card">
+        <h3>Dark themes — glow</h3>
+        <p class="mono" style="font-size:13px">box-shadow: 0 0 12 1 #4AFFFFFF</p>
+        <p class="note">A black shadow is invisible on a dark page, so elevation flips polarity: a faint
+        white emission, symmetric (offset 0), with 1&nbsp;px of spread for body.</p>
+      </div>
+    </div>
+    <h3>The three laws of the shadow</h3>
+    <ul class="lawlist">
+      <li><b>One token.</b> Card, peer, drawer, bar and toast share the same shadow. Two strengths = two apparent materials.</li>
+      <li><b>Reach &lt; clearance.</b> Reach = offset+blur+spread = 13&nbsp;px. Side inset is 14, stack gap 16 — the fade always completes. If a container clips (UserControl roots, ItemsControl containers, opacity layers on ancestors), the fade turns into a hard edge: opacity changes go <em>on the shadow-casting element</em>, clipping goes on inner panels.</li>
+      <li><b>Content slides under.</b> Floating surfaces (bottom bar, drawers) let the list scroll beneath them and yield — fading out on overlap, returning on hover. Elevation is the only separator; no full-width seams.</li>
+    </ul>
+  </section>
+
+  <!-- ================================================================ -->
+  <section>
+    <div class="sechead">
+      <span class="secno">§4</span><h2>Accents — four hues + mono</h2>
+      <span class="secsub">the accent is identity, never semantics</span>
+    </div>
+    <p>
+      One accent at a time, chosen by the user, applied everywhere at once: names, toggles, primary buttons,
+      selection rings, the tray icon. Hues are deliberately desaturated — chrome, not alarms. Semantic color
+      (success / warning / danger) is a separate fixed set and never follows the accent.
+    </p>
+    <div class="tablewrap"><table>
+      <tr><th>Accent</th><th>Fill</th><th>Text on light themes</th><th>Text on dark themes</th><th>On-accent ink</th></tr>
+      <tr><td>green (default)</td><td class="mono"><span class="sw" style="background:#3DAF7E"></span>#3DAF7E</td>
+          <td class="mono">#1E7A54 <span class="chip pass">&ge;4.98:1</span></td>
+          <td class="mono">#3DAF7E <span class="chip pass">5.1:1</span></td>
+          <td class="mono">#1A1A1A <span class="chip pass">6.3:1</span></td></tr>
+      <tr><td>red</td><td class="mono"><span class="sw" style="background:#D76D64"></span>#D76D64</td>
+          <td class="mono">#B04A42 <span class="chip pass">&ge;5.06:1</span></td>
+          <td class="mono">#D76D64 <span class="chip large">3.8:1 large</span></td>
+          <td class="mono">#1A1A1A <span class="chip pass">5.2:1</span></td></tr>
+      <tr><td>blue</td><td class="mono"><span class="sw" style="background:#4A93CF"></span>#4A93CF</td>
+          <td class="mono">#2F6E9E <span class="chip pass">&ge;5.14:1</span></td>
+          <td class="mono">#4A93CF <span class="chip large">3.9:1 large</span></td>
+          <td class="mono">#1A1A1A <span class="chip pass">5.3:1</span></td></tr>
+      <tr><td>purple</td><td class="mono"><span class="sw" style="background:#8E86C9"></span>#8E86C9</td>
+          <td class="mono">#5F5799 <span class="chip pass">&ge;5.97:1</span></td>
+          <td class="mono">#8E86C9 <span class="chip large">3.9:1 large</span></td>
+          <td class="mono">#1A1A1A <span class="chip pass">5.3:1</span></td></tr>
+      <tr><td>mono</td><td class="mono">theme-tracking</td>
+          <td class="mono">#1A1A1A</td><td class="mono">#FFFFFF</td>
+          <td class="mono">inverted automatically</td></tr>
+    </table></div>
+
+    <div class="rec">
+      <div class="rectag">Shipped · R1</div>
+      <p>Raw accent hue as <em>text</em> measured 2.75:1 on white — below even the large-text floor. The app
+      now ships theme-keyed <code>AccentTextBrush</code> variants (column two above, all &ge; 4.98:1),
+      exactly like the syntax palette; raw hues remain for fills.</p>
+    </div>
+    <div class="rec">
+      <div class="rectag">Shipped · R2</div>
+      <p>The on-accent ink threshold (luma &gt; 160 → dark ink) leaves the green Save button with white
+      text at <b>2.75:1</b>. The threshold is now 135: green (and any similar mid-tone) gets dark ink at <b>6.3:1</b>; red, blue
+      and purple fills likewise (all &ge; 5.2:1 vs &le; 3.4:1 for white).</p>
+    </div>
+  </section>
+
+  <!-- ================================================================ -->
+  <section>
+    <div class="sechead">
+      <span class="secno">§5</span><h2>Syntax palette</h2>
+      <span class="secsub">values are colored by kind, on every theme</span>
+    </div>
+    <p>
+      IPs, domains, keys and numbers keep one hue-identity across themes — blue, green, violet, amber —
+      with per-polarity variants: deep and saturated on the light grounds, bright on the dark ones. The
+      raw-config editor, the edit chips and the collapsed detail all consume the same four brushes.
+    </p>
+    <div class="tablewrap"><table>
+      <tr><th>Token</th><th>Light themes</th><th>vs surface #F7F8FA</th><th>Dark themes</th><th>vs surface #282C31</th></tr>
+      <tr><td>SynIp</td><td class="mono"><span class="sw" style="background:#1C67A6"></span>#1C67A6</td><td>5.58 <span class="chip pass">AA</span></td>
+          <td class="mono"><span class="sw" style="background:#57A9E0"></span>#57A9E0</td><td>5.46 <span class="chip pass">AA</span></td></tr>
+      <tr><td>SynDomain</td><td class="mono"><span class="sw" style="background:#2A7430"></span>#2A7430</td><td>5.43 <span class="chip pass">AA</span></td>
+          <td class="mono"><span class="sw" style="background:#6FC06F"></span>#6FC06F</td><td>6.32 <span class="chip pass">AA</span></td></tr>
+      <tr><td>SynKey</td><td class="mono"><span class="sw" style="background:#6A3FA0"></span>#6A3FA0</td><td>6.98 <span class="chip pass">AA</span></td>
+          <td class="mono"><span class="sw" style="background:#B08BE0"></span>#B08BE0</td><td>5.09 <span class="chip pass">AA</span></td></tr>
+      <tr><td>SynNum</td><td class="mono"><span class="sw" style="background:#8F5600"></span>#8F5600</td><td>5.65 <span class="chip pass">AA</span></td>
+          <td class="mono"><span class="sw" style="background:#E0A040"></span>#E0A040</td><td>6.20 <span class="chip pass">AA</span></td></tr>
+    </table></div>
+    <div class="rec">
+      <div class="rectag">Shipped · R3</div>
+      <p>Shipped: light-theme amber <code>#8F5600</code> (3.50 → <b>5.65:1</b>), <code>SynIp #1C67A6</code>
+      (5.58) and <code>SynDomain #2A7430</code> (5.43) — every syntax token clears AA with margin on
+      every ground.</p>
+    </div>
+  </section>
+
+  <!-- ================================================================ -->
+  <section>
+    <div class="sechead">
+      <span class="secno">§6</span><h2>Accessibility — measured, not asserted</h2>
+      <span class="secsub">WCAG 2.1 contrast, hit targets, keyboard reach</span>
+    </div>
+    <div class="tablewrap"><table>
+      <tr><th>Pair</th><th>white</th><th>light</th><th>graphite</th><th>black</th></tr>
+      <tr><td>Primary text / surface</td>
+        <td class="num">17.63 <span class="chip pass">AAA</span></td>
+        <td class="num">14.54 <span class="chip pass">AAA</span></td>
+        <td class="num">12.74 <span class="chip pass">AAA</span></td>
+        <td class="num">18.92 <span class="chip pass">AAA</span></td></tr>
+      <tr><td>Dim text (labels, hints) / surface</td>
+        <td class="num">6.50 <span class="chip pass">AA</span></td>
+        <td class="num">6.34 <span class="chip pass">AA</span></td>
+        <td class="num">8.41 <span class="chip pass">AAA</span></td>
+        <td class="num">12.15 <span class="chip pass">AAA</span></td></tr>
+    </table></div>
+    <p class="note">Dim opacities were raised per-theme (0.70–0.80) specifically to clear AA with margin —
+    dim text is a tone, not a squint test.</p>
+
+    <h3>Interaction floor</h3>
+    <ul>
+      <li>Minimum hit target <b>18&nbsp;px</b> on dense inline controls (chip ×), <b>26&nbsp;px</b> standard control height. Destructive micro-buttons carry tooltips.</li>
+      <li>Focus is visible on every focusable control; closed drawers leave the tab order entirely (hidden, not just 0-height).</li>
+      <li>Keyboard: <span class="kbd">Ctrl+N</span> new · <span class="kbd">Ctrl+O</span> import · <span class="kbd">Ctrl+V</span> paste config · <span class="kbd">Ctrl+E</span> raw editor · <span class="kbd">Esc</span> unfocus → close drawer → cancel edit.</li>
+      <li>Motion respects the shared 120–200&nbsp;ms band — nothing loops except the deliberate 1.2&nbsp;s "connecting" pulse.</li>
+    </ul>
+    <div class="rec">
+      <div class="rectag">Recommendation · R4</div>
+      <p>Cards expand only by pointer today. Make the card focusable, map <span class="kbd">Enter</span>/<span class="kbd">Space</span>
+      to expand, and mirror the hover border as a <code>:focus-visible</code> ring — keyboard users can currently
+      close an editor they can never open.</p>
+    </div>
+  </section>
+
+  <!-- ================================================================ -->
+  <section>
+    <div class="sechead">
+      <span class="secno">§7</span><h2>Consistency laws</h2>
+      <span class="secsub">what a reviewer checks before any UI change ships</span>
+    </div>
+    <ul class="lawlist">
+      <li><b>One radius per tier.</b> 8 surface / 6 control / 4 micro. A new value needs a new tier, not an exception.</li>
+      <li><b>One shadow token.</b> Every floating surface shares it; polarity (shadow vs glow) is the theme's job, not the component's.</li>
+      <li><b>One gutter.</b> 14&nbsp;px side inset aligns strip content, cards, drawers, bar and toast.</li>
+      <li><b>One easing, three durations.</b> Nothing animates outside 120/160/200&nbsp;ms CubicEaseOut (+ the connecting pulse).</li>
+      <li><b>Grey does structure, hue does meaning.</b> Borders, fills and hovers are alpha'd mid-grey; color is reserved for accent identity, syntax kinds, and the fixed semantic set.</li>
+      <li><b>Dim is an opacity, not a color.</b> Secondary text = foreground × DimOpacity, so it self-adapts to every ground.</li>
+      <li><b>Themes re-light, accents re-tint, neither reshapes.</b> No layout, size or radius may differ across themes or accents.</li>
+      <li><b>Values are mono.</b> If it's an IP, key, domain, port or rate, it renders in the data face with its syntax color.</li>
+      <li><b>Every icon-only control explains itself</b> — tooltip minimum, label preferred.</li>
+      <li><b>The demo is a sealed room.</b> <code>--ui-demo</code> renders everything and touches nothing.</li>
+    </ul>
+  </section>
+
+  <div class="footer">
+    SplitGuard design specification · measured against v0.4.11 + the contrast overhaul (WCAG 2.1 relative-luminance contrast,
+    computed 2026-07-16) · mocks render the shipped token values verbatim; R1–R3 are shipped, R4 (keyboard card expand) remains open.
+  </div>
+</div>
+
+<script>
+  // Accent switcher: retints the hero mocks; "mono" resolves per mock polarity (like the app).
+  const mocks = document.querySelectorAll('#heromocks .mock');
+  const darkMock = m => m.classList.contains('t-graphite') || m.classList.contains('t-black');
+  document.querySelectorAll('.accbtn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.accbtn').forEach(b => b.setAttribute('aria-pressed', b === btn ? 'true' : 'false'));
+      const v = btn.dataset.acc;
+      mocks.forEach(m => m.style.setProperty('--acc', v === 'mono' ? (darkMock(m) ? '#FFFFFF' : '#1A1A1A') : v));
+    });
+  });
+</script>

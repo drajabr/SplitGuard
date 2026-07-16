@@ -20,7 +20,7 @@
                      Text="{Binding BlockTitle}" IsVisible="{Binding IsDnsOnly}" />
           <TextBox Classes="plainname" MinWidth="60" MaxWidth="220" Text="{Binding Name}" Watermark="Peer"
                    IsVisible="{Binding ShowWgFields}"
-                   Foreground="{DynamicResource AccentBrush}" FontWeight="Bold" FontSize="{DynamicResource Fs17}" VerticalAlignment="Center" />
+                   Foreground="{DynamicResource AccentTextBrush}" FontWeight="Bold" FontSize="{DynamicResource Fs17}" VerticalAlignment="Center" />
           <!-- Failover rank, only while this peer's routes actually overlap another's. -->
           <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center" IsVisible="{Binding MetricEnabled}">
             <TextBlock Classes="lbl" Text="metric" ToolTip.Tip="{Binding MetricRankText}" />
