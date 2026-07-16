@@ -143,19 +143,24 @@
                 Margin="14,0,14,12" Padding="5">
           <Grid ColumnDefinitions="*,Auto,Auto">
             <Button Grid.Column="0" Name="SettingsToggle" Classes="hdr" Click="OnSettingsToggleClick"
-                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="8,6"
-                    ToolTip.Tip="Settings">
+                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="8,6">
               <DockPanel>
                 <TextBlock DockPanel.Dock="Right" Name="SettingsChevron" Classes="glyph" Text="&#xE70E;"
-                           FontSize="{DynamicResource Fs12}" Opacity="0.6" VerticalAlignment="Center" />
-                <TextBlock Classes="glyph accentfg" Text="&#xE713;" FontSize="{DynamicResource Fs14}"
-                           VerticalAlignment="Center" HorizontalAlignment="Left" />
+                           FontSize="{DynamicResource Fs12}" Opacity="0.6" VerticalAlignment="Center" Margin="8,0,0,0" />
+                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                  <TextBlock Classes="glyph accentfg" Text="&#xE713;" FontSize="{DynamicResource Fs14}" />
+                  <TextBlock Text="Settings" Classes="setlabel" />
+                </StackPanel>
+                <!-- Fill child: trims with an ellipsis instead of running under the chevron. -->
+                <TextBlock Classes="muted" Text="startup · notifications · updates · appearance"
+                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="8,0,0,0" />
               </DockPanel>
             </Button>
             <Border Grid.Column="1" Width="1" Background="{DynamicResource SeparatorBrush}" Margin="4,5" />
             <Button Grid.Column="2" Name="AddToggle" Classes="hdr" Padding="12,6" Click="OnAddToggleClick" ToolTip.Tip="Add a tunnel">
               <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
                 <TextBlock Classes="glyph accentfg" Text="&#xE710;" FontSize="{DynamicResource Fs14}" />
+                <TextBlock Text="Add" Classes="setlabel" />
                 <TextBlock Name="AddChevron" Classes="glyph" Text="&#xE70E;" FontSize="{DynamicResource Fs12}" Opacity="0.6" VerticalAlignment="Center" />
               </StackPanel>
             </Button>
