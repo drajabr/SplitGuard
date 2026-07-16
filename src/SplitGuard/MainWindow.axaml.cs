@@ -119,6 +119,11 @@ public partial class MainWindow : Window, IDialogs
         BottomBar.Opacity = op;
         SettingsRegion.Opacity = op;
         AddRegion.Opacity = op;
+        // The toast rides just above the cluster's ACTUAL height (an open drawer grows it far
+        // past the bare bar), so an error toast never covers the drawer's controls.
+        var clearance = Math.Max(70, BottomCluster.Bounds.Height + 8);
+        if (Math.Abs(Toast.Margin.Bottom - clearance) > 0.5)
+            Toast.Margin = new Thickness(14, 0, 14, clearance);
     }
 
     async void OnDrop(object? sender, DragEventArgs e)
@@ -501,6 +506,11 @@ public partial class MainWindow : Window, IDialogs
     void AnimateRegion(Border region, Control card, TextBlock chevron, bool open, int gen, Func<int> cur)
     {
         chevron.Text = open ? "" : ""; // down = click to close; up = opens upward
+        // A closed drawer must leave the tab order entirely — a zero-height region still has
+        // IsVisible children, so Tab would land on invisible toggles and Enter/Space would
+        // activate them (e.g. silently flipping "Start on Windows startup"). Show before the
+        // expand; hide in the collapse finalize below.
+        if (open) region.IsVisible = true;
         var from = region.Bounds.Height;
         double to = 0;
         if (open)
@@ -531,6 +541,7 @@ public partial class MainWindow : Window, IDialogs
             {
                 if (cur() != gen) return;
                 if (open) region.Height = double.NaN;
+                else region.IsVisible = false; // fully out of the tab order once collapsed
                 region.Margin = new Thickness(14, m1, 14, m1);
             });
     }

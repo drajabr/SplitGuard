@@ -334,9 +334,6 @@ public class MainViewModel : ObservableObject, ITunnelHost
             {
                 t.SetConnectedState(true);
                 t.MarkEstablished(); // no real handshake in the demo — don't pulse "connecting"
-                // Fake a plausible throughput wave so the header sparkline renders.
-                for (int k = 0; k < TunnelViewModel.SparkCapacity; k++)
-                    t.PushRateSample(40_000 + 30_000 * Math.Sin(k / 4.0) + (k * 977 % 9000));
                 foreach (var p in t.Peers)
                 {
                     p.HasStats = true;
@@ -421,7 +418,12 @@ public class MainViewModel : ObservableObject, ITunnelHost
 
     // ---- tunnel lifecycle -------------------------------------------------
 
-    public void RequestConnect(TunnelViewModel vm) => _ = Task.Run(() =>
+    public void RequestConnect(TunnelViewModel vm)
+    {
+        // UI-review harness: never create a real adapter/routes from the fake demo tunnels —
+        // pretend the connect succeeded so the toggle stays interactive.
+        if (RuleStore.DemoMode) { vm.MarkEstablished(); return; }
+        _ = Task.Run(() =>
     {
         try
         {
@@ -443,8 +445,12 @@ public class MainViewModel : ObservableObject, ITunnelHost
             });
         }
     });
+    }
 
-    public void RequestDisconnect(TunnelViewModel vm) => _ = Task.Run(() =>
+    public void RequestDisconnect(TunnelViewModel vm)
+    {
+        if (RuleStore.DemoMode) return; // demo: the optimistic UI already flipped the toggle
+        _ = Task.Run(() =>
     {
         try
         {
@@ -464,6 +470,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
             });
         }
     });
+    }
 
     // ---- pin / catch-all --------------------------------------------------
 

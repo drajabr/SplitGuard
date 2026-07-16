@@ -37,12 +37,15 @@
       </Border>
     </Panel>
 
+    <!-- Grid (not a horizontal StackPanel) so the text gets a finite width and actually wraps
+         instead of clipping off the right edge at narrow window widths. -->
     <Border DockPanel.Dock="Top" Background="{DynamicResource WarningBgBrush}" Padding="14,8" IsVisible="{Binding GpoWarning}">
-      <StackPanel Orientation="Horizontal" Spacing="8">
-        <TextBlock Classes="glyph" Foreground="{DynamicResource WarningBrush}" Text="&#xE7BA;" VerticalAlignment="Top" />
-        <TextBlock FontSize="{DynamicResource Fs12}" TextWrapping="Wrap" VerticalAlignment="Center"
+      <Grid ColumnDefinitions="Auto,*">
+        <TextBlock Grid.Column="0" Classes="glyph" Foreground="{DynamicResource WarningBrush}" Text="&#xE7BA;"
+                   VerticalAlignment="Top" Margin="0,2,8,0" />
+        <TextBlock Grid.Column="1" FontSize="{DynamicResource Fs12}" TextWrapping="Wrap" VerticalAlignment="Center"
                    Text="Group Policy DNS rules are active on this machine and override local ones — this tool's rules won't take effect." />
-      </StackPanel>
+      </Grid>
     </Border>
 
     <!-- Everything below the title is one layered Panel: the list scrolls the FULL height, and
@@ -50,8 +53,9 @@
          shadow — content visibly slides underneath instead of being clipped dead against it. -->
     <Panel Name="ListHost" ClipToBounds="True">
       <ScrollViewer Name="MainScroll" Focusable="True" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Hidden">
-        <!-- Top/bottom margins reserve the floating title bar's and bottom bar's footprints so
-             the first/last cards can rest clear of them; scrolling slides cards behind both. -->
+        <!-- Top margin = breathing room under the docked title strip (enough for the first
+             card's glow to fade); the 70px bottom reserves the floating bottom bar's footprint
+             so the last card can scroll fully clear of it. -->
         <StackPanel Margin="14,10,14,70">
           <ItemsControl ItemsSource="{Binding Tunnels}">
             <ItemsControl.ItemTemplate>
@@ -92,18 +96,16 @@
       <!-- Floating bottom cluster. Drawers grow upward (bottom-anchored stack); their Height AND
            vertical margins are animated by the code-behind (closed = zero footprint, so the open
            drawer always sits 8px above the bar). Clipping lives on an INNER panel so the Border
-           itself can round its background and cast a shadow without clipping either. The whole
-           cluster fades out while cards scroll behind it (code-behind), hover brings it back;
-           the transparent background makes the full rect hover-sensitive. -->
-      <!-- The yield-to-content fade targets the three child Borders individually (never this
-           StackPanel): an opacity layer on the parent would clip the children's BoxShadows to
-           the panel's bounds. The transparent background keeps the full rect hover-sensitive. -->
+           itself can round its background and cast a shadow without clipping either. The
+           yield-to-content fade targets the three child Borders individually (never this
+           StackPanel — an opacity layer on the parent would clip the children's BoxShadows);
+           the transparent background keeps the full rect hover-sensitive. -->
       <StackPanel Name="BottomCluster" VerticalAlignment="Bottom" Background="Transparent">
         <!-- Expandable Add drawer: each row is an action with its keyboard shortcut flushed
              right, like a menu accelerator. -->
         <Border Name="AddRegion" Classes="drawer"
                 Background="{DynamicResource MenuSurfaceBrush}" BorderBrush="{DynamicResource HairlineBrush}"
-                BorderThickness="1" CornerRadius="8" Margin="14,0,14,0" Height="0">
+                BorderThickness="1" CornerRadius="8" Margin="14,0,14,0" Height="0" IsVisible="False">
           <Panel ClipToBounds="True">
             <StackPanel Name="AddCard" Spacing="1" Margin="6" VerticalAlignment="Bottom">
               <Button Classes="actionrow" Click="OnImportClick">
@@ -130,7 +132,7 @@
         <!-- Expandable settings panel, same mechanism. -->
         <Border Name="SettingsRegion" Classes="drawer"
                 Background="{DynamicResource MenuSurfaceBrush}" BorderBrush="{DynamicResource HairlineBrush}"
-                BorderThickness="1" CornerRadius="8" Margin="14,0,14,0" Height="0">
+                BorderThickness="1" CornerRadius="8" Margin="14,0,14,0" Height="0" IsVisible="False">
           <Panel ClipToBounds="True">
             <Grid Name="SettingsCard" ColumnDefinitions="1.3*,Auto,1*" Margin="12,8" VerticalAlignment="Bottom">
               <StackPanel Grid.Column="0" Name="GeneralList" Spacing="1" VerticalAlignment="Center" />
@@ -141,7 +143,7 @@
         </Border>
 
         <!-- Bottom bar: Settings expander (left) + Add (right). Same side inset (14) and radius
-             (card = 11) as the tunnel cards so it lines up with them. -->
+             (card = 8) as the tunnel cards so it lines up with them. -->
         <Border Name="BottomBar" Classes="card float" Background="{DynamicResource MenuSurfaceBrush}"
                 Margin="14,0,14,12" Padding="5">
           <Grid ColumnDefinitions="*,Auto,Auto">
@@ -176,7 +178,7 @@
       <!-- Transient toast (connect errors / failover): floats bottom-right above the bar,
            slides+fades via the .shown class, auto-clears after a few seconds (VM timer),
            click dismisses immediately. -->
-      <Border Classes="toast" Classes.shown="{Binding HasStatus}" IsHitTestVisible="{Binding HasStatus}"
+      <Border Name="Toast" Classes="toast" Classes.shown="{Binding HasStatus}" IsHitTestVisible="{Binding HasStatus}"
               HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="14,0,14,70"
               MaxWidth="380" PointerPressed="OnToastPressed">
         <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap"

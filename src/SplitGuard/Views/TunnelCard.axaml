@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:sys="clr-namespace:System;assembly=System.Runtime"
              xmlns:vm="clr-namespace:SplitGuard.ViewModels"
@@ -24,7 +24,7 @@
           </StackPanel>
         </StackPanel>
         <Grid VerticalAlignment="Center" ColumnDefinitions="Auto,Auto,*">
-          <TextBox Grid.Column="0" MinWidth="60" HorizontalAlignment="Left" VerticalAlignment="Center"
+          <TextBox Grid.Column="0" MinWidth="60" MaxWidth="240" HorizontalAlignment="Left" VerticalAlignment="Center"
                    FontSize="{DynamicResource Fs17}" FontWeight="Bold"
                    Foreground="{DynamicResource AccentBrush}" Text="{Binding Name}"
                    Classes="plainname"
@@ -109,7 +109,7 @@
                     <DataTemplate DataType="sys:String">
                       <Border Classes="item" Margin="0,0,6,4">
                         <DockPanel>
-                          <Button Classes="chipx" DockPanel.Dock="Right" VerticalAlignment="Center" Margin="6,0,0,0"
+                          <Button Classes="chipx" ToolTip.Tip="Remove" DockPanel.Dock="Right" VerticalAlignment="Center" Margin="6,0,0,0"
                                   Command="{Binding $parent[ItemsControl].DataContext.RemoveAddressCommand}" CommandParameter="{Binding}">
                             <TextBlock Classes="glyph" Text="&#xE711;" FontSize="{DynamicResource Fs9}" Opacity="0.6" />
                           </Button>

@@ -132,11 +132,15 @@
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
   </Style>
+  <!-- Chip remove (×): a destructive tap target, so give it a real minimum hit size — the
+       background stays transparent so the chip's visual density is unchanged. -->
   <Style Selector="Button.chipx">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />
-    <Setter Property="Padding" Value="1" />
-    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Padding" Value="4" />
+    <Setter Property="MinHeight" Value="18" />
+    <Setter Property="MinWidth" Value="18" />
+    <Setter Property="CornerRadius" Value="4" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
   <Style Selector="Button.link">
@@ -170,18 +174,6 @@
   </Style>
   <Style Selector="Button.hdr:pressed /template/ ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource FieldFillBrush}" />
-  </Style>
-
-  <!-- Floating Add control: centered at the page bottom, borderless, icon over label. -->
-  <Style Selector="Button.addbtn">
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="BorderThickness" Value="0" />
-    <Setter Property="Padding" Value="10,4" />
-    <Setter Property="MinHeight" Value="0" />
-    <Setter Property="CornerRadius" Value="6" />
-  </Style>
-  <Style Selector="Button.addbtn:pointerover /template/ ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource ItemBrush}" />
   </Style>
 
   <!-- Full-width action row in the Add drawer: left-aligned label with its shortcut flushed
@@ -391,6 +383,7 @@
     <!-- No ClipToBounds here: it would swallow the elevation shadow. The animated region
          is clipped by the inner Border.body; the header/footer are inset from the corners. -->
     <Setter Property="BoxShadow" Value="{DynamicResource CardShadow}" />
+    <Setter Property="Cursor" Value="Hand" />
     <Setter Property="Transitions">
       <Transitions>
         <BrushTransition Property="BorderBrush" Duration="{x:Static v:Motion.Base}" Easing="{x:Static v:Motion.Standard}" />
@@ -403,6 +396,7 @@
   </Style>
   <Style Selector="Border.card.editing">
     <Setter Property="BorderBrush" Value="{DynamicResource AccentDimBrush}" />
+    <Setter Property="Cursor" Value="Arrow" />
   </Style>
   <!-- Floating bottom cluster: an elevated layer the list scrolls beneath. The shadow is what
        sells the elevation; ClipToBounds must stay off or it would swallow the shadow (clipping
@@ -434,8 +428,8 @@
     <Setter Property="Stroke" Value="{DynamicResource FieldBorderBrush}" />
     <Setter Property="StrokeThickness" Value="1.5" />
     <Setter Property="StrokeDashArray" Value="4,3" />
-    <Setter Property="RadiusX" Value="11" />
-    <Setter Property="RadiusY" Value="11" />
+    <Setter Property="RadiusX" Value="8" />
+    <Setter Property="RadiusY" Value="8" />
     <Setter Property="Fill" Value="Transparent" />
   </Style>
   <Style Selector="Rectangle.dropzone.active">
@@ -453,25 +447,17 @@
     <Setter Property="Padding" Value="8,3" />
     <Setter Property="MinHeight" Value="{DynamicResource CtrlH}" />
     <Setter Property="VerticalAlignment" Value="Center" />
-  </Style>
-  <Style Selector="Border.item > DockPanel">
-    <Setter Property="VerticalAlignment" Value="Center" />
-  </Style>
-  <Style Selector="Border.item">
     <Setter Property="Transitions">
       <Transitions>
         <BrushTransition Property="Background" Duration="{x:Static v:Motion.Fast}" Easing="{x:Static v:Motion.Standard}" />
       </Transitions>
     </Setter>
   </Style>
+  <Style Selector="Border.item > DockPanel">
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
   <Style Selector="Border.item:pointerover">
     <Setter Property="Background" Value="{DynamicResource FieldFillHoverBrush}" />
-  </Style>
-  <Style Selector="Border.card">
-    <Setter Property="Cursor" Value="Hand" />
-  </Style>
-  <Style Selector="Border.card.editing">
-    <Setter Property="Cursor" Value="Arrow" />
   </Style>
 
   <!-- Single clipped region below the header. Its Height is animated by the code-behind
@@ -549,11 +535,6 @@
   <Style Selector="TextBlock.pinicon.pinned.suspended">
     <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
   </Style>
-  <Style Selector="TextBlock.accent">
-    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
-    <Setter Property="FontSize" Value="{DynamicResource Fs115}" />
-    <Setter Property="VerticalAlignment" Value="Center" />
-  </Style>
   <Style Selector="TextBlock.errtext">
     <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
     <Setter Property="FontSize" Value="{DynamicResource Fs12}" />
@@ -567,20 +548,6 @@
   <Style Selector="TextBlock.oktext">
     <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" />
     <Setter Property="FontSize" Value="{DynamicResource Fs12}" />
-  </Style>
-
-  <Style Selector="Ellipse.dot">
-    <Setter Property="Width" Value="8" />
-    <Setter Property="Height" Value="8" />
-    <Setter Property="Fill" Value="{DynamicResource DotBrush}" />
-    <Setter Property="VerticalAlignment" Value="Center" />
-  </Style>
-  <Style Selector="Ellipse.dot.up">
-    <Setter Property="Fill" Value="{DynamicResource AccentBrush}" />
-  </Style>
-  <!-- Adapter is up but no handshake yet (or it went stale): amber, not green. -->
-  <Style Selector="Ellipse.dot.connecting">
-    <Setter Property="Fill" Value="{DynamicResource WarningBrush}" />
   </Style>
 
   <Style Selector="TextBlock.accentfg">
@@ -625,49 +592,24 @@
     <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
   </Style>
 
-  <Style Selector="ToggleSwitch">
-    <Setter Property="OnContent" Value="{x:Null}" />
-    <Setter Property="OffContent" Value="{x:Null}" />
-    <Setter Property="MinWidth" Value="0" />
-  </Style>
   <Style Selector="Separator">
     <Setter Property="Background" Value="{DynamicResource SeparatorBrush}" />
     <Setter Property="Height" Value="1" />
     <Setter Property="Margin" Value="0" />
   </Style>
 
-  <!-- Menu surfaces, shared by the in-app flyout menus (Add + the logo menu) and, where
-       Avalonia renders it managed, the Windows tray menu. -->
-  <Style Selector="FlyoutPresenter">
-    <Setter Property="Background" Value="{DynamicResource MenuSurfaceBrush}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource HairlineBrush}" />
-    <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="10" />
-    <Setter Property="Padding" Value="5" />
-  </Style>
+  <!-- Menu surfaces: the TextBox context flyout and, where Avalonia renders it managed, the
+       Windows tray menu. -->
   <Style Selector="MenuFlyoutPresenter">
     <Setter Property="Background" Value="{DynamicResource MenuSurfaceBrush}" />
     <Setter Property="BorderBrush" Value="{DynamicResource HairlineBrush}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="8" />
     <Setter Property="Padding" Value="4" />
-    <!-- Small gap so a dropdown doesn't sit flush against its menu-bar title. -->
-    <Setter Property="Margin" Value="0,3,0,0" />
   </Style>
   <Style Selector="MenuItem">
     <Setter Property="MinHeight" Value="{DynamicResource CtrlH}" />
     <Setter Property="Padding" Value="10,5" />
-    <Setter Property="CornerRadius" Value="5" />
-    <Setter Property="FontSize" Value="{DynamicResource Fs12}" />
-  </Style>
-  <!-- Menu bar: a transparent strip in the title bar; top-level titles are compact. -->
-  <Style Selector="Menu">
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="Padding" Value="0" />
-  </Style>
-  <Style Selector="Menu > MenuItem">
-    <Setter Property="MinHeight" Value="0" />
-    <Setter Property="Padding" Value="8,3" />
     <Setter Property="CornerRadius" Value="6" />
     <Setter Property="FontSize" Value="{DynamicResource Fs12}" />
   </Style>

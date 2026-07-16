@@ -259,7 +259,6 @@ public class TunnelViewModel : ObservableObject
     {
         _isEstablished = false;
         _everEstablished = false;
-        RateHistory.Clear(); // the sparkline restarts with the next connection
         // Live readouts are meaningless once the tunnel is down (or reconnecting with
         // fresh counters); clear them so the collapsed view never shows a frozen
         // handshake/RTT/totals as if it were current.
@@ -289,11 +288,9 @@ public class TunnelViewModel : ObservableObject
     void RaiseDotState()
     {
         Raise(nameof(IsEstablished));
-        Raise(nameof(ShowUp));
         Raise(nameof(ShowConnecting));
     }
 
-    public bool ShowUp => IsConnected && IsEstablished;
     public bool ShowConnecting => IsConnected && !IsEstablished;
 
     public bool StatsVisible => IsConnected && !IsExternal && !IsCustom;
@@ -711,7 +708,6 @@ public class TunnelViewModel : ObservableObject
         }
         UpRate = Format.Rate(up);
         DownRate = Format.Rate(down);
-        PushRateSample(up + down);
         if (IsConnected)
             IsEstablished = newest is not null && DateTime.UtcNow - newest < HandshakeFresh;
         // Refresh the collapsed-card detail so its per-peer handshake/RTT stay live.
@@ -721,15 +717,4 @@ public class TunnelViewModel : ObservableObject
     // Bumped every stats poll; the card watches it to rebuild the collapsed detail.
     int _statsTick;
     public int StatsTick { get => _statsTick; set => Set(ref _statsTick, value); }
-
-    // Rolling total-throughput samples (up+down Bps, one per stats poll) for the header
-    // sparkline; the card redraws it on StatsTick.
-    public const int SparkCapacity = 40;
-    public List<double> RateHistory { get; } = new();
-
-    public void PushRateSample(double bps)
-    {
-        RateHistory.Add(bps);
-        if (RateHistory.Count > SparkCapacity) RateHistory.RemoveAt(0);
-    }
 }

@@ -217,6 +217,10 @@ public partial class TunnelCard : UserControl
         }
         if (e.PropertyName == nameof(TunnelViewModel.IsEditing) && _vm is not null)
         {
+            // Leaving edit: rebuild the detail first — theme/accent may have changed while the
+            // detail was hidden (the StatsTick rebuild is skipped during edits), and the pills
+            // snapshot brush instances, so an un-rebuilt detail would show the old palette.
+            if (!_vm.IsEditing) BuildDetail();
             SwapBody(_vm.IsEditing);
             if (_vm.IsEditing) ScrollSelfIntoView(); // starts now, in sync with the expand
         }
