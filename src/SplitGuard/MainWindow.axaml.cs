@@ -102,6 +102,9 @@ public partial class MainWindow : Window, IDialogs
 
     void UpdateClusterFade()
     {
+        // An expanded drawer is something the user explicitly opened — it never auto-hides.
+        // Only the bare bar yields to content scrolling behind it.
+        if (_openDrawer != Drawer.None) { BottomCluster.Opacity = 1; return; }
         // Where the cards actually end, in ListHost coordinates: the reserved bottom margin is
         // part of the scroll extent but holds no content, so subtract it back out.
         var cardsBottom = MainScroll.Extent.Height - ListBottomPad - MainScroll.Offset.Y;
