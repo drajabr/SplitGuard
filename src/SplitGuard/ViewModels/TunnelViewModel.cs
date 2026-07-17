@@ -513,19 +513,26 @@ public class TunnelViewModel : ObservableObject
         IsEditing = false;
         PrivateKeyEdit = "";
         ValidationError = "";
-        if (IsExternal)
+        // Defer the snapshot restore until the card's collapse curtain has fully closed:
+        // Peers.Clear()+rebuild guts the still-visible edit pane mid-animation (a tall empty
+        // shell shrinking). If the user re-enters edit before this fires, restoring then is
+        // still correct — cancel promised the saved values either way.
+        Avalonia.Threading.DispatcherTimer.RunOnce(() =>
         {
-            Peers[0].Dns = External!.Dns ?? "";
-            PeerViewModel.FillDomains(Peers[0].Domains, External.Domains);
-        }
-        else if (IsCustom)
-        {
-            LoadFromCustom();
-        }
-        else
-        {
-            LoadFromConfig();
-        }
+            if (IsExternal)
+            {
+                Peers[0].Dns = External!.Dns ?? "";
+                PeerViewModel.FillDomains(Peers[0].Domains, External.Domains);
+            }
+            else if (IsCustom)
+            {
+                LoadFromCustom();
+            }
+            else
+            {
+                LoadFromConfig();
+            }
+        }, TimeSpan.FromMilliseconds(Views.Motion.SlowMs + Views.Motion.CushionMs));
     }
 
     void LoadFromCustom()

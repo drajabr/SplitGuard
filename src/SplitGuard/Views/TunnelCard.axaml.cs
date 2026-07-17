@@ -226,48 +226,74 @@ public partial class TunnelCard : UserControl
         }
     }
 
-    // Swap the visible body pane and animate the card height to the new content. Only the
-    // target pane is ever visible, so the growing/shrinking clip reveals it cleanly — no
-    // opacity crossfade (which glitched when the target's measured height changed mid-run).
+    // Swap the visible body pane and animate the card height to the new content.
+    // EXPAND (detail -> edit): the edit pane becomes visible immediately and the growing clip
+    // reveals it while it fades/slides in — a curtain opening.
+    // COLLAPSE (edit -> detail): the edit pane STAYS visible while the card shrinks (the clip
+    // eats it bottom-up — a curtain closing), and only at the settled height does the detail
+    // swap in with the fade. Hiding the edit pane up front left the card animating a blank
+    // void under the early-shown detail for the whole tween.
     void SwapBody(bool editing)
     {
         var show = editing ? (Control)ExpandContent : DetailPanel;
         var hide = editing ? (Control)DetailPanel : ExpandContent;
         var gen = ++_animGen;
         var from = Body.Bounds.Height;
-        hide.IsVisible = false;
-        show.IsVisible = true;
         var w = Body.Bounds.Width;
         if (w < 1) w = 400;
+
+        // Measure the target pane (it must be visible for Measure to see its content; for the
+        // collapse path flip it back immediately — nothing renders between the two writes).
+        var wasVisible = show.IsVisible;
+        show.IsVisible = true;
         var to = NaturalHeight(show, w);
+        if (!editing && !wasVisible) show.IsVisible = false;
+
         if (to < 1 || from < 1 || Math.Abs(to - from) < 0.5)
         {
-            // No height change to ride — just show the pane, no reveal.
+            // No height change to ride — just swap the panes, no reveal.
+            hide.IsVisible = false;
+            show.IsVisible = true;
             show.Opacity = 1;
             if (show.RenderTransform is TranslateTransform t0) t0.Y = 0;
             Body.Height = double.NaN;
             return;
         }
-        // Reveal the incoming pane in step with the height tween: fade + a small slide up.
-        // Only one pane is ever visible (fade-in, not the crossfade that glitched); the
-        // reveal is a RenderTransform + Opacity so it never perturbs the measured height.
-        var shift = new TranslateTransform(0, RevealShift);
-        show.RenderTransform = shift;
-        show.Opacity = 0;
-        Tween(0, 1, AnimMs,
-            v => { if (_animGen == gen) { show.Opacity = v; shift.Y = RevealShift * (1 - v); } },
-            () =>
-            {
-                if (_animGen != gen) return;
-                show.Opacity = 1;
-                if (ReferenceEquals(show.RenderTransform, shift)) show.RenderTransform = null;
-            });
+
+        void RevealShow()
+        {
+            // Fade + small slide up for the incoming pane (RenderTransform + Opacity only, so
+            // it never perturbs the measured height).
+            var shift = new TranslateTransform(0, RevealShift);
+            show.RenderTransform = shift;
+            show.Opacity = 0;
+            show.IsVisible = true;
+            Tween(0, 1, AnimMs,
+                v => { if (_animGen == gen) { show.Opacity = v; shift.Y = RevealShift * (1 - v); } },
+                () =>
+                {
+                    if (_animGen != gen) return;
+                    show.Opacity = 1;
+                    if (ReferenceEquals(show.RenderTransform, shift)) show.RenderTransform = null;
+                });
+        }
+
+        if (editing)
+        {
+            hide.IsVisible = false;
+            RevealShow();               // reveal rides the growing clip
+        }
         Body.Height = from;
         Tween(from, to, AnimMs,
             v => { if (_animGen == gen) Body.Height = v; },
             () =>
             {
                 if (_animGen != gen) return;
+                if (!editing)
+                {
+                    hide.IsVisible = false; // the curtain has fully closed over the edit pane
+                    RevealShow();           // detail fades in at the settled height
+                }
                 Body.Height = double.NaN;
                 _postTween.Restart();
             });
