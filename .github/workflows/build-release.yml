@@ -29,11 +29,37 @@ jobs:
           name: SplitGuard-Setup
           path: dist/SplitGuard-Setup-*.exe
 
+  # Android APK. Signed with the committed release keystore (see the csproj note) so a
+  # sideloaded install updates in place. versionCode is derived from VERSION in the csproj.
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Install Android workload
+        run: dotnet workload install android
+      - name: Build signed APK
+        run: |
+          VER=$(tr -d '[:space:]' < VERSION)
+          dotnet publish src/SplitGuard.Android/SplitGuard.Android.csproj -c Release
+          APK=$(find src/SplitGuard.Android/bin/Release -name '*-Signed.apk' | head -1)
+          cp "$APK" "SplitGuard-$VER.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SplitGuard-APK
+          path: SplitGuard-*.apk
+
   # Releases are driven by the repo-root VERSION file: bump it and push to main and
   # a tagged release is cut automatically (if that tag doesn't already exist).
-  # The installer is the one and only release artifact.
+  # Artifacts: the Windows installer and the Android APK.
   release:
-    needs: build
+    needs: [build, android]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
@@ -65,5 +91,7 @@ jobs:
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
           name: SplitGuard ${{ steps.ver.outputs.tag }}
-          files: artifacts/SplitGuard-Setup-*.exe
+          files: |
+            artifacts/SplitGuard-Setup-*.exe
+            artifacts/SplitGuard-*.apk
           generate_release_notes: true

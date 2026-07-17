@@ -16,6 +16,19 @@
     <ApplicationVersion Condition="'$(ApplicationVersion)' == ''">$([MSBuild]::Add($([MSBuild]::Add($([MSBuild]::Multiply($([System.Int32]::Parse($(SgVersion.Split('.')[0]))), 10000)), $([MSBuild]::Multiply($([System.Int32]::Parse($(SgVersion.Split('.')[1]))), 100)))), $([System.Int32]::Parse($(SgVersion.Split('.')[2])))))</ApplicationVersion>
     <AndroidPackageFormats>apk</AndroidPackageFormats>
   </PropertyGroup>
+
+  <!-- Release APK signing. The keystore is committed (build/android) with known
+       passwords ON PURPOSE: this app is sideloaded (no Play Store), so the key isn't a
+       secret — its only job is a STABLE signature so successive APKs update in place.
+       Anyone can re-sign a sideloaded APK regardless. Override the Signing* props to use
+       a private key. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <AndroidKeyStore>true</AndroidKeyStore>
+    <AndroidSigningKeyStore Condition="'$(AndroidSigningKeyStore)' == ''">$(MSBuildProjectDirectory)/../../build/android/splitguard-release.jks</AndroidSigningKeyStore>
+    <AndroidSigningKeyAlias Condition="'$(AndroidSigningKeyAlias)' == ''">splitguard</AndroidSigningKeyAlias>
+    <AndroidSigningKeyPass Condition="'$(AndroidSigningKeyPass)' == ''">splitguard</AndroidSigningKeyPass>
+    <AndroidSigningStorePass Condition="'$(AndroidSigningStorePass)' == ''">splitguard</AndroidSigningStorePass>
+  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\SplitGuard\SplitGuard.csproj" />
   </ItemGroup>
