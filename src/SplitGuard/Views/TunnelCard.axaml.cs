@@ -128,7 +128,7 @@ public partial class TunnelCard : UserControl
             {
                 if (_vm is null || !double.IsNaN(Body.Height)) return;
                 var content = _vm.IsEditing ? (Control)ExpandContent : DetailPanel;
-                var to = Motion.MeasureHeight(content, BodyWidth());
+                var to = NaturalHeight(content, Body.Bounds.Width < 1 ? 400 : Body.Bounds.Width);
                 if (to > 0 && Math.Abs(Body.Bounds.Height - to) > 0.5)
                     TweenBodyToContent();
             }, DispatcherPriority.Loaded);
@@ -225,22 +225,29 @@ public partial class TunnelCard : UserControl
         }
     }
 
-    // Swap the visible body pane and animate the card height to the new content, all on the
-    // card's single "body" channel (Motion settles any in-flight run first, so rapid re-toggles
-    // can never leave two writers on the height).
+    // Swap the visible body pane and animate the card height to the new content.
     // EXPAND (detail -> edit): the edit pane becomes visible immediately and the growing clip
     // reveals it while it fades/slides in — a curtain opening.
     // COLLAPSE (edit -> detail): the edit pane STAYS visible while the card shrinks (the clip
-    // eats it bottom-up — a curtain closing); at the settled height the detail swaps in with
-    // the fade and the VM is told the collapse settled (Cancel's snapshot restore waits on it).
+    // eats it bottom-up — a curtain closing), and only at the settled height does the detail
+    // swap in with the fade. Hiding the edit pane up front left the card animating a blank
+    // void under the early-shown detail for the whole tween.
     void SwapBody(bool editing)
     {
         var show = editing ? (Control)ExpandContent : DetailPanel;
         var hide = editing ? (Control)DetailPanel : ExpandContent;
+        var gen = ++_animGen;
         var from = Body.Bounds.Height;
-        Func<double> target = () => Motion.MeasureHeight(show, BodyWidth());
+        var w = Body.Bounds.Width;
+        if (w < 1) w = 400;
 
-        var to = target();
+        // Measure the target pane (it must be visible for Measure to see its content; for the
+        // collapse path flip it back immediately — nothing renders between the two writes).
+        var wasVisible = show.IsVisible;
+        show.IsVisible = true;
+        var to = NaturalHeight(show, w);
+        if (!editing && !wasVisible) show.IsVisible = false;
+
         if (to < 1 || from < 1 || Math.Abs(to - from) < 0.5)
         {
             // No height change to ride — just swap the panes, no reveal.
@@ -249,73 +256,59 @@ public partial class TunnelCard : UserControl
             show.Opacity = 1;
             if (show.RenderTransform is TranslateTransform t0) t0.Y = 0;
             Body.Height = double.NaN;
-            if (!editing) (DataContext as TunnelViewModel)?.CollapseSettled();
             return;
+        }
+
+        void RevealShow()
+        {
+            // Fade + small slide up for the incoming pane (RenderTransform + Opacity only, so
+            // it never perturbs the measured height).
+            var shift = new TranslateTransform(0, RevealShift);
+            show.RenderTransform = shift;
+            show.Opacity = 0;
+            show.IsVisible = true;
+            Tween(0, 1, AnimMs,
+                v => { if (_animGen == gen) { show.Opacity = v; shift.Y = RevealShift * (1 - v); } },
+                () =>
+                {
+                    if (_animGen != gen) return;
+                    show.Opacity = 1;
+                    if (ReferenceEquals(show.RenderTransform, shift)) show.RenderTransform = null;
+                });
         }
 
         if (editing)
         {
             hide.IsVisible = false;
-            show.IsVisible = true;
-            RevealPane(show); // reveal rides the growing clip
+            RevealShow();               // reveal rides the growing clip
         }
         Body.Height = from;
-        Motion.Animate(this, "body", from, target, AnimMs,
-            v => Body.Height = v,
-            interrupted =>
+        Tween(from, to, AnimMs,
+            v => { if (_animGen == gen) Body.Height = v; },
+            () =>
             {
-                if (interrupted) return; // the successor animation owns the body now
+                if (_animGen != gen) return;
                 if (!editing)
                 {
                     hide.IsVisible = false; // the curtain has fully closed over the edit pane
-                    RevealPane(show);       // detail fades in at the settled height
-                    (DataContext as TunnelViewModel)?.CollapseSettled();
+                    RevealShow();           // detail fades in at the settled height
                 }
-                SettleBodyToAuto(target);
+                Body.Height = double.NaN;
+                _postTween.Restart();
             });
     }
 
-    double BodyWidth() { var w = Body.Bounds.Width; return w < 1 ? 400 : w; }
-
-    // Fade + small slide up for an incoming pane (RenderTransform + Opacity only, so it never
-    // perturbs the measured height). One "reveal" channel: an interrupted reveal leaves its
-    // pane fully shown, which is the correct resting state either way.
-    void RevealPane(Control pane)
-    {
-        var shift = new TranslateTransform(0, RevealShift);
-        pane.RenderTransform = shift;
-        pane.Opacity = 0;
-        pane.IsVisible = true;
-        Motion.Animate(this, "reveal", 0, 1, AnimMs,
-            v => { pane.Opacity = v; shift.Y = RevealShift * (1 - v); },
-            _ =>
-            {
-                pane.Opacity = 1;
-                if (ReferenceEquals(pane.RenderTransform, shift)) pane.RenderTransform = null;
-            });
-    }
-
-    // Release the body to auto height ONLY once the animated end matches the measured content
-    // (±0.5px); otherwise run one short correction toward the live target. A release-time snap
-    // is structurally impossible this way.
-    void SettleBodyToAuto(Func<double> target)
-    {
-        if (Math.Abs(Body.Bounds.Height - target()) > 0.5)
-            Motion.Animate(this, "body", Body.Bounds.Height, target, Motion.FastMs,
-                v => Body.Height = v,
-                interrupted => { if (!interrupted) Body.Height = double.NaN; });
-        else
-            Body.Height = double.NaN;
-    }
+    // Thin forwarder to the shared Motion.Tween, so the whole app has one tween loop and one
+    // easing curve. Kept because callers here and in MainWindow/PeerBlock reference TunnelCard.Tween.
+    internal static void Tween(double from, double to, int ms, Action<double> apply, Action? done = null)
+        => Motion.Tween(from, to, ms, apply, done);
 
     // Slide a pane in horizontally — used for the raw <-> fields swap.
     void SlideIn(Control pane, double fromX)
     {
         var tt = new TranslateTransform(fromX, 0);
         pane.RenderTransform = tt;
-        Motion.Animate(this, "slide", fromX, 0, AnimMs,
-            v => tt.X = v,
-            _ => { if (ReferenceEquals(pane.RenderTransform, tt)) pane.RenderTransform = null; });
+        Tween(fromX, 0, AnimMs, v => tt.X = v, () => { if (ReferenceEquals(pane.RenderTransform, tt)) pane.RenderTransform = null; });
     }
 
     // Scroll the card near the top of the list, animated in step with the expand.
@@ -325,14 +318,20 @@ public partial class TunnelCard : UserControl
         if (sv?.Content is not Visual content) return;
         var p = this.TranslatePoint(new Point(0, 0), content);
         if (p is not { } pt) return;
-        Motion.Animate(sv, "offset", sv.Offset.Y, Math.Max(0, pt.Y - 12), AnimMs,
-            v => sv.Offset = new Vector(sv.Offset.X, Math.Max(0, v)));
+        Tween(sv.Offset.Y, Math.Max(0, pt.Y - 12), AnimMs, v => sv.Offset = new Vector(sv.Offset.X, Math.Max(0, v)));
     }
 
     // ---- expand/collapse: explicit height animation of a single region ----------
 
     const int AnimMs = Motion.SlowMs;              // structural motion (expand/collapse/reveal)
     const double RevealShift = Motion.RevealShift; // px the incoming pane slides up from as it fades in
+    int _animGen; // cancels a stale animation finalize on rapid re-toggle
+
+    static double NaturalHeight(Control content, double width)
+    {
+        content.Measure(new Size(width, double.PositiveInfinity));
+        return content.DesiredSize.Height;
+    }
 
     // Subscribe to the editable collections so adding/removing peers, domains, allowed IPs
     // or addresses animates the card's resize (same tween as expand/collapse).
@@ -370,52 +369,74 @@ public partial class TunnelCard : UserControl
         if (_vm?.IsEditing == true) TweenBodyToContent();
     }
 
-    // Only reacts while the body is in auto mode: a non-NaN Height means the body channel is
-    // already driving it (and live retargeting will bend that run to the new content anyway).
-    // While anything animates WITHIN the card (a peer curtain), the auto-height body follows
-    // the child frame by frame on its own — starting a follow animation would double-drive it.
-    // The first layout (0 → natural) is skipped — cards appear via the opacity fade, not a grow.
+    // A driven tween measures its target before release; the post-release layout can
+    // differ by a hair, and re-animating that correction reads as an overshoot bounce.
+    readonly Stopwatch _postTween = new();
+
+    // Only reacts while the body is in auto mode: a non-NaN Height means an animation is
+    // already driving it (and re-triggering off its own frames would loop). The first
+    // layout (0 → natural) is skipped — cards appear via the opacity fade, not a grow.
+    // A peer block drives its own clipped height curtain on expand/collapse; while it does, the
+    // outer body must NOT also start a follow tween (two tweens on the same height fight and the
+    // collapse snaps). The peer brackets its animation with these, and the auto-height body just
+    // tracks the peer's size frame by frame.
+    int _suppressBodySize;
+    internal void BeginBodySuppression() => _suppressBodySize++;
+    internal void EndBodySuppression() { if (_suppressBodySize > 0) _suppressBodySize--; }
+
     void OnBodyContentSizeChanged(object? sender, SizeChangedEventArgs e)
     {
+        if (_suppressBodySize > 0) return;
         if (sender is Control { IsVisible: false }) return;
         if (!double.IsNaN(Body.Height)) return;
-        if (Motion.IsAnimating(this)) return;
+        if (_postTween.IsRunning && _postTween.ElapsedMilliseconds < 150) return;
         if (e.PreviousSize.Height < 0.5) return;
         if (Math.Abs(e.NewSize.Height - e.PreviousSize.Height) < 0.5) return;
         TweenBodyToContent(e.PreviousSize.Height);
     }
 
-    // Fade + collapse the card, then run the real removal (a XAML Height transition would lerp
-    // from the unset NaN auto height and snap, so the channel drives it).
+    // Fade + collapse the card, then run the real removal. The height is driven by the shared
+    // code tween (a XAML Height transition would lerp from the unset NaN auto height and snap).
     bool PlayRemove(Action complete)
     {
         _appeared = true; // don't re-trigger the appear fade
         ClipToBounds = true; // clip content to the shrinking height (shadow is fading out anyway)
         CardShell.Opacity = 0; // fades via the Border.card style's Opacity transition
-        Motion.Animate(this, "remove", Bounds.Height, 0, AnimMs,
-            v => Height = v,
-            interrupted => { if (!interrupted) DispatcherTimer.RunOnce(complete, TimeSpan.FromMilliseconds(Motion.CushionMs)); });
+        Motion.Tween(Bounds.Height, 0, AnimMs, v => Height = v);
+        DispatcherTimer.RunOnce(complete, TimeSpan.FromMilliseconds(AnimMs + Motion.CushionMs));
         return true;
     }
 
-    // Animate the body from where it is now to the visible content's live natural height,
-    // then release back to Auto once converged (SettleBodyToAuto) so later edits resize freely.
+    // Animate the shared region's Height from where it is now to the visible content's
+    // natural height, then release it back to Auto so later edits resize freely. The
+    // target is measured synchronously (Measure works without waiting for a layout
+    // pass) — the old deferred-post version could be pre-empted and skip the animation.
+    // Plain property tween — an Animation with FillMode.Forward keeps clamping Height
+    // even after setting it back to NaN, which froze the card and clipped content.
     void TweenBodyToContent(double? fromOverride = null)
     {
         if (_vm is null) return;
+        var gen = ++_animGen;
         var from = fromOverride ?? Body.Bounds.Height;
+        var w = Body.Bounds.Width;
+        if (w < 1) w = 400;
         var content = _vm.IsEditing ? (Control)ExpandContent : DetailPanel;
-        Func<double> target = () => Motion.MeasureHeight(content, BodyWidth());
-        var to = target();
+        var to = NaturalHeight(content, w);
         if (to < 1 || from < 1 || Math.Abs(to - from) < 0.5)
         {
             Body.Height = double.NaN;
             return;
         }
+
         Body.Height = from;
-        Motion.Animate(this, "body", from, target, AnimMs,
-            v => Body.Height = v,
-            interrupted => { if (!interrupted) SettleBodyToAuto(target); });
+        Tween(from, to, AnimMs,
+            v => { if (_animGen == gen) Body.Height = v; },
+            () =>
+            {
+                if (_animGen != gen) return;
+                Body.Height = double.NaN; // back to auto
+                _postTween.Restart();
+            });
     }
 
     // Syntax-colored collapsed detail as atomic tokens in a WrapPanel: addresses in

@@ -467,9 +467,6 @@ public class TunnelViewModel : ObservableObject
 
     void BeginEdit()
     {
-        // A cancel's restore may still be waiting on its collapse animation — flush it now so
-        // the editor opens on the saved values, as cancel promised.
-        CollapseSettled();
         ValidationError = "";
         EditingPrivateKey = false; // start showing the derived public key
         if (!IsExternal && !IsCustom)
@@ -502,25 +499,22 @@ public class TunnelViewModel : ObservableObject
     void CancelEdit()
     {
         DeleteArmed = false;
+        IsTextMode = false;
         if (IsDraft)
         {
             IsEditing = false;
-            IsTextMode = false;
             Host.RequestDelete(this);
             return;
         }
-        // Leave edit FIRST; text mode drops in the settle callback below — flipping it now
-        // would swap the fading ghost's content to fields mode mid-collapse (and flipping it
-        // before IsEditing used to play the raw->fields swap as an intermediate step).
         IsEditing = false;
         PrivateKeyEdit = "";
         ValidationError = "";
-        // The snapshot restore waits for the card's collapse curtain to fully close (the view
-        // calls CollapseSettled when it has): Peers.Clear()+rebuild would gut the still-visible
-        // edit pane mid-animation. Sequenced by completion, not by a timing constant.
-        _pendingCancelRestore = () =>
+        // Defer the snapshot restore until the card's collapse curtain has fully closed:
+        // Peers.Clear()+rebuild guts the still-visible edit pane mid-animation (a tall empty
+        // shell shrinking). If the user re-enters edit before this fires, restoring then is
+        // still correct — cancel promised the saved values either way.
+        Avalonia.Threading.DispatcherTimer.RunOnce(() =>
         {
-            IsTextMode = false; // now invisible — the collapse ghost kept its raw-editor look
             if (IsExternal)
             {
                 Peers[0].Dns = External!.Dns ?? "";
@@ -534,19 +528,7 @@ public class TunnelViewModel : ObservableObject
             {
                 LoadFromConfig();
             }
-        };
-    }
-
-    // Cancel's deferred snapshot restore; see CancelEdit. Flushed when the collapse animation
-    // settles, or immediately if editing re-opens first (cancel promised saved values either
-    // way); a successful Save clears it (its values must not be reverted).
-    Action? _pendingCancelRestore;
-
-    public void CollapseSettled()
-    {
-        var restore = _pendingCancelRestore;
-        _pendingCancelRestore = null;
-        restore?.Invoke();
+        }, TimeSpan.FromMilliseconds(Views.Motion.SlowMs + Views.Motion.CushionMs));
     }
 
     void LoadFromCustom()
@@ -563,12 +545,11 @@ public class TunnelViewModel : ObservableObject
 
     void SaveEdit()
     {
-        // Save's values are authoritative — a cancel-restore still waiting on its animation
-        // must never fire afterwards and revert them.
-        _pendingCancelRestore = null;
-        var wasTextMode = IsTextMode;
-        if (wasTextMode) ApplyTextToFields(); // IsTextMode drops only after IsEditing below,
-                                              // or the raw->fields swap plays before the collapse
+        if (IsTextMode)
+        {
+            ApplyTextToFields();
+            IsTextMode = false;
+        }
         // A tunnel can be saved incomplete/empty; problems are only enforced when it is
         // turned on (see ValidateConfig in the IsConnected setter).
         ValidationError = "";
@@ -620,7 +601,6 @@ public class TunnelViewModel : ObservableObject
         }
         IsDraft = false;
         IsEditing = false;
-        if (wasTextMode) IsTextMode = false; // after IsEditing so no intermediate pane swap plays
         PrivateKeyEdit = "";
         foreach (var p in Peers) p.PresharedKey = "";
         NotifyPresentation();

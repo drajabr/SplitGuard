@@ -482,6 +482,7 @@ public partial class MainWindow : Window, IDialogs
 
     enum Drawer { None, Settings, Add }
     Drawer _openDrawer = Drawer.None;
+    int _setGen, _addGen; // per-region guards cancelling a stale expand/collapse finalize
 
     void OnSettingsToggleClick(object? sender, RoutedEventArgs e) =>
         SetDrawer(_openDrawer == Drawer.Settings ? Drawer.None : Drawer.Settings);
@@ -509,14 +510,13 @@ public partial class MainWindow : Window, IDialogs
         // ".open" wears the floating shadow — a closed (zero-height) region must paint nothing.
         SettingsRegion.Classes.Set("open", which == Drawer.Settings);
         AddRegion.Classes.Set("open", which == Drawer.Add);
-        AnimateRegion(SettingsRegion, SettingsCard, SettingsChevron, which == Drawer.Settings);
-        AnimateRegion(AddRegion, AddCard, AddChevron, which == Drawer.Add);
+        AnimateRegion(SettingsRegion, SettingsCard, SettingsChevron, which == Drawer.Settings, ++_setGen, () => _setGen);
+        AnimateRegion(AddRegion, AddCard, AddChevron, which == Drawer.Add, ++_addGen, () => _addGen);
     }
 
-    // Animate a region's Height between 0 and its card's natural height on the region's own
-    // "drawer" channel (Motion settles any in-flight run and continues from the current height,
-    // so rapid re-toggles never fight), then release to Auto when open so it follows content.
-    void AnimateRegion(Border region, Control card, TextBlock chevron, bool open)
+    // Tween a region's Height between 0 and its card's natural height (shared Slow token), then
+    // release to Auto when open so it follows content. gen/cur guard against rapid re-toggle.
+    void AnimateRegion(Border region, Control card, TextBlock chevron, bool open, int gen, Func<int> cur)
     {
         chevron.Text = open ? "" : ""; // down = click to close; up = opens upward
         // A closed drawer must leave the tab order entirely — a zero-height region still has
@@ -541,17 +541,18 @@ public partial class MainWindow : Window, IDialogs
         // gaps), so the open drawer always hugs the bar and a closed one leaves no dead space.
         var m0 = region.Margin.Top;
         double m1 = open ? 8 : 0;
-        Motion.Animate(region, "drawer", from, to, Motion.SlowMs,
+        TunnelCard.Tween(from, to, Motion.SlowMs,
             v =>
             {
+                if (cur() != gen) return;
                 region.Height = v;
                 var f = Math.Abs(to - from) < 0.5 ? 1 : Math.Clamp((v - from) / (to - from), 0, 1);
                 var m = m0 + (m1 - m0) * f;
                 region.Margin = new Thickness(14, m, 14, m);
             },
-            interrupted =>
+            () =>
             {
-                if (interrupted) return; // the successor run owns the drawer now
+                if (cur() != gen) return;
                 if (open) region.Height = double.NaN;
                 else region.IsVisible = false; // fully out of the tab order once collapsed
                 region.Margin = new Thickness(14, m1, 14, m1);
