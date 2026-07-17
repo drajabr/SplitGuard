@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-android34.0</TargetFramework>
+    <SupportedOSPlatformVersion>26.0</SupportedOSPlatformVersion>
+    <OutputType>Exe</OutputType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationId>energy.saba.splitguard</ApplicationId>
+    <RootNamespace>SplitGuard.Droid</RootNamespace>
+    <AssemblyName>SplitGuard.Android</AssemblyName>
+    <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+    <!-- VERSION file drives both display version and the monotonic versionCode
+         (major*10000 + minor*100 + patch); CI passes explicit -p: overrides too. -->
+    <SgVersion>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)/../../VERSION').Trim())</SgVersion>
+    <ApplicationDisplayVersion Condition="'$(ApplicationDisplayVersion)' == ''">$(SgVersion)</ApplicationDisplayVersion>
+    <ApplicationVersion Condition="'$(ApplicationVersion)' == ''">$([MSBuild]::Add($([MSBuild]::Add($([MSBuild]::Multiply($([System.Int32]::Parse($(SgVersion.Split('.')[0]))), 10000)), $([MSBuild]::Multiply($([System.Int32]::Parse($(SgVersion.Split('.')[1]))), 100)))), $([System.Int32]::Parse($(SgVersion.Split('.')[2])))))</ApplicationVersion>
+    <AndroidPackageFormats>apk</AndroidPackageFormats>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SplitGuard\SplitGuard.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Android" Version="11.2.3" />
+  </ItemGroup>
+</Project>

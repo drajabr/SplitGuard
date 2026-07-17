@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Fullscreen, no action bar: Avalonia draws everything. DayNight so the OS
+       light/dark hint reaches the app (the in-app "auto" theme follows it). -->
+  <style name="SplitGuardTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+    <item name="android:windowNoTitle">true</item>
+    <item name="android:windowActionBar">false</item>
+  </style>
+</resources>
