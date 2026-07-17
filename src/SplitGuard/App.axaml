@@ -3,6 +3,11 @@
              x:Class="SplitGuard.App"
              RequestedThemeVariant="Default">
   <Application.Resources>
+    <!-- Icon font for TextBlock.glyph. Windows uses the native Segoe icon fonts; the
+         Android head swaps this resource for the bundled SplitGuard Symbols TTF
+         (tools/build_symbols.py — open Fluent System Icons remapped to the same
+         codepoints), since Segoe Fluent Icons doesn't exist there. -->
+    <FontFamily x:Key="GlyphFontFamily">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
     <x:Double x:Key="DimOpacity">0.68</x:Double>
     <x:Double x:Key="Fs9">9</x:Double>
     <x:Double x:Key="Fs11">11</x:Double>

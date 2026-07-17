@@ -28,6 +28,10 @@ public class MainActivity : AvaloniaMainActivity<App>
         App.BuildHead = app =>
         {
             if (app.ApplicationLifetime is not ISingleViewApplicationLifetime single) return;
+            // Segoe icon fonts don't exist on Android — swap in the bundled symbols font
+            // (same codepoints, open Fluent System Icons outlines).
+            app.Resources["GlyphFontFamily"] =
+                new Avalonia.Media.FontFamily("avares://SplitGuard.Core/Assets/Fonts#SplitGuard Symbols");
             var view = new MainView();
             var vm = new MainViewModel(new AndroidDialogs(view), App.Platform!);
             view.DataContext = vm;
