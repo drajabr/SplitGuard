@@ -54,6 +54,15 @@ public class MainViewModel : ObservableObject, ITunnelHost
             StatusOk = true;
             Notify("Failover", msg, false);
         });
+        // Engine-initiated teardown (single-tunnel platform replaced it, or the OS
+        // revoked the VPN): flip the card off without re-entering the disconnect path.
+        _tunnels.Disconnected += name => Dispatcher.UIThread.Post(() =>
+        {
+            var vm = Tunnels.FirstOrDefault(t => !t.IsExternal && !t.IsCustom && t.Name == name);
+            if (vm is null || !vm.IsConnected) return;
+            vm.SetConnectedState(false);
+            RefreshPins();
+        });
         if (_external is not null)
             _external.AdaptersChanged += () => Dispatcher.UIThread.Post(() => _ = RefreshExternalsAsync());
         Tunnels.CollectionChanged += (_, _) => NotifyStatus();
@@ -183,8 +192,9 @@ public class MainViewModel : ObservableObject, ITunnelHost
     // success so a hidden-to-tray app still tells the user).
     public async Task CheckForUpdatesAsync(bool manual)
     {
-        // The UI-review harness must never hit GitHub or fetch a real installer.
-        if (RuleStore.DemoMode) return;
+        // The UI-review harness must never hit GitHub or fetch a real installer; platforms
+        // without an installer flow (Android — updates come from the releases page) skip too.
+        if (RuleStore.DemoMode || !Platform.SupportsInstallerUpdate) return;
         if (_update is UpdateStatus.Checking or UpdateStatus.Downloading) return;
         // A downloaded update is already waiting — don't let a re-check (e.g. flipping the
         // check-updates toggle) reset Ready and, on a network hiccup, silently discard it.

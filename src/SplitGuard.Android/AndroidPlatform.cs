@@ -14,7 +14,7 @@ public class AndroidPlatform : IPlatform
     // Keystore-backed protector is a post-0.5.0 hardening item.
     public IKeyProtector KeyProtector { get; } = new PassThroughProtector();
 
-    public ITunnelEngine CreateEngine() => new NullEngine();
+    public ITunnelEngine CreateEngine() => new AndroidTunnelEngine();
     public ISplitDnsService CreateSplitDns() => new NullSplitDns();
     public IExternalTunnels? CreateExternalTunnels() => null; // no external-client concept
 
@@ -23,17 +23,6 @@ public class AndroidPlatform : IPlatform
 
     public void SetStartOnBoot(bool on) { }
     public void SetSkipUacLaunch(bool on) { }
-
-    sealed class NullEngine : ITunnelEngine
-    {
-        public event Action<string, TunnelStats>? StatsUpdated { add { } remove { } }
-        public event Action<string>? FailoverChanged { add { } remove { } }
-        public bool IsConnected(string name) => false;
-        public void Connect(Models.TunnelConfig config) { }
-        public void Disconnect(string name) { }
-        public void DisconnectAll() { }
-        public void Dispose() { }
-    }
 
     sealed class NullSplitDns : ISplitDnsService
     {

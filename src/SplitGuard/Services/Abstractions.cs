@@ -29,6 +29,9 @@ public interface ITunnelEngine : IDisposable
     void DisconnectAll();
     event Action<string, TunnelStats>? StatsUpdated;
     event Action<string>? FailoverChanged;
+    // The engine tore a tunnel down on its own (single-tunnel platforms replacing the
+    // active tunnel, or the OS revoking the VPN) — the UI must flip the card off.
+    event Action<string>? Disconnected;
 }
 
 // Watches for externally-managed WireGuard adapters. Windows-only concept.

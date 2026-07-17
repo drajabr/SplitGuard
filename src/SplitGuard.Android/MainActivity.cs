@@ -18,12 +18,10 @@ namespace SplitGuard.Droid;
     ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.UiMode)]
 public class MainActivity : AvaloniaMainActivity<App>
 {
+    const int VpnConsentRequest = 71;
+
     protected override AppBuilder CustomizeAppBuilder(AppBuilder builder)
     {
-        // Phase 2 bring-up: the Android head runs the UI review harness (canned config,
-        // no side effects) until the VpnService engine lands in Phase 3.
-        SplitGuard.Services.RuleStore.DemoMode = true;
-
         App.Platform = new AndroidPlatform();
         App.BuildHead = app =>
         {
@@ -40,6 +38,16 @@ public class MainActivity : AvaloniaMainActivity<App>
             _ = vm.InitializeAsync();
         };
         return base.CustomizeAppBuilder(builder);
+    }
+
+    protected override void OnResume()
+    {
+        base.OnResume();
+        // The VPN consent dialog (one-time, or again after revocation) must come from an
+        // Activity. Ask up front so the connect toggle just works.
+        var consent = Android.Net.VpnService.Prepare(this);
+        if (consent is not null)
+            StartActivityForResult(consent, VpnConsentRequest);
     }
 }
 

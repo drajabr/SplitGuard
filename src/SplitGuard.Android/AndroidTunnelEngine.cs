@@ -1,0 +1,118 @@
+using Android.Content;
+using Com.Wireguard.Android.Backend;
+using SplitGuard.Models;
+using SplitGuard.Services;
+
+namespace SplitGuard.Droid;
+
+// ITunnelEngine over SgVpnService + wireguard-go. Single tunnel: connecting a second
+// tunnel replaces the first (the engine reports the implicit disconnect so the UI
+// flips the old card off). Stats poll wgGetConfig every 2s while a tunnel is up.
+public class AndroidTunnelEngine : ITunnelEngine
+{
+    public event Action<string, TunnelStats>? StatsUpdated;
+    public event Action<string>? FailoverChanged { add { } remove { } } // no failover on Android
+    public event Action<string>? Disconnected;
+
+    readonly System.Threading.Timer _timer;
+    readonly Dictionary<string, (ulong Tx, ulong Rx, DateTime At)> _prev = new();
+    string? _active;
+    DateTime _connectedAt;
+
+    public AndroidTunnelEngine()
+    {
+        _timer = new System.Threading.Timer(_ => Poll(), null, 2000, 2000);
+        SgVpnService.StateChanged += (name, error) =>
+        {
+            if (error is null) { _active = name; _connectedAt = DateTime.UtcNow; }
+        };
+        SgVpnService.Stopped += name =>
+        {
+            if (_active == name) _active = null;
+            _prev.Clear();
+            Disconnected?.Invoke(name);
+        };
+    }
+
+    public bool IsConnected(string name) => _active == name;
+
+    public void Connect(TunnelConfig config)
+    {
+        var ctx = Android.App.Application.Context;
+        // Consent must already be granted (MainActivity runs the prepare flow before
+        // flipping the toggle); a null prepare intent means we're clear.
+        if (Android.Net.VpnService.Prepare(ctx) is not null)
+            throw new InvalidOperationException("VPN permission not granted — toggle again after accepting the consent dialog");
+
+        var replaced = _active;
+        string? error = null;
+        using var done = new ManualResetEventSlim();
+        void OnState(string name, string? err)
+        {
+            if (name != config.Name) return;
+            error = err;
+            done.Set();
+        }
+        SgVpnService.StateChanged += OnState;
+        try
+        {
+            SgVpnService.PendingConfig = config;
+            var intent = new Intent(ctx, typeof(SgVpnService)).SetAction(SgVpnService.ActionConnect);
+            if (Android.OS.Build.VERSION.SdkInt >= Android.OS.BuildVersionCodes.O)
+                ctx.StartForegroundService(intent);
+            else
+                ctx.StartService(intent);
+            if (!done.Wait(TimeSpan.FromSeconds(15)))
+                throw new InvalidOperationException("VPN service did not start in time");
+            if (error is not null) throw new InvalidOperationException(error);
+        }
+        finally { SgVpnService.StateChanged -= OnState; }
+        // Replacing a running tunnel: Stopped fired for the old one inside the service.
+        if (replaced is not null && replaced != config.Name)
+            Disconnected?.Invoke(replaced);
+    }
+
+    public void Disconnect(string name)
+    {
+        if (_active != name) return;
+        var ctx = Android.App.Application.Context;
+        ctx.StartService(new Intent(ctx, typeof(SgVpnService)).SetAction(SgVpnService.ActionDisconnect));
+    }
+
+    public void DisconnectAll()
+    {
+        if (_active is not null) Disconnect(_active);
+    }
+
+    void Poll()
+    {
+        var name = _active;
+        var handle = SgVpnService.Handle;
+        if (name is null || handle < 0) return;
+        string uapi;
+        try { uapi = WgGo.GetConfig(handle) ?? ""; }
+        catch { return; }
+        var now = DateTime.UtcNow;
+        var per = new Dictionary<string, PeerLive>();
+        foreach (var (key, s) in Uapi.ParseStats(uapi))
+        {
+            double up = 0, down = 0;
+            if (_prev.TryGetValue(key, out var prev))
+            {
+                var dt = Math.Max(0.5, (now - prev.At).TotalSeconds);
+                up = Math.Max(0, (double)(s.Tx - prev.Tx)) / dt;
+                down = Math.Max(0, (double)(s.Rx - prev.Rx)) / dt;
+            }
+            _prev[key] = (s.Tx, s.Rx, now);
+            // Health = handshake freshness (same thresholds as the desktop engine),
+            // with a grace window for the first handshake after connect.
+            var fresh = s.Handshake is not null && now - s.Handshake.Value < TimeSpan.FromSeconds(180);
+            var inGrace = now - _connectedAt < TimeSpan.FromSeconds(60);
+            per[key] = new PeerLive(up, down, s.Handshake,
+                null, null, fresh || inGrace, null, null, null, s.Tx, s.Rx);
+        }
+        if (per.Count > 0) StatsUpdated?.Invoke(name, new TunnelStats(per));
+    }
+
+    public void Dispose() => _timer.Dispose();
+}

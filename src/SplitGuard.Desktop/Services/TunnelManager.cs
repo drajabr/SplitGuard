@@ -31,6 +31,8 @@ public class TunnelManager : ITunnelEngine
     public event Action<string, TunnelStats>? StatsUpdated;
     // "10.0.0.0/24: failover tunnelA → tunnelB" style message for the UI.
     public event Action<string>? FailoverChanged;
+    // Never raised here: on Windows every disconnect is user-initiated through the VM.
+    public event Action<string>? Disconnected { add { } remove { } }
 
     class PeerRuntime
     {
