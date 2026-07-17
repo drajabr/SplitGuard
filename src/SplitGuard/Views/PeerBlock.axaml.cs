@@ -16,7 +16,6 @@ public partial class PeerBlock : UserControl
 
     PeerViewModel? _vm;
     readonly TranslateTransform _shift = new(0, 0);
-    int _revealGen;
 
     public PeerBlock()
     {
@@ -31,7 +30,6 @@ public partial class PeerBlock : UserControl
             if (_vm is not null) _vm.PropertyChanged += OnVmPropertyChanged;
 
             // Initial state, no animation (matches the card's own init).
-            _revealGen++;
             var exp = _vm?.IsExpanded ?? false;
             PeerBody.IsVisible = exp;
             PeerBody.Opacity = exp ? 1 : 0;
@@ -58,62 +56,64 @@ public partial class PeerBlock : UserControl
             AnimateReveal(_vm.IsExpanded);
     }
 
-    // The peer body runs its own clipped height curtain, symmetric both ways: expand grows its
-    // Height 0 -> content (fading/sliding the content in), collapse shrinks content -> 0 (content
-    // clipped away as it closes) then hides. The outer tunnel card's body is auto-height, so it
-    // tracks the peer frame by frame; suppression stops it starting a competing follow tween
-    // (which is what made collapse blank-then-snap instead of animating).
+    // The peer body runs its own clipped height curtain on the "peer" channel, symmetric both
+    // ways: expand grows its Height toward the content (fading/sliding the content in), collapse
+    // shrinks toward 0 (content clipped away as it closes) then hides. The outer tunnel card's
+    // body is auto-height and simply follows the peer frame by frame (the card's size-follow
+    // handler stands down while anything animates inside it — Motion.IsAnimating). A re-toggle
+    // mid-flight settles the previous run and continues from the CURRENT height, so rapid
+    // open/close never jumps.
     void AnimateReveal(bool expand)
     {
-        var gen = ++_revealGen;
-        var card = this.FindAncestorOfType<TunnelCard>();
-        card?.BeginBodySuppression();
-        // Unconditional: every started tween fires done() exactly once (Motion.Tween guarantees
-        // it, even on a zero-delta short-circuit), so decrementing here — regardless of whether
-        // this generation is still current — keeps the suppression counter balanced when a rapid
-        // re-toggle supersedes an in-flight reveal. The final-state restore stays gen-guarded.
-        void Release() => card?.EndBodySuppression();
-
         if (expand)
         {
-            // Compute the TRUE target height before animating, by forcing a real layout pass with
-            // the body at auto height — not a manual Measure at a guessed width. A manual measure
-            // could mis-wrap a row or miss the trailing "Remove peer" button (the glitch, which
-            // only showed when peers differed in height); reading the arranged Bounds.Height after
-            // a layout pass is exactly what the final layout will be, so there's no end-snap.
-            PeerBody.Opacity = 0;              // don't flash full-height content during the pass
+            // Compute the TRUE target height before animating, by forcing a real layout pass
+            // with the body at auto height — not a manual Measure at a guessed width. A manual
+            // measure could mis-wrap a row or miss the trailing "Remove peer" button; reading
+            // the arranged Bounds.Height after a layout pass is exactly what the final layout
+            // will be, so there's no end-snap. (No render happens between these writes.)
+            var from = PeerBody.IsVisible ? PeerBody.Bounds.Height : 0; // continue an interrupted close
+            if (!PeerBody.IsVisible) PeerBody.Opacity = 0; // don't flash content during the pass
             PeerBody.IsVisible = true;
-            PeerBody.Height = double.NaN;       // auto -> real natural height at the real width
+            PeerBody.Height = double.NaN;
             PeerBody.UpdateLayout();
             var to = PeerBody.Bounds.Height;
             if (to < 1)                          // layout not settled yet — fall back to a measure
             {
                 var w = (PeerBody.Parent as Control)?.Bounds.Width ?? this.Bounds.Width;
                 if (w < 1) w = 360;
-                PeerBody.Measure(new Size(w, double.PositiveInfinity));
-                to = PeerBody.DesiredSize.Height;
+                to = Motion.MeasureHeight(PeerBody, w);
             }
-            PeerBody.Height = 0;
-            _shift.Y = RevealShift;
-            TunnelCard.Tween(0, to, RevealMs,
+            PeerBody.Height = from;
+            Motion.Animate(this, "peer", from, to, RevealMs,
                 v =>
                 {
-                    if (_revealGen != gen) return;
                     PeerBody.Height = v;
                     var f = to > 0.5 ? v / to : 1;
                     PeerBody.Opacity = f;
                     _shift.Y = RevealShift * (1 - f);
                 },
-                () => { if (_revealGen == gen) { PeerBody.Height = double.NaN; PeerBody.Opacity = 1; _shift.Y = 0; } Release(); });
+                interrupted =>
+                {
+                    if (interrupted) return; // the successor run owns the curtain now
+                    PeerBody.Height = double.NaN;
+                    PeerBody.Opacity = 1;
+                    _shift.Y = 0;
+                });
         }
         else
         {
             var from = PeerBody.Bounds.Height;
             PeerBody.Height = from;
             _shift.Y = 0;
-            TunnelCard.Tween(from, 0, RevealMs,
-                v => { if (_revealGen == gen) { PeerBody.Height = v; PeerBody.Opacity = from > 0.5 ? v / from : 0; } },
-                () => { if (_revealGen == gen) { PeerBody.IsVisible = false; PeerBody.Height = 0; } Release(); });
+            Motion.Animate(this, "peer", from, 0, RevealMs,
+                v => { PeerBody.Height = v; PeerBody.Opacity = from > 0.5 ? v / from : 0; },
+                interrupted =>
+                {
+                    if (interrupted) return;
+                    PeerBody.IsVisible = false;
+                    PeerBody.Height = 0;
+                });
         }
     }
 

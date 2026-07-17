@@ -467,6 +467,9 @@ public class TunnelViewModel : ObservableObject
 
     void BeginEdit()
     {
+        // A cancel's restore may still be waiting on its collapse animation — flush it now so
+        // the editor opens on the saved values, as cancel promised.
+        CollapseSettled();
         ValidationError = "";
         EditingPrivateKey = false; // start showing the derived public key
         if (!IsExternal && !IsCustom)
@@ -509,11 +512,10 @@ public class TunnelViewModel : ObservableObject
         IsEditing = false;
         PrivateKeyEdit = "";
         ValidationError = "";
-        // Defer the snapshot restore until the card's collapse curtain has fully closed:
-        // Peers.Clear()+rebuild guts the still-visible edit pane mid-animation (a tall empty
-        // shell shrinking). If the user re-enters edit before this fires, restoring then is
-        // still correct — cancel promised the saved values either way.
-        Avalonia.Threading.DispatcherTimer.RunOnce(() =>
+        // The snapshot restore waits for the card's collapse curtain to fully close (the view
+        // calls CollapseSettled when it has): Peers.Clear()+rebuild would gut the still-visible
+        // edit pane mid-animation. Sequenced by completion, not by a timing constant.
+        _pendingCancelRestore = () =>
         {
             if (IsExternal)
             {
@@ -528,7 +530,19 @@ public class TunnelViewModel : ObservableObject
             {
                 LoadFromConfig();
             }
-        }, TimeSpan.FromMilliseconds(Views.Motion.SlowMs + Views.Motion.CushionMs));
+        };
+    }
+
+    // Cancel's deferred snapshot restore; see CancelEdit. Flushed when the collapse animation
+    // settles, or immediately if editing re-opens first (cancel promised saved values either
+    // way); a successful Save clears it (its values must not be reverted).
+    Action? _pendingCancelRestore;
+
+    public void CollapseSettled()
+    {
+        var restore = _pendingCancelRestore;
+        _pendingCancelRestore = null;
+        restore?.Invoke();
     }
 
     void LoadFromCustom()
@@ -545,6 +559,9 @@ public class TunnelViewModel : ObservableObject
 
     void SaveEdit()
     {
+        // Save's values are authoritative — a cancel-restore still waiting on its animation
+        // must never fire afterwards and revert them.
+        _pendingCancelRestore = null;
         if (IsTextMode)
         {
             ApplyTextToFields();
