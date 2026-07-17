@@ -14,17 +14,26 @@ public interface IDialogs
 public class MainViewModel : ObservableObject, ITunnelHost
 {
     readonly IDialogs _dialogs;
-    readonly RuleStore _store = new();
-    readonly NrptService _nrpt = new();
-    readonly TunnelManager _tunnels = new();
-    readonly TunnelService _external = new();
+    readonly RuleStore _store;
+    readonly ISplitDnsService _nrpt;
+    readonly ITunnelEngine _tunnels;
+    readonly IExternalTunnels? _external;
     AppConfig _config = new();
+
+    public IPlatform Platform { get; }
+    // Whether this platform can even have externally-managed adapters (gates the rescan row).
+    public bool HasExternalTunnels => _external is not null;
 
     public ObservableCollection<TunnelViewModel> Tunnels { get; } = new();
 
-    public MainViewModel(IDialogs dialogs)
+    public MainViewModel(IDialogs dialogs, IPlatform platform)
     {
         _dialogs = dialogs;
+        Platform = platform;
+        _store = new RuleStore(platform.ConfigDirectory);
+        _nrpt = platform.CreateSplitDns();
+        _tunnels = platform.CreateEngine();
+        _external = platform.CreateExternalTunnels();
         _config = _store.Load(); // sync, so UI prefs are available before the window shows
         _tunnels.StatsUpdated += (name, stats) => Dispatcher.UIThread.Post(() =>
         {
@@ -45,7 +54,8 @@ public class MainViewModel : ObservableObject, ITunnelHost
             StatusOk = true;
             Notify("Failover", msg, false);
         });
-        _external.AdaptersChanged += () => Dispatcher.UIThread.Post(() => _ = RefreshExternalsAsync());
+        if (_external is not null)
+            _external.AdaptersChanged += () => Dispatcher.UIThread.Post(() => _ = RefreshExternalsAsync());
         Tunnels.CollectionChanged += (_, _) => NotifyStatus();
     }
 
@@ -305,7 +315,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
 
     public async Task InitializeAsync()
     {
-        GpoWarning = NrptService.IsGpoNrptActive();
+        GpoWarning = !RuleStore.DemoMode && _nrpt.IsPolicyManaged;
         foreach (var t in _config.Tunnels)
             Tunnels.Add(new TunnelViewModel(this, t));
         // Custom DNS forwarding is on by default; materialize its card if enabled.
@@ -368,7 +378,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
                 if (vm is null || !vm.IsConnected || string.IsNullOrEmpty(ext.Dns)) continue;
                 foreach (var d in ext.Domains)
                 {
-                    var id = NrptService.RuleId(ExtName(ext.AdapterName), ext.AdapterName, d);
+                    var id = SplitDnsRules.RuleId(ExtName(ext.AdapterName), ext.AdapterName, d);
                     if (!tagged.Any(r => r.Id == id))
                         _nrpt.ApplyDomain(ExtName(ext.AdapterName), ext.AdapterName, d, ext.Dns);
                 }
@@ -378,7 +388,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
                 foreach (var role in _config.Custom.Roles.Where(r => !string.IsNullOrEmpty(r.Dns)))
                     foreach (var d in role.Domains)
                     {
-                        var id = NrptService.RuleId(CustomName, role.Id, d);
+                        var id = SplitDnsRules.RuleId(CustomName, role.Id, d);
                         if (!tagged.Any(r => r.Id == id))
                             _nrpt.ApplyDomain(CustomName, role.Id, d, role.Dns!);
                     }
@@ -397,13 +407,13 @@ public class MainViewModel : ObservableObject, ITunnelHost
             var vm = Tunnels.FirstOrDefault(t => t.IsExternal && t.Name == ext.AdapterName);
             if (vm is null || !vm.IsConnected || string.IsNullOrEmpty(ext.Dns)) continue;
             foreach (var d in ext.Domains)
-                set.Add(NrptService.RuleId(ExtName(ext.AdapterName), ext.AdapterName, d));
+                set.Add(SplitDnsRules.RuleId(ExtName(ext.AdapterName), ext.AdapterName, d));
         }
         // Custom card rules are desired while the card is active.
         if (_config.Custom is { Active: true })
             foreach (var role in _config.Custom.Roles.Where(r => !string.IsNullOrEmpty(r.Dns)))
                 foreach (var d in role.Domains)
-                    set.Add(NrptService.RuleId(CustomName, role.Id, d));
+                    set.Add(SplitDnsRules.RuleId(CustomName, role.Id, d));
         return set;
     }
 
@@ -899,6 +909,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
 
     async Task RefreshExternalsAsync()
     {
+        if (_external is null) return; // platform has no externally-managed adapters
         var adapters = (await Task.Run(_external.GetExternalAdapters))
             .Where(a => _config.Tunnels.All(t => t.Name != a.Name)) // our own adapters aren't "external"
             .Where(a => !_config.DismissedExternals.Contains(a.Name)) // user-deleted until rescan

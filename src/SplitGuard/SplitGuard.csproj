@@ -1,38 +1,22 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
-    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
-    <AssemblyName>SplitGuard</AssemblyName>
+    <!-- The exe keeps the SplitGuard assembly name (installer/process checks); the shared
+         library is SplitGuard.Core but keeps the SplitGuard root namespace so nothing moves. -->
+    <AssemblyName>SplitGuard.Core</AssemblyName>
+    <RootNamespace>SplitGuard</RootNamespace>
     <!-- Single source of truth: the repo-root VERSION file (also read by CI to tag releases). -->
     <Version>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)/../../VERSION').Trim())</Version>
-    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.2.3" />
-    <PackageReference Include="Avalonia.Desktop" Version="11.2.3" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.2.3" />
     <PackageReference Include="Avalonia.AvaloniaEdit" Version="11.1.0" />
-    <PackageReference Include="Microsoft.Management.Infrastructure" Version="3.0.0" />
-    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
-    <PackageReference Include="System.Threading.AccessControl" Version="8.0.0" />
   </ItemGroup>
-
-  <Target Name="CopyWireGuardDll" AfterTargets="Build;Publish">
-    <ItemGroup>
-      <WireGuardDllCandidates Include="$(MSBuildProjectDirectory)/../../.cache/**/wireguard.dll" Condition="Exists('$(MSBuildProjectDirectory)/../../.cache')" />
-      <WireGuardDllCandidates Include="$(MSBuildProjectDirectory)/../../dist/win-x64/wireguard.dll" Condition="Exists('$(MSBuildProjectDirectory)/../../dist/win-x64/wireguard.dll')" />
-      <WireGuardDllCandidates Include="$(MSBuildProjectDirectory)/../../dist/win-arm64/wireguard.dll" Condition="Exists('$(MSBuildProjectDirectory)/../../dist/win-arm64/wireguard.dll')" />
-    </ItemGroup>
-    <Copy SourceFiles="@(WireGuardDllCandidates)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="'@(WireGuardDllCandidates)' != ''" />
-  </Target>
 </Project>

@@ -1,4 +1,4 @@
-# Builds the SplitGuard installer: dist\SplitGuard-Setup-<version>.exe (x64 only).
+﻿# Builds the SplitGuard installer: dist\SplitGuard-Setup-<version>.exe (x64 only).
 # Requires the .NET 8 SDK and Inno Setup 6. The repo-root VERSION file is the single
 # source of truth for the version (csproj, installer, and CI release tag all read it).
 $ErrorActionPreference = "Stop"
@@ -69,7 +69,7 @@ if (Test-Path $dist) {
 $out = Join-Path $dist "win-x64"
 
 Write-Host "Publishing (x64)..."
-& $dotnetExe publish (Join-Path $root "src\SplitGuard") -c Release -r win-x64 --self-contained `
+& $dotnetExe publish (Join-Path $root "src\SplitGuard.Desktop") -c Release -r win-x64 --self-contained `
     -p:PublishSingleFile=true -o $out -v q
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed." }
 

@@ -173,6 +173,13 @@ static class Program
         Services.StartupService.UnregisterLaunchTask();
     }
 
-    public static AppBuilder BuildAvaloniaApp() =>
-        AppBuilder.Configure<App>().UsePlatformDetect();
+    public static AppBuilder BuildAvaloniaApp()
+    {
+        // Install the Windows platform + head before the framework starts: the shared App
+        // shell only carries styles/resources and defers everything else to these hooks.
+        App.Platform = new DesktopPlatform();
+        Services.RuleStore.Protector = new DpapiKeyProtector();
+        App.BuildHead = TrayHost.Build;
+        return AppBuilder.Configure<App>().UsePlatformDetect();
+    }
 }

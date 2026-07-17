@@ -1,19 +1,23 @@
-﻿using Avalonia;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using Avalonia.Styling;
 using Avalonia.VisualTree;
-using SplitGuard.Services;
 using SplitGuard.ViewModels;
 
 namespace SplitGuard.Views;
 
-public partial class MainWindow : Window, IDialogs
+// The whole app UI, shared by every head: the desktop window hosts it inside its
+// extended-chrome shell; Android hosts it as the single view. Window-only concerns
+// (native chrome, drag-drop, keyboard shortcuts, bounds persistence) stay in the host,
+// which reaches in through the small public surface at the bottom.
+public partial class MainView : UserControl
 {
     // Each theme is one coherent palette: page + card surface + chip fill + border
     // strength + secondary-text contrast, tuned together. null page/surface/item = the
@@ -65,28 +69,26 @@ public partial class MainWindow : Window, IDialogs
         ("CtrlH", 26), ("HeaderH", 38), ("CollapseH", 170),
     };
 
-
     int _themeIndex;
     int _accentIndex;
     int _fontIndex;
     int _zoomIndex;
 
-    public MainWindow()
+    // ---- host hooks --------------------------------------------------------------
+
+    // Where the page background / foreground / font land. The desktop window passes
+    // itself (its extended-chrome title bar must share the page color and keep native
+    // caption drag on empty areas); on Android this view is the target.
+    public TemplatedControl ChromeTarget { get; set; }
+
+    // Fired whenever the accent recomposites the app icons; the desktop host updates the
+    // window icon, tray, and toast registration from it.
+    public Action<(WindowIcon Idle, WindowIcon Active, Bitmap Logo)>? IconsChanged;
+
+    public MainView()
     {
         InitializeComponent();
-        // The header sits inside the extended-client title-bar region (TitleBarHeightHint).
-        // It has no background, so empty areas fall through to the OS caption and drag the
-        // window natively; only the hit-testable header controls capture the pointer.
-        AddHandler(DragDrop.DragOverEvent, (_, e) =>
-            e.DragEffects = e.Data.Contains(DataFormats.Files) ? DragDropEffects.Copy : DragDropEffects.None);
-        // "Drop to import" overlay while files hover anywhere over the window.
-        AddHandler(DragDrop.DragEnterEvent, (_, e) =>
-            DropOverlay.IsVisible = e.Data.Contains(DataFormats.Files));
-        AddHandler(DragDrop.DragLeaveEvent, (_, _) => DropOverlay.IsVisible = false);
-        AddHandler(DragDrop.DropEvent, OnDrop);
-        // Collapse the settings panel on any press outside it (tunnelled + handledEventsToo so it
-        // still fires when a card or control handles the press first).
-        AddHandler(PointerPressedEvent, OnWindowPointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
+        ChromeTarget = this;
         // Under the "auto" theme, an OS light<->dark flip must re-resolve every variant-dependent
         // resource (field fills, menu foregrounds, the mono accent). Re-running ApplyTheme sets the
         // same RequestedThemeVariant, so this can't loop — the event only fires on a real change.
@@ -98,6 +100,13 @@ public partial class MainWindow : Window, IDialogs
         BottomCluster.PointerEntered += (_, _) => { _clusterHover = true; UpdateClusterFade(); };
         BottomCluster.PointerExited += (_, _) => { _clusterHover = false; UpdateClusterFade(); };
         LayoutUpdated += (_, _) => UpdateClusterFade();
+        // Collapse the open drawer on any press outside it, wherever in the window it lands
+        // (tunnelled + handledEventsToo so it still fires when a card handles the press first).
+        AttachedToVisualTree += (_, _) =>
+            TopLevel.GetTopLevel(this)?.AddHandler(PointerPressedEvent, OnHostPointerPressed,
+                RoutingStrategies.Tunnel, handledEventsToo: true);
+        DetachedFromVisualTree += (_, _) =>
+            TopLevel.GetTopLevel(this)?.RemoveHandler(PointerPressedEvent, OnHostPointerPressed);
     }
 
     bool _clusterHover;
@@ -129,105 +138,6 @@ public partial class MainWindow : Window, IDialogs
             Toast.Margin = new Thickness(14, 0, 14, clearance);
     }
 
-    async void OnDrop(object? sender, DragEventArgs e)
-    {
-        DropOverlay.IsVisible = false;
-        if (DataContext is not MainViewModel vm) return;
-        var files = e.Data.GetFiles() ?? Enumerable.Empty<IStorageItem>();
-        foreach (var item in files.OfType<IStorageFile>())
-        {
-            if (!item.Name.EndsWith(".conf", StringComparison.OrdinalIgnoreCase)) continue;
-            await using var stream = await item.OpenReadAsync();
-            using var reader = new StreamReader(stream);
-            vm.AddTunnelFromText(await reader.ReadToEndAsync(), Path.GetFileNameWithoutExtension(item.Name));
-        }
-    }
-
-    protected override async void OnKeyDown(KeyEventArgs e)
-    {
-        var vm = DataContext as MainViewModel;
-        var ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
-
-        // Enter in a single-line field commits and drops focus (clearing the highlight).
-        // Add-boxes bind Enter to their add command and mark it handled, so they never
-        // reach here; multiline (raw-config) fields keep Enter for newlines.
-        if (e.Key == Key.Enter && !e.Handled
-            && FocusManager?.GetFocusedElement() is TextBox { AcceptsReturn: false })
-        {
-            MainScroll.Focus();
-            e.Handled = true;
-            return;
-        }
-        // Esc peels back one layer at a time: drop field focus, then close an open drawer,
-        // then collapse (cancel) the editing card.
-        if (e.Key == Key.Escape && !e.Handled)
-        {
-            if (FocusManager?.GetFocusedElement() is TextBox)
-            {
-                MainScroll.Focus();
-                e.Handled = true;
-                return;
-            }
-            if (_openDrawer != Drawer.None)
-            {
-                SetDrawer(Drawer.None);
-                e.Handled = true;
-                return;
-            }
-            var editing = vm?.Tunnels.FirstOrDefault(t => t.IsEditing);
-            if (editing is not null)
-            {
-                editing.CancelEditCommand.Execute(null);
-                e.Handled = true;
-                return;
-            }
-        }
-        if (ctrl && e.Key == Key.N && vm is not null)
-        {
-            vm.CreateEmptyTunnel();
-            e.Handled = true;
-            return;
-        }
-        // Ctrl+O opens the file picker to import a .conf (mirrors the Add drawer's Import row).
-        // Not while typing in a field (same guard as Ctrl+V), and close any open drawer first so
-        // it isn't left hanging under the file dialog.
-        if (ctrl && e.Key == Key.O && !e.Handled && vm is not null
-            && FocusManager?.GetFocusedElement() is not TextBox)
-        {
-            SetDrawer(Drawer.None);
-            _ = ImportConfAsync();
-            e.Handled = true;
-            return;
-        }
-        if (ctrl && e.Key == Key.E && vm is not null)
-        {
-            vm.Tunnels.FirstOrDefault(t => t.IsEditing)?.ToggleTextModeCommand.Execute(null);
-            e.Handled = true;
-            return;
-        }
-        // Ctrl+D: same two-step arming as the Delete button (first arms, second deletes).
-        if (ctrl && e.Key == Key.D && vm is not null)
-        {
-            vm.Tunnels.FirstOrDefault(t => t.IsEditing)?.DeleteCommand.Execute(null);
-            e.Handled = true;
-            return;
-        }
-        // Ctrl+V outside a text field imports a config from the clipboard.
-        if (ctrl && e.Key == Key.V
-            && FocusManager?.GetFocusedElement() is not TextBox
-            && vm is not null && Clipboard is not null)
-        {
-            var text = await Clipboard.GetTextAsync();
-            if (MainViewModel.LooksLikeConfig(text))
-            {
-                vm.AddTunnelFromText(text!, null);
-                e.Handled = true;
-                return;
-            }
-        }
-        base.OnKeyDown(e);
-    }
-
     // Saved zoom names from before the 1x..1.3x rename; without this map an upgrading user's
     // "125%"/"150%" wouldn't match and would silently reset to 1x.
     static string MigrateZoomName(string? name) => name switch
@@ -237,35 +147,6 @@ public partial class MainWindow : Window, IDialogs
         "150%" => "1.3x",
         _ => name ?? "1x",
     };
-
-    // Restore the last window size/position when the saved rect still lands on a visible
-    // screen (a monitor may have been unplugged since); otherwise keep the defaults.
-    public void RestoreWindowBounds(SplitGuard.Models.UiPrefs p)
-    {
-        if (p.WindowW < (int)MinWidth || p.WindowH < (int)MinHeight) return; // never saved (or nonsense)
-        Width = p.WindowW;
-        Height = p.WindowH;
-        var pos = new PixelPoint(p.WindowX, p.WindowY);
-        foreach (var s in Screens.All)
-        {
-            // The title bar's midpoint must be reachable so the window can always be dragged.
-            if (!s.WorkingArea.Contains(new PixelPoint(pos.X + p.WindowW / 2, pos.Y + 20))) continue;
-            Position = pos;
-            return;
-        }
-    }
-
-    // Capture the current bounds for persistence — only a Normal window's geometry is worth
-    // keeping (a maximized/minimized rect would restore wrong).
-    public void SaveWindowBounds(SplitGuard.Models.UiPrefs p)
-    {
-        if (WindowState != WindowState.Normal) return;
-        if (Bounds.Width < 1 || Bounds.Height < 1) return;
-        p.WindowW = (int)Bounds.Width;
-        p.WindowH = (int)Bounds.Height;
-        p.WindowX = Position.X;
-        p.WindowY = Position.Y;
-    }
 
     public void ApplyUiPrefs(SplitGuard.Models.UiPrefs prefs)
     {
@@ -278,16 +159,14 @@ public partial class MainWindow : Window, IDialogs
         ApplyFont();
         ApplyZoom();
         BuildSettingsPanel();
-        // Reconcile the run-at-boot registry entry with the (possibly default-on) pref — never
-        // from the UI-review harness, which must not point the Run key at a dev binary.
-        if (!Services.RuleStore.DemoMode)
-            try { StartupService.Set(prefs.StartOnBoot); } catch { }
+        // The Add drawer's rescan row only makes sense where an external client exists.
+        RescanRow.IsVisible = (DataContext as MainViewModel)?.HasExternalTunnels ?? true;
     }
 
     void ApplyFont()
     {
         var (_, family) = FontSteps[_fontIndex];
-        FontFamily = new FontFamily(family);
+        ChromeTarget.FontFamily = new FontFamily(family);
     }
 
     void ApplyZoom()
@@ -320,12 +199,12 @@ public partial class MainWindow : Window, IDialogs
         }
         var resources = Avalonia.Application.Current!.Resources;
 
-        if (t.Page is null) ClearValue(BackgroundProperty);
-        else Background = new SolidColorBrush(Color.Parse(t.Page));
+        if (t.Page is null) ChromeTarget.ClearValue(BackgroundProperty);
+        else ChromeTarget.Background = new SolidColorBrush(Color.Parse(t.Page));
         // Light themes: Fluent's default foreground is a softened ~89% black that reads dull on
         // the bright pages — force a crisp near-black. Dark themes keep the theme default.
-        if (EffectiveVariant() == ThemeVariant.Light) Foreground = new SolidColorBrush(Color.Parse("#17191B"));
-        else ClearValue(ForegroundProperty);
+        if (EffectiveVariant() == ThemeVariant.Light) ChromeTarget.Foreground = new SolidColorBrush(Color.Parse("#17191B"));
+        else ChromeTarget.ClearValue(ForegroundProperty);
         // Opaque surfaces when the palette defines them; transparent overlays under "auto".
         resources["SurfaceBrush"] = new SolidColorBrush(t.Surface is null ? Color.Parse("#00FFFFFF") : Color.Parse(t.Surface));
         resources["ItemBrush"] = new SolidColorBrush(t.Item is null ? Color.FromArgb(0x14, 0x80, 0x80, 0x80) : Color.Parse(t.Item));
@@ -419,21 +298,8 @@ public partial class MainWindow : Window, IDialogs
         // colored accents are mid-tone and read fine on both.
         var iconColor = hex.Length > 0 ? color : Color.Parse("#8A93A0");
         var icons = AppIcons.Get(iconColor);
-        Icon = icons.Idle;
         LogoImage.Source = icons.Logo;
-        if (Avalonia.Application.Current is App app)
-            app.SetAccentIcons(icons.Idle, icons.Active);
-
-        // Save a branded PNG and register it as the toast-notification app icon/name.
-        try
-        {
-            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SplitGuard");
-            Directory.CreateDirectory(dir);
-            var iconPath = Path.Combine(dir, "notify.png");
-            icons.Logo.Save(iconPath);
-            NotificationService.Register(iconPath);
-        }
-        catch { }
+        IconsChanged?.Invoke(icons);
 
         // The collapsed-detail pills are BUILT with brush INSTANCES snapshotted from the
         // resources (BuildDetail can't use DynamicResource for the derived translucent pill
@@ -492,7 +358,7 @@ public partial class MainWindow : Window, IDialogs
     // Collapse the open drawer when a press lands outside both drawers and both toggles (a tunnel
     // card, the list, the title bar). Tunnelled + handledEventsToo so it fires even when a child
     // handles the press first.
-    void OnWindowPointerPressed(object? sender, PointerPressedEventArgs e)
+    void OnHostPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (_openDrawer == Drawer.None) return;
         for (var el = e.Source as Visual; el is not null; el = el.GetVisualParent())
@@ -565,31 +431,32 @@ public partial class MainWindow : Window, IDialogs
         if (DataContext is not MainViewModel sv) return;
         GeneralList.Children.Clear();
         GeneralList.Children.Add(ToggleRow("Custom DNS forwarding", () => sv.HasCustomDns, on => sv.ToggleCustomDns(on)));
-        // The registry/scheduled-task side effects are skipped in the UI-review harness — a demo
-        // session toggling a switch must never install the dev binary as a logon task (or delete
-        // the installed app's launch task). The pref writes are already no-ops there (Save gates).
-        GeneralList.Children.Add(ToggleRow("Start on Windows startup", () => sv.Prefs.StartOnBoot, on =>
+        // Startup rows exist only where the platform has the concept (Windows: registry Run key +
+        // the UAC-skip scheduled task). The registry/scheduled-task side effects are skipped in
+        // the UI-review harness — a demo session toggling a switch must never install the dev
+        // binary as a logon task. The pref writes are already no-ops there (Save gates).
+        if (sv.Platform.SupportsStartup)
         {
-            if (!Services.RuleStore.DemoMode) StartupService.Set(on);
-            sv.Prefs.StartOnBoot = on; sv.PersistPrefs();
-        }));
-        GeneralList.Children.Add(ToggleRow("Skip UAC prompt on launch", () => sv.Prefs.SkipUacLaunch, on =>
-        {
-            sv.Prefs.SkipUacLaunch = on; sv.PersistPrefs();
-            if (!Services.RuleStore.DemoMode)
-                _ = Task.Run(() =>
-                {
-                    if (on) StartupService.RegisterLaunchTask();
-                    else StartupService.UnregisterLaunchTask();
-                });
-        }));
+            GeneralList.Children.Add(ToggleRow("Start on Windows startup", () => sv.Prefs.StartOnBoot, on =>
+            {
+                if (!Services.RuleStore.DemoMode) sv.Platform.SetStartOnBoot(on);
+                sv.Prefs.StartOnBoot = on; sv.PersistPrefs();
+            }));
+            GeneralList.Children.Add(ToggleRow("Skip UAC prompt on launch", () => sv.Prefs.SkipUacLaunch, on =>
+            {
+                sv.Prefs.SkipUacLaunch = on; sv.PersistPrefs();
+                if (!Services.RuleStore.DemoMode)
+                    _ = Task.Run(() => sv.Platform.SetSkipUacLaunch(on));
+            }));
+        }
         GeneralList.Children.Add(ToggleRow("Notifications", () => sv.Prefs.Notifications, on => { sv.Prefs.Notifications = on; sv.PersistPrefs(); }));
         // Turning on the update check runs one now, so a found update surfaces the header arrow.
-        GeneralList.Children.Add(ToggleRow("Check for updates on startup", () => sv.Prefs.CheckUpdates, on =>
-        {
-            sv.Prefs.CheckUpdates = on; sv.PersistPrefs();
-            if (on) _ = sv.CheckForUpdatesAsync(manual: true);
-        }));
+        if (sv.Platform.SupportsInstallerUpdate)
+            GeneralList.Children.Add(ToggleRow("Check for updates on startup", () => sv.Prefs.CheckUpdates, on =>
+            {
+                sv.Prefs.CheckUpdates = on; sv.PersistPrefs();
+                if (on) _ = sv.CheckForUpdatesAsync(manual: true);
+            }));
 
         AppearanceList.Children.Clear();
         AppearanceList.Children.Add(ThemeGroup());
@@ -743,10 +610,20 @@ public partial class MainWindow : Window, IDialogs
     void SelectFont(int i) { _fontIndex = i; ApplyFont(); Persist(p => p.Font = FontSteps[i].Name); }
     void SelectZoom(int i) { _zoomIndex = i; ApplyZoom(); Persist(p => p.Zoom = ZoomSteps[i].Name); }
 
-    async Task ImportConfAsync()
+    // ---- host-facing surface ----------------------------------------------------
+
+    public bool HasOpenDrawer => _openDrawer != Drawer.None;
+    public void CloseDrawers() => SetDrawer(Drawer.None);
+    public void SetDropOverlay(bool visible) => DropOverlay.IsVisible = visible;
+    // Drops focus out of a text field (Enter/Esc commit) — the scroll host is focusable.
+    public void FocusList() => MainScroll.Focus();
+
+    public async Task ImportConfAsync()
     {
         if (DataContext is not MainViewModel vm) return;
-        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        var storage = TopLevel.GetTopLevel(this)?.StorageProvider;
+        if (storage is null) return;
+        var files = await storage.OpenFilePickerAsync(new FilePickerOpenOptions
         {
             Title = "Import WireGuard configuration",
             AllowMultiple = true,
@@ -759,13 +636,4 @@ public partial class MainWindow : Window, IDialogs
             vm.AddTunnelFromText(await reader.ReadToEndAsync(), Path.GetFileNameWithoutExtension(file.Name));
         }
     }
-
-    public async Task CopyToClipboardAsync(string text)
-    {
-        if (Clipboard is not null)
-            await Clipboard.SetTextAsync(text);
-    }
-
-    public void Notify(string title, string message, bool isError) =>
-        NotificationService.Show(title, message, isError);
 }

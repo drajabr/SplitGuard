@@ -2,10 +2,8 @@ using System.Net.NetworkInformation;
 
 namespace SplitGuard.Services;
 
-public record ExternalAdapter(string Name, bool IsUp);
-
 // Detects WireGuard adapters managed by the official client (read-only for us).
-public class TunnelService : IDisposable
+public class TunnelService : IExternalTunnels
 {
     public event Action? AdaptersChanged;
 

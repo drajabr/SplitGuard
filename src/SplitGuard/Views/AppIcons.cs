@@ -39,7 +39,7 @@ public static class AppIcons
 
     static byte[] Compose(int size, Color accent, bool tick)
     {
-        using var stream = AssetLoader.Open(new Uri($"avares://SplitGuard/Assets/icon-template-{size}.png"));
+        using var stream = AssetLoader.Open(new Uri($"avares://SplitGuard.Core/Assets/icon-template-{size}.png"));
         using var template = WriteableBitmap.Decode(stream);
         var output = new WriteableBitmap(new PixelSize(size, size), new Vector(96, 96),
             PixelFormat.Bgra8888, AlphaFormat.Unpremul);

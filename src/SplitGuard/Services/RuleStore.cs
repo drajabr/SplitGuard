@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Text.Json;
 using SplitGuard.Models;
 
@@ -10,19 +9,25 @@ public class RuleStore
     // no elevation, no NRPT/scheduled-task side effects. For eyeballing layout only.
     public static bool DemoMode;
 
-    static readonly string Dir = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "SplitGuard");
-    static readonly string ConfigPath = Path.Combine(Dir, "config.json");
+    // Key at-rest protection, installed once by the platform head (DPAPI on Windows).
+    // Static because Protect/Unprotect are called from view models and the tunnel engine
+    // without a store instance in hand.
+    public static IKeyProtector Protector = new PassThroughProtector();
 
-    static RuleStore()
+    readonly string _dir;
+    readonly string _configPath;
+
+    public RuleStore(string dir)
     {
-        // One-time migration from the pre-rename data folder.
+        _dir = dir;
+        _configPath = Path.Combine(_dir, "config.json");
+        // One-time migration from the pre-rename data folder (no-op off Windows).
         try
         {
             var old = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "WgSplitDns");
-            if (!Directory.Exists(Dir) && Directory.Exists(old))
-                Directory.Move(old, Dir);
+            if (!Directory.Exists(_dir) && Directory.Exists(old))
+                Directory.Move(old, _dir);
         }
         catch { }
     }
@@ -38,13 +43,13 @@ public class RuleStore
         if (DemoMode) return DemoConfig();
         try
         {
-            if (File.Exists(ConfigPath))
-                return JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(ConfigPath), JsonOpts) ?? new AppConfig();
+            if (File.Exists(_configPath))
+                return JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(_configPath), JsonOpts) ?? new AppConfig();
         }
         catch
         {
             // Corrupt config: start fresh rather than crash; the old file is preserved.
-            try { File.Copy(ConfigPath, ConfigPath + ".bad", overwrite: true); } catch { }
+            try { File.Copy(_configPath, _configPath + ".bad", overwrite: true); } catch { }
         }
         return new AppConfig();
     }
@@ -52,23 +57,15 @@ public class RuleStore
     public void Save(AppConfig config)
     {
         if (DemoMode) return;
-        Directory.CreateDirectory(Dir);
-        var tmp = ConfigPath + ".tmp";
+        Directory.CreateDirectory(_dir);
+        var tmp = _configPath + ".tmp";
         File.WriteAllText(tmp, JsonSerializer.Serialize(config, JsonOpts));
-        File.Move(tmp, ConfigPath, overwrite: true);
+        File.Move(tmp, _configPath, overwrite: true);
     }
 
-    public static string Protect(string base64Key)
-    {
-        var blob = ProtectedData.Protect(Convert.FromBase64String(base64Key), null, DataProtectionScope.LocalMachine);
-        return Convert.ToBase64String(blob);
-    }
+    public static string Protect(string base64Key) => Protector.Protect(base64Key);
 
-    public static string Unprotect(string protectedBase64)
-    {
-        var raw = ProtectedData.Unprotect(Convert.FromBase64String(protectedBase64), null, DataProtectionScope.LocalMachine);
-        return Convert.ToBase64String(raw);
-    }
+    public static string Unprotect(string protectedBase64) => Protector.Unprotect(protectedBase64);
 
     // A representative config exercising every UI element: two tunnels, multi-peer with
     // overlapping allowed IPs (failover group), ping settings, DNS + domains, long values.

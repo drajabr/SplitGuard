@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{11DFB5BE-B050-44C3-B769-581B417E20DA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SplitGuard", "src\SplitGuard\SplitGuard.csproj", "{3345DDB7-586A-4907-9A5F-828A6C7EB103}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SplitGuard.Desktop", "src\SplitGuard.Desktop\SplitGuard.Desktop.csproj", "{9218D73E-1030-48E1-9A0E-6D3488524E0C}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3345DDB7-586A-4907-9A5F-828A6C7EB103}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3345DDB7-586A-4907-9A5F-828A6C7EB103}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3345DDB7-586A-4907-9A5F-828A6C7EB103}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3345DDB7-586A-4907-9A5F-828A6C7EB103}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9218D73E-1030-48E1-9A0E-6D3488524E0C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9218D73E-1030-48E1-9A0E-6D3488524E0C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9218D73E-1030-48E1-9A0E-6D3488524E0C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9218D73E-1030-48E1-9A0E-6D3488524E0C}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{3345DDB7-586A-4907-9A5F-828A6C7EB103} = {11DFB5BE-B050-44C3-B769-581B417E20DA}
+		{9218D73E-1030-48E1-9A0E-6D3488524E0C} = {11DFB5BE-B050-44C3-B769-581B417E20DA}
+	EndGlobalSection
+EndGlobal

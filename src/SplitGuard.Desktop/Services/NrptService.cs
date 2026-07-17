@@ -6,11 +6,9 @@ using Microsoft.Win32;
 
 namespace SplitGuard.Services;
 
-public record NrptRule(string Id, string[] Namespaces, string[] Servers);
-
 // Sole owner of NRPT state. Only rules tagged WG-SPLIT-DNS are ever touched.
 // CIM is the primary backend; PowerShell cmdlets are the fallback.
-public class NrptService
+public class NrptService : ISplitDnsService
 {
     public const string Tag = "WG-SPLIT-DNS";
     const string CatchAllId = "WGSDNS|catchall";
@@ -41,13 +39,14 @@ public class NrptService
         }
     }
 
-    public static string DomainToNamespace(string domain) =>
-        domain.StartsWith("*.") ? domain[1..] : domain; // "*.x" → ".x" (subdomain-inclusive), bare stays exact
-
+    // Rule identity/namespace forms live in the shared SplitDnsRules so every backend
+    // (and the reconcile pass) agrees on ids.
+    public static string DomainToNamespace(string domain) => SplitDnsRules.DomainToNamespace(domain);
     public static string RuleId(string tunnelName, string peerPublicKey, string domain) =>
-        $"WGSDNS|{tunnelName}|{Short(peerPublicKey)}|{domain}";
+        SplitDnsRules.RuleId(tunnelName, peerPublicKey, domain);
+    static string Short(string key) => SplitDnsRules.Short(key);
 
-    static string Short(string key) => key.Length > 8 ? key[..8] : key;
+    public bool IsPolicyManaged => IsGpoNrptActive();
 
     public void ApplyDomain(string tunnelName, string peerPublicKey, string domain, string dnsServer)
     {

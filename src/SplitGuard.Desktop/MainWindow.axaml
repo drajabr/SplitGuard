@@ -1,0 +1,18 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:SplitGuard.Views;assembly=SplitGuard.Core"
+        x:Class="SplitGuard.Views.MainWindow"
+        Title="SplitGuard"
+        Icon="avares://SplitGuard.Core/Assets/app.ico"
+        Width="520" Height="700"
+        MinWidth="520" MinHeight="300"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="PreferSystemChrome"
+        ExtendClientAreaTitleBarHeightHint="38"
+        FontFamily="Segoe UI Variable Text, Segoe UI"
+        RenderOptions.TextRenderingMode="SubpixelAntialias"
+        DragDrop.AllowDrop="True">
+  <!-- The entire UI is the shared MainView; this window is only the desktop shell:
+       native chrome, drag-drop, keyboard shortcuts, bounds persistence, clipboard/toasts. -->
+  <views:MainView Name="View" />
+</Window>

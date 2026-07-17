@@ -5,15 +5,7 @@ using SplitGuard.Models;
 
 namespace SplitGuard.Services;
 
-// Per-peer live signals published every poll tick. FailoverRole: null = not part of an
-// overlap group, otherwise "active" / "standby".
-public record PeerLive(double UpBps, double DownBps, DateTime? Handshake,
-    double? PingMs, bool? PingOk, bool Healthy, string? FailoverRole,
-    double? AvgPingMs, double? PingLoss, ulong TotalTx, ulong TotalRx);
-
-public record TunnelStats(Dictionary<string, PeerLive> PerPeer);
-
-public class TunnelManager : IDisposable
+public class TunnelManager : ITunnelEngine
 {
     // Health model, one rule per signal:
     //  - Ping host set (and the probe actually tests this path): PingDownCount
