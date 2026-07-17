@@ -502,13 +502,16 @@ public class TunnelViewModel : ObservableObject
     void CancelEdit()
     {
         DeleteArmed = false;
-        IsTextMode = false;
         if (IsDraft)
         {
             IsEditing = false;
+            IsTextMode = false;
             Host.RequestDelete(this);
             return;
         }
+        // Leave edit FIRST; text mode drops in the settle callback below — flipping it now
+        // would swap the fading ghost's content to fields mode mid-collapse (and flipping it
+        // before IsEditing used to play the raw->fields swap as an intermediate step).
         IsEditing = false;
         PrivateKeyEdit = "";
         ValidationError = "";
@@ -517,6 +520,7 @@ public class TunnelViewModel : ObservableObject
         // edit pane mid-animation. Sequenced by completion, not by a timing constant.
         _pendingCancelRestore = () =>
         {
+            IsTextMode = false; // now invisible — the collapse ghost kept its raw-editor look
             if (IsExternal)
             {
                 Peers[0].Dns = External!.Dns ?? "";
@@ -562,11 +566,9 @@ public class TunnelViewModel : ObservableObject
         // Save's values are authoritative — a cancel-restore still waiting on its animation
         // must never fire afterwards and revert them.
         _pendingCancelRestore = null;
-        if (IsTextMode)
-        {
-            ApplyTextToFields();
-            IsTextMode = false;
-        }
+        var wasTextMode = IsTextMode;
+        if (wasTextMode) ApplyTextToFields(); // IsTextMode drops only after IsEditing below,
+                                              // or the raw->fields swap plays before the collapse
         // A tunnel can be saved incomplete/empty; problems are only enforced when it is
         // turned on (see ValidateConfig in the IsConnected setter).
         ValidationError = "";
@@ -618,6 +620,7 @@ public class TunnelViewModel : ObservableObject
         }
         IsDraft = false;
         IsEditing = false;
+        if (wasTextMode) IsTextMode = false; // after IsEditing so no intermediate pane swap plays
         PrivateKeyEdit = "";
         foreach (var p in Peers) p.PresharedKey = "";
         NotifyPresentation();

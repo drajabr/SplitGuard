@@ -5,7 +5,7 @@
         Title="SplitGuard"
         Icon="avares://SplitGuard/Assets/app.ico"
         Width="520" Height="700"
-        MinWidth="520" MinHeight="420"
+        MinWidth="520" MinHeight="300"
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaChromeHints="PreferSystemChrome"
         ExtendClientAreaTitleBarHeightHint="38"

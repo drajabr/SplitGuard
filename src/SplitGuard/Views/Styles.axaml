@@ -26,12 +26,24 @@
       </Transitions>
     </Setter>
   </Style>
+  <!-- Hover speaks the same language as focus: the fill stays the resting fill and only a
+       ring appears (grey on hover, accent on focus) — no separate stronger hover shade. -->
   <Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
-    <Setter Property="Background" Value="{DynamicResource FieldFillHoverBrush}" />
+    <Setter Property="Background" Value="{DynamicResource FieldFillBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource FieldBorderBrush}" />
   </Style>
   <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
     <Setter Property="Background" Value="{DynamicResource FieldFillBrush}" />
     <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+  </Style>
+  <!-- Disabled boxes keep the soft resting fill at reduced opacity — Fluent's own disabled
+       shade painted a heavy dark slab that shouted louder than the enabled fields. -->
+  <Style Selector="TextBox:disabled">
+    <Setter Property="Opacity" Value="0.45" />
+  </Style>
+  <Style Selector="TextBox:disabled /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="{DynamicResource FieldFillBrush}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
   </Style>
   <!-- Read-only public-key display that copies on click; looks like a field. -->
   <Style Selector="Button.keyfield">

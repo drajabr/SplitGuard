@@ -353,7 +353,7 @@ public partial class MainWindow : Window, IDialogs
         // shadow. Dark themes: a subtle WHITE glow — a black shadow is invisible on an
         // already-dark page. Reach (offset+blur+spread) must stay under the cards' 14px side
         // inset and the 16px stack gap, or the fade gets cut into a hard edge.
-        var shadow = BoxShadows.Parse(lightFill ? "0 1 12 0 #3C000000" : "0 0 12 1 #4AFFFFFF");
+        var shadow = BoxShadows.Parse(lightFill ? "0 1 12 0 #3C000000" : "0 0 12 1 #38FFFFFF");
         resources["FloatShadow"] = shadow;
         resources["CardShadow"] = shadow;
         // Menus/popups need an opaque backing (cards may be translucent overlays under "auto").
@@ -396,6 +396,9 @@ public partial class MainWindow : Window, IDialogs
         // themes, so text gets a per-hue darkened variant there; dark themes keep the raw hue.
         resources["AccentTextBrush"] = new SolidColorBrush(
             dark ? color : Color.Parse(Accents.TextOnLight(name)));
+        // Text selection: a translucent accent wash, not the solid accent block Fluent derives
+        // from SystemAccentColor (which drowned the selected text).
+        resources["TextControlSelectionHighlightColor"] = new SolidColorBrush(color, 0.35);
         // Text/glyphs on accent fills — mono's white accent needs dark text, not white.
         resources["OnAccentBrush"] = new SolidColorBrush(Accents.On(color));
         // Menu item hover/press = a soft shade of the accent (menu bar + tray menu share the
