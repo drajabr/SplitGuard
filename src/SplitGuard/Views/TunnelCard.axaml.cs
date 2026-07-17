@@ -83,10 +83,9 @@ public partial class TunnelCard : UserControl
             DetailPanel.Opacity = 1;
             Body.Height = double.NaN; // auto — sizes to content
         };
-        // Press arms a tap-or-drag; the actual expand happens on release when no drag occurred,
-        // so a mouse-drag on a collapsed user card can reorder the list instead (see OnCard*).
+        // Press arms a tap; the expand happens on release (see OnCard*), so a press that
+        // collapsed an editing card can't re-expand it when released.
         AddHandler(PointerPressedEvent, OnCardPressed, handledEventsToo: false);
-        AddHandler(PointerMovedEvent, OnCardPointerMoved, handledEventsToo: false);
         AddHandler(PointerReleasedEvent, OnCardPointerReleased, handledEventsToo: false);
         AddHandler(PointerCaptureLostEvent, OnCardCaptureLost, handledEventsToo: false);
 
@@ -645,15 +644,13 @@ public partial class TunnelCard : UserControl
             LabeledRow("", new List<Control> { Mono("no peers configured", ipBrush) });
     }
 
-    // ---- press / tap-to-expand / drag-to-reorder --------------------------------
+    // ---- press / tap-to-expand ---------------------------------------------------
 
-    ItemsControl? _list;
-    bool _dragArmed, _dragging;
-    Point _pressPt;               // grab point in card space (preserves grab offset while dragging)
-    TranslateTransform? _dragXf;
+    bool _tapArmed;
 
-    // Collapsed: press arms a tap-or-drag; a real drag (moved past threshold) reorders, otherwise
-    // release expands. Expanded: a header press collapses (cancel). Controls never arm anything.
+    // Collapsed: a press arms a tap and the release expands. Expanded: a header press collapses
+    // (cancel). Controls never arm anything. Arming on press + acting on release keeps a press
+    // that collapsed an editing card from re-expanding it when released.
     void OnCardPressed(object? sender, PointerPressedEventArgs e)
     {
         if (DataContext is not TunnelViewModel vm) return;
@@ -661,90 +658,23 @@ public partial class TunnelCard : UserControl
         var inHeader = false;
         for (var el = e.Source as Avalonia.Visual; el is not null && el != this; el = el.GetVisualParent())
         {
-            if (el is Button or ToggleButton or ToggleSwitch or TextBox or ComboBox) return;
+            if (el is Button or ToggleButton or TextBox or ComboBox) return;
             if (el == ConnectBox) return;
             if (el == HeaderRow) inHeader = true;
         }
         if (vm.IsEditing) { if (inHeader) vm.CancelEditCommand.Execute(null); return; }
-
-        _pressPt = e.GetPosition(this);
-        _dragArmed = true;
-        _dragging = false;
-        _list = this.FindAncestorOfType<ItemsControl>();
-        e.Pointer.Capture(this);
+        _tapArmed = true;
     }
 
-    void OnCardPointerMoved(object? sender, PointerEventArgs e)
+    void OnCardPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
-        if (!_dragArmed || _dragging) { if (_dragging) DragTo(e); return; }
-        if (DataContext is not TunnelViewModel vm) return;
-        var p = e.GetPosition(this);
-        if (Math.Abs(p.Y - _pressPt.Y) < 6 && Math.Abs(p.X - _pressPt.X) < 6) return; // movement threshold
-        // Only user tunnels reorder, and only when there's more than one to shuffle.
-        if (vm.IsCustom || vm.IsExternal || _list is null || vm.Host.ReorderableCount < 2)
-        {
-            _dragArmed = false;
-            return;
-        }
-        _dragging = true;
-        _dragXf = new TranslateTransform();
-        RenderTransform = _dragXf;
-        CardShell.Opacity = 0.9; // on the shadow-casting Border, not this UserControl (see ctor)
-        if (this.GetVisualParent() is Control container) container.ZIndex = 1; // float above siblings
-        DragTo(e);
-    }
-
-    // Follow the pointer (re-based off the container's live layout position so a reorder mid-drag
-    // doesn't make the card jump) and move to whichever user slot the pointer is over.
-    void DragTo(PointerEventArgs e)
-    {
-        if (_list is null || _dragXf is null || DataContext is not TunnelViewModel vm) return;
-        var pY = e.GetPosition(_list).Y;
-        if (this.GetVisualParent() is Control container)
-        {
-            var top = container.TranslatePoint(new Point(0, 0), _list)?.Y ?? 0;
-            _dragXf.Y = pY - _pressPt.Y - top; // keep the grabbed point under the pointer
-        }
-        foreach (var c in _list.GetRealizedContainers())
-        {
-            if (c.DataContext is not TunnelViewModel tvm || tvm.IsCustom || tvm.IsExternal) continue;
-            var t = c.TranslatePoint(new Point(0, 0), _list)?.Y ?? 0;
-            if (pY >= t && pY < t + c.Bounds.Height)
-            {
-                int idx = _list.IndexFromContainer(c);
-                if (idx >= 0) vm.Host.MoveTunnel(vm, idx);
-                break;
-            }
-        }
-    }
-
-    void OnCardPointerReleased(object? sender, PointerReleasedEventArgs e) => EndDrag(tapped: true);
-    void OnCardCaptureLost(object? sender, PointerCaptureLostEventArgs e) => EndDrag(tapped: false);
-
-    void EndDrag(bool tapped)
-    {
-        var wasDragging = _dragging;
-        var wasArmed = _dragArmed; // false for editing-card presses (handled on press) and controls
-        _dragArmed = false;
-        _dragging = false;
-        if (wasDragging)
-        {
-            var xf = _dragXf; _dragXf = null;
-            CardShell.Opacity = 1;
-            if (this.GetVisualParent() is Control container) container.ZIndex = 0;
-            if (xf is not null) // settle into the final slot
-                Tween(xf.Y, 0, AnimMs, v => xf.Y = v,
-                      () => { if (ReferenceEquals(RenderTransform, xf)) RenderTransform = null; });
-            (DataContext as TunnelViewModel)?.Host.SaveTunnelOrder();
-        }
-        // Expand only if THIS press armed a tap on a collapsed card. Guarding on wasArmed stops a
-        // press that collapsed an editing card (CancelEdit on press) from re-expanding it on release.
-        else if (wasArmed && tapped && DataContext is TunnelViewModel { IsEditing: false } vm)
-        {
+        var wasArmed = _tapArmed; // false for editing-card presses (handled on press) and controls
+        _tapArmed = false;
+        if (wasArmed && DataContext is TunnelViewModel { IsEditing: false } vm)
             vm.BeginEditCommand.Execute(null); // a plain tap expands
-        }
-        _list = null;
     }
+
+    void OnCardCaptureLost(object? sender, PointerCaptureLostEventArgs e) => _tapArmed = false;
 
     // Clicking the state label toggles the connection (the switch's own area does too).
     void OnConnectLabelPressed(object? sender, PointerPressedEventArgs e)
