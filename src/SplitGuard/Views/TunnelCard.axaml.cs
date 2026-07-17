@@ -228,10 +228,11 @@ public partial class TunnelCard : UserControl
     // Swap the visible body pane and animate the card height to the new content, all on the
     // card's single "body" channel (Motion settles any in-flight run first, so rapid re-toggles
     // can never leave two writers on the height).
-    // Both directions are ONE breath: the detail sits underneath, the edit pane (the Panel's
-    // upper layer) crossfades in/out ON TOP while the height moves — no sequential phases,
-    // no void, no late content swap. When a collapse lands, the VM is told it settled
-    // (Cancel's snapshot restore waits on that).
+    // EXPAND (detail -> edit): the edit pane becomes visible immediately and the growing clip
+    // reveals it while it fades/slides in — a curtain opening.
+    // COLLAPSE (edit -> detail): the edit pane STAYS visible while the card shrinks (the clip
+    // eats it bottom-up — a curtain closing); at the settled height the detail swaps in with
+    // the fade and the VM is told the collapse settled (Cancel's snapshot restore waits on it).
     void SwapBody(bool editing)
     {
         var show = editing ? (Control)ExpandContent : DetailPanel;
@@ -242,39 +243,57 @@ public partial class TunnelCard : UserControl
         var to = target();
         if (to < 1 || from < 1 || Math.Abs(to - from) < 0.5)
         {
-            // No height change to ride — just swap the panes.
+            // No height change to ride — just swap the panes, no reveal.
             hide.IsVisible = false;
             show.IsVisible = true;
             show.Opacity = 1;
+            if (show.RenderTransform is TranslateTransform t0) t0.Y = 0;
             Body.Height = double.NaN;
             if (!editing) (DataContext as TunnelViewModel)?.CollapseSettled();
             return;
         }
 
-        // Crossfade riding the resize: both panes visible, the edit layer fades toward its
-        // state while the clip grows/shrinks the card in the same 200ms. Starting from the
-        // CURRENT opacity keeps an interrupted swap continuous.
-        var editOpacity = ExpandContent.IsVisible ? ExpandContent.Opacity : 0;
-        DetailPanel.IsVisible = true;
-        DetailPanel.Opacity = 1;
-        ExpandContent.IsVisible = true;
-        ExpandContent.Opacity = editOpacity;
-        Motion.Animate(this, "fade", editOpacity, editing ? 1 : 0, AnimMs,
-            v => ExpandContent.Opacity = v);
+        if (editing)
+        {
+            hide.IsVisible = false;
+            show.IsVisible = true;
+            RevealPane(show); // reveal rides the growing clip
+        }
         Body.Height = from;
         Motion.Animate(this, "body", from, target, AnimMs,
             v => Body.Height = v,
             interrupted =>
             {
                 if (interrupted) return; // the successor animation owns the body now
-                hide.IsVisible = false;
-                show.Opacity = 1;
-                if (!editing) (DataContext as TunnelViewModel)?.CollapseSettled();
+                if (!editing)
+                {
+                    hide.IsVisible = false; // the curtain has fully closed over the edit pane
+                    RevealPane(show);       // detail fades in at the settled height
+                    (DataContext as TunnelViewModel)?.CollapseSettled();
+                }
                 SettleBodyToAuto(target);
             });
     }
 
     double BodyWidth() { var w = Body.Bounds.Width; return w < 1 ? 400 : w; }
+
+    // Fade + small slide up for an incoming pane (RenderTransform + Opacity only, so it never
+    // perturbs the measured height). One "reveal" channel: an interrupted reveal leaves its
+    // pane fully shown, which is the correct resting state either way.
+    void RevealPane(Control pane)
+    {
+        var shift = new TranslateTransform(0, RevealShift);
+        pane.RenderTransform = shift;
+        pane.Opacity = 0;
+        pane.IsVisible = true;
+        Motion.Animate(this, "reveal", 0, 1, AnimMs,
+            v => { pane.Opacity = v; shift.Y = RevealShift * (1 - v); },
+            _ =>
+            {
+                pane.Opacity = 1;
+                if (ReferenceEquals(pane.RenderTransform, shift)) pane.RenderTransform = null;
+            });
+    }
 
     // Release the body to auto height ONLY once the animated end matches the measured content
     // (±0.5px); otherwise run one short correction toward the live target. A release-time snap

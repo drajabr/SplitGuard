@@ -12,12 +12,15 @@ namespace SplitGuard.Views;
 public partial class PeerBlock : UserControl
 {
     const int RevealMs = Motion.SlowMs;            // structural reveal (shared token)
+    const double RevealShift = Motion.RevealShift;
 
     PeerViewModel? _vm;
+    readonly TranslateTransform _shift = new(0, 0);
 
     public PeerBlock()
     {
         InitializeComponent();
+        PeerBody.RenderTransform = _shift;
         PeerBody.ClipToBounds = true; // clip its own animated-height curtain
 
         DataContextChanged += (_, _) =>
@@ -29,8 +32,9 @@ public partial class PeerBlock : UserControl
             // Initial state, no animation (matches the card's own init).
             var exp = _vm?.IsExpanded ?? false;
             PeerBody.IsVisible = exp;
-            PeerBody.Opacity = 1;
+            PeerBody.Opacity = exp ? 1 : 0;
             PeerBody.Height = exp ? double.NaN : 0;
+            _shift.Y = 0;
         };
 
         // Clicking the header's empty space toggles the peer body, like the tunnel card;
@@ -69,8 +73,8 @@ public partial class PeerBlock : UserControl
             // the arranged Bounds.Height after a layout pass is exactly what the final layout
             // will be, so there's no end-snap. (No render happens between these writes.)
             var from = PeerBody.IsVisible ? PeerBody.Bounds.Height : 0; // continue an interrupted close
+            if (!PeerBody.IsVisible) PeerBody.Opacity = 0; // don't flash content during the pass
             PeerBody.IsVisible = true;
-            PeerBody.Opacity = 1; // pure curtain: the clip reveals fully-visible content
             PeerBody.Height = double.NaN;
             PeerBody.UpdateLayout();
             var to = PeerBody.Bounds.Height;
@@ -82,15 +86,28 @@ public partial class PeerBlock : UserControl
             }
             PeerBody.Height = from;
             Motion.Animate(this, "peer", from, to, RevealMs,
-                v => PeerBody.Height = v,
-                interrupted => { if (!interrupted) PeerBody.Height = double.NaN; });
+                v =>
+                {
+                    PeerBody.Height = v;
+                    var f = to > 0.5 ? v / to : 1;
+                    PeerBody.Opacity = f;
+                    _shift.Y = RevealShift * (1 - f);
+                },
+                interrupted =>
+                {
+                    if (interrupted) return; // the successor run owns the curtain now
+                    PeerBody.Height = double.NaN;
+                    PeerBody.Opacity = 1;
+                    _shift.Y = 0;
+                });
         }
         else
         {
             var from = PeerBody.Bounds.Height;
             PeerBody.Height = from;
+            _shift.Y = 0;
             Motion.Animate(this, "peer", from, 0, RevealMs,
-                v => PeerBody.Height = v,
+                v => { PeerBody.Height = v; PeerBody.Opacity = from > 0.5 ? v / from : 0; },
                 interrupted =>
                 {
                     if (interrupted) return;
