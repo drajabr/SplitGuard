@@ -33,7 +33,12 @@ public class SgVpnService : Android.Net.VpnService
     public static string? ActiveTunnel;
     public static int Handle = -1;
 
+    // Per-domain DNS routing (the relay + forwarder). Off = stock behavior: tun fd
+    // handed straight to wireguard-go, DNS from the conf. Mirrors UiPrefs.AndroidSplitDns.
+    public static volatile bool SplitDnsEnabled = true;
+
     ParcelFileDescriptor? _tun;
+    TunPacketRelay? _relay;
     string? _name;
 
     public override void OnCreate()
@@ -85,15 +90,40 @@ public class SgVpnService : Android.Net.VpnService
                 if (WireGuardConf.TryParseCidr(cidr, out var net, out var prefix)
                     && routes.Add($"{net}/{prefix}"))
                     builder.AddRoute(net.ToString(), prefix);
-        // Tunnel-wide DNS from the config (per-domain routing arrives with the Phase 4
-        // forwarder; until then this matches stock WireGuard behavior).
-        foreach (var dns in cfg.Peers.Where(p => !string.IsNullOrWhiteSpace(p.Dns))
-                     .Select(p => p.Dns!.Trim()).Distinct())
-            try { builder.AddDnsServer(dns); } catch { }
+        var split = SplitDnsEnabled;
+        if (split)
+        {
+            // All DNS goes to the in-tunnel forwarder: the OS resolver sends queries to
+            // the virtual IP, the relay peels them off the tun and answers per-domain
+            // (peer DNS through the tunnel, system DNS around it) with NRPT semantics.
+            builder.AddDnsServer(DnsForwarder.VirtualDns);
+            builder.AddRoute(DnsForwarder.VirtualDns, 32);
+        }
+        else
+        {
+            // Stock behavior: tunnel-wide DNS straight from the config.
+            foreach (var dns in cfg.Peers.Where(p => !string.IsNullOrWhiteSpace(p.Dns))
+                         .Select(p => p.Dns!.Trim()).Distinct())
+                try { builder.AddDnsServer(dns); } catch { }
+        }
 
         _tun = builder.Establish() ?? throw new InvalidOperationException("VPN establish failed (consent revoked?)");
         _name = cfg.Name;
-        var handle = WgGo.TurnOn(cfg.Name, _tun.DetachFd(), Uapi.BuildSettings(cfg));
+        int wgFd;
+        if (split)
+        {
+            // The relay takes ownership of the tun fd (detaches it from the PFD) and gives
+            // wireguard-go the socketpair end.
+            _relay = new TunPacketRelay(_tun, new DnsForwarder(this));
+            _tun = null;
+            wgFd = _relay.WgEndFd;
+        }
+        else
+        {
+            wgFd = _tun.DetachFd();
+            _tun = null; // wireguard-go owns it now
+        }
+        var handle = WgGo.TurnOn(cfg.Name, wgFd, Uapi.BuildSettings(cfg));
         if (handle < 0)
             throw new InvalidOperationException($"wireguard-go failed to start (code {handle})");
         Handle = handle;
@@ -101,6 +131,7 @@ public class SgVpnService : Android.Net.VpnService
         // this the handshake packets route back into the tunnel and nothing connects).
         var v4 = WgGo.SocketV4(handle); if (v4 >= 0) Protect(v4);
         var v6 = WgGo.SocketV6(handle); if (v6 >= 0) Protect(v6);
+        _relay?.Start();
     }
 
     void TearDown()
@@ -110,6 +141,8 @@ public class SgVpnService : Android.Net.VpnService
             try { WgGo.TurnOff(Handle); } catch { }
             Handle = -1;
         }
+        try { _relay?.Dispose(); } catch { }
+        _relay = null;
         try { _tun?.Close(); } catch { }
         _tun = null;
         if (_name is not null) { var n = _name; _name = null; ActiveTunnel = null; Stopped?.Invoke(n); }

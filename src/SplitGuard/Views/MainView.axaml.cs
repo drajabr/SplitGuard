@@ -449,6 +449,14 @@ public partial class MainView : UserControl
                     _ = Task.Run(() => sv.Platform.SetSkipUacLaunch(on));
             }));
         }
+        // Android's split-DNS fallback: off = stock WireGuard DNS (no per-domain routing),
+        // for devices where the in-tunnel forwarder misbehaves. Applies on the next connect.
+        if (sv.Platform.SupportsSplitDnsToggle)
+            GeneralList.Children.Add(ToggleRow("Per-domain DNS routing", () => sv.Prefs.AndroidSplitDns, on =>
+            {
+                sv.Prefs.AndroidSplitDns = on; sv.PersistPrefs();
+                sv.Platform.SetSplitDnsEnabled(on);
+            }));
         GeneralList.Children.Add(ToggleRow("Notifications", () => sv.Prefs.Notifications, on => { sv.Prefs.Notifications = on; sv.PersistPrefs(); }));
         // Turning on the update check runs one now, so a found update surfaces the header arrow.
         if (sv.Platform.SupportsInstallerUpdate)

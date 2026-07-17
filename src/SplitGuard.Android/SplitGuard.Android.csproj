@@ -24,10 +24,11 @@
     <PackageReference Include="Xamarin.AndroidX.Annotation" Version="1.7.1.1" />
   </ItemGroup>
   <ItemGroup>
-    <!-- Official wireguard-android tunnel library (Apache-2.0): used only for its embedded
-         libwg-go.so; the VpnService is ours (split DNS needs the tun fd). WgGo.java is the
-         same-package gateway to GoBackend's private JNI entry points. -->
-    <AndroidLibrary Include="Libs\wireguard-tunnel-1.0.20230706.aar" />
+    <!-- Official wireguard-android tunnel library (Apache-2.0) with libwg-go.so rebuilt
+         to accept the split-DNS relay's socketpair fd (see tools/libwg-go-patch). Used
+         only for libwg-go.so; the VpnService is ours. WgGo.java is the same-package
+         gateway to GoBackend's private JNI entry points. -->
+    <AndroidLibrary Include="Libs\wireguard-tunnel-1.0.20230706-splitguard1.aar" />
     <AndroidJavaSource Include="JavaShim\WgGo.java" Bind="true" />
   </ItemGroup>
 </Project>

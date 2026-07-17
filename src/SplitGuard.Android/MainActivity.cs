@@ -32,6 +32,7 @@ public class MainActivity : AvaloniaMainActivity<App>
                 new Avalonia.Media.FontFamily("avares://SplitGuard.Core/Assets/Fonts#SplitGuard Symbols");
             var view = new MainView();
             var vm = new MainViewModel(new AndroidDialogs(view), App.Platform!);
+            SgVpnService.SplitDnsEnabled = vm.Prefs.AndroidSplitDns;
             view.DataContext = vm;
             view.ApplyUiPrefs(vm.Prefs);
             single.MainView = view;

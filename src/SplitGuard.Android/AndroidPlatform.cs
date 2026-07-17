@@ -15,14 +15,16 @@ public class AndroidPlatform : IPlatform
     public IKeyProtector KeyProtector { get; } = new PassThroughProtector();
 
     public ITunnelEngine CreateEngine() => new AndroidTunnelEngine();
-    public ISplitDnsService CreateSplitDns() => new NullSplitDns();
+    public ISplitDnsService CreateSplitDns() => AndroidSplitDnsService.Instance;
     public IExternalTunnels? CreateExternalTunnels() => null; // no external-client concept
 
     public bool SupportsStartup => false;          // no logon task / UAC on Android
     public bool SupportsInstallerUpdate => false;  // updates come from GitHub releases page
+    public bool SupportsSplitDnsToggle => true;
 
     public void SetStartOnBoot(bool on) { }
     public void SetSkipUacLaunch(bool on) { }
+    public void SetSplitDnsEnabled(bool on) => SgVpnService.SplitDnsEnabled = on;
 
     sealed class NullSplitDns : ISplitDnsService
     {

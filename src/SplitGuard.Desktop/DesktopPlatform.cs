@@ -17,6 +17,9 @@ public class DesktopPlatform : IPlatform
 
     public bool SupportsStartup => true;
     public bool SupportsInstallerUpdate => true;
+    public bool SupportsSplitDnsToggle => false; // NRPT is always the mechanism here
+
+    public void SetSplitDnsEnabled(bool on) { }
 
     public void SetStartOnBoot(bool on) => Services.StartupService.Set(on);
 
