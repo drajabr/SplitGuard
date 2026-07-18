@@ -103,56 +103,80 @@ if (-not $SkipAndroid) {
         Write-Warning "Android workload not installed - skipping APK. Install with: dotnet workload install android"
     }
     else {
-        Write-Host "Building Android APK..."
-        # Locate JDK 17 (skip a stray JDK 21) and the Android SDK; pass them when found,
-        # otherwise let MSBuild auto-detect.
-        $androidProps = @()
-        $jdk = @(
-            $env:JAVA_HOME,
-            "$env:ProgramFiles\Microsoft\jdk-17*",
-            "$env:ProgramFiles\Eclipse Adoptium\jdk-17*",
-            "$env:ProgramFiles\Java\jdk-17*",
-            "$env:ProgramFiles\Android\Android Studio\jbr"
-        ) | Where-Object { $_ } | ForEach-Object { Get-Item $_ -ErrorAction SilentlyContinue } |
-            Where-Object { $_ -and (Test-Path (Join-Path $_.FullName "bin\java.exe")) } | Select-Object -First 1
-        if ($jdk) { $androidProps += "-p:JavaSdkDirectory=$($jdk.FullName)" }
-
-        $sdk = @($env:ANDROID_HOME, $env:ANDROID_SDK_ROOT, "$env:LOCALAPPDATA\Android\Sdk") |
-            Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
-        if ($sdk) { $androidProps += "-p:AndroidSdkDirectory=$sdk" }
-
-        # OneDrive can hold a lock on obj\...\generated, failing the bindings clean; drop the
-        # stale APK and generated sources so the signed Release publish starts clean.
-        $abin = Join-Path $root "src\SplitGuard.Android\bin\Release"
-        $agen = Join-Path $root "src\SplitGuard.Android\obj\Release\net8.0-android34.0\generated"
-        Remove-Item -Recurse -Force $abin -ErrorAction SilentlyContinue
-        Remove-Item -Recurse -Force $agen -ErrorAction SilentlyContinue
-
-        $code = 1
-        foreach ($attempt in 1..2) {   # one retry for the transient OneDrive lock
-            & $dotnetExe publish $androidProj -c Release @androidProps -v q
-            $code = $LASTEXITCODE
-            if ($code -eq 0) { break }
-            if ($attempt -eq 1) {
-                Write-Warning "Android publish failed (retrying once - OneDrive lock?)..."
-                Remove-Item -Recurse -Force $agen -ErrorAction SilentlyContinue
-                Start-Sleep -Seconds 2
-            }
+        # Locate the Android SDK. MSBuild's own auto-detect is unreliable across shells
+        # (env vars, elevation), so resolve it explicitly and validate the candidate is a
+        # real SDK (has platform-tools / cmdline-tools / platforms). Checks env vars, the
+        # per-user default, and adb/sdkmanager on PATH.
+        $sdkCandidates = @(
+            $env:ANDROID_HOME, $env:ANDROID_SDK_ROOT,
+            "$env:LOCALAPPDATA\Android\Sdk",
+            "$env:USERPROFILE\AppData\Local\Android\Sdk",
+            "$env:ProgramFiles\Android\android-sdk",
+            "${env:ProgramFiles(x86)}\Android\android-sdk"
+        )
+        foreach ($t in 'adb', 'sdkmanager') {
+            $c = Get-Command $t -ErrorAction SilentlyContinue
+            if ($c) { $sdkCandidates += (Split-Path (Split-Path $c.Source -Parent) -Parent) }
         }
+        $sdk = $sdkCandidates | Where-Object {
+            $_ -and (Test-Path $_) -and (
+                (Test-Path (Join-Path $_ 'platform-tools')) -or
+                (Test-Path (Join-Path $_ 'cmdline-tools')) -or
+                (Test-Path (Join-Path $_ 'platforms'))) } | Select-Object -First 1
 
-        if ($code -ne 0) {
-            Write-Warning "Android APK build failed - the Windows installer is still in $dist."
+        if (-not $sdk) {
+            Write-Warning "Android SDK not found - skipping APK (the Windows installer is still in $dist)."
+            Write-Warning "  Set ANDROID_HOME to your SDK path (e.g. %LOCALAPPDATA%\Android\Sdk), or install it:"
+            Write-Warning "  https://aka.ms/dotnet-android-install-sdk"
         }
         else {
-            $apk = Get-ChildItem $abin -Recurse -Filter "*-Signed.apk" -ErrorAction SilentlyContinue |
-                Sort-Object LastWriteTime -Descending | Select-Object -First 1
-            if ($apk) {
-                $apkOut = Join-Path $dist "SplitGuard-$version.apk"
-                Copy-Item $apk.FullName $apkOut -Force
-                Write-Host "Done: $apkOut"
+            Write-Host "Building Android APK (SDK: $sdk)..."
+            $androidProps = @("-p:AndroidSdkDirectory=$sdk")
+
+            # JDK 17 (skip a stray JDK 21); pass it when found, else let MSBuild auto-detect.
+            $jdk = @(
+                $env:JAVA_HOME,
+                "$env:ProgramFiles\Microsoft\jdk-17*",
+                "$env:ProgramFiles\Eclipse Adoptium\jdk-17*",
+                "$env:ProgramFiles\Java\jdk-17*",
+                "$env:ProgramFiles\Android\Android Studio\jbr"
+            ) | Where-Object { $_ } | ForEach-Object { Get-Item $_ -ErrorAction SilentlyContinue } |
+                Where-Object { $_ -and (Test-Path (Join-Path $_.FullName "bin\java.exe")) } | Select-Object -First 1
+            if ($jdk) { $androidProps += "-p:JavaSdkDirectory=$($jdk.FullName)"; Write-Host "  JDK: $($jdk.FullName)" }
+
+            # OneDrive can hold a lock on obj\...\generated, failing the bindings clean; drop the
+            # stale APK and generated sources so the signed Release publish starts clean.
+            $abin = Join-Path $root "src\SplitGuard.Android\bin\Release"
+            $agen = Join-Path $root "src\SplitGuard.Android\obj\Release\net8.0-android34.0\generated"
+            Remove-Item -Recurse -Force $abin -ErrorAction SilentlyContinue
+            Remove-Item -Recurse -Force $agen -ErrorAction SilentlyContinue
+
+            $code = 1
+            foreach ($attempt in 1..2) {   # one retry clears the OneDrive-locked generated dir
+                & $dotnetExe publish $androidProj -c Release @androidProps -v q
+                $code = $LASTEXITCODE
+                if ($code -eq 0) { break }
+                if ($attempt -eq 1) {
+                    Write-Warning "Android publish failed - clearing intermediates and retrying once..."
+                    Remove-Item -Recurse -Force $agen -ErrorAction SilentlyContinue
+                    Start-Sleep -Seconds 2
+                }
+            }
+
+            if ($code -ne 0) {
+                Write-Warning "Android APK build failed (see the dotnet output above) - the Windows installer is still in $dist."
             }
             else {
-                Write-Warning "Signed APK not found under $abin."
+                $apk = Get-ChildItem $abin -Recurse -Filter "*-Signed.apk" -ErrorAction SilentlyContinue |
+                    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+                if ($apk) {
+                    $apkOut = Join-Path $dist "SplitGuard-$version.apk"
+                    Copy-Item $apk.FullName $apkOut -Force
+                    Write-Host "Done: $apkOut"
+                }
+                else {
+                    Write-Warning "Signed APK not found under $abin."
+                }
             }
         }
     }
