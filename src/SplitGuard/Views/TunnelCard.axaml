@@ -54,8 +54,8 @@
            edit pane; the card clips it to its rounded corners. Wired in code. -->
       <Border Name="ExportOverlay" IsVisible="False">
         <Grid Margin="16,10,14,14" ColumnDefinitions="Auto,*">
-          <Border Grid.Column="0" Background="White" CornerRadius="10" Padding="9" VerticalAlignment="Top" Margin="0,0,14,0">
-            <Image Name="ExportQr" Width="152" Height="152" RenderOptions.BitmapInterpolationMode="None" />
+          <Border Grid.Column="0" Background="White" CornerRadius="7" Padding="5" VerticalAlignment="Top" Margin="0,0,14,0">
+            <Image Name="ExportQr" Width="184" Height="184" RenderOptions.BitmapInterpolationMode="None" />
           </Border>
           <StackPanel Grid.Column="1" Spacing="9">
             <DockPanel>
@@ -91,8 +91,8 @@
            "reachable at" endpoint, and Copy stack to its right. Wired in code. -->
       <Border Name="PairOverlay" IsVisible="False">
         <Grid Margin="16,10,14,14" ColumnDefinitions="Auto,*">
-          <Border Grid.Column="0" Background="White" CornerRadius="10" Padding="9" VerticalAlignment="Top" Margin="0,0,14,0">
-            <Image Name="PairQr" Width="152" Height="152" RenderOptions.BitmapInterpolationMode="None" />
+          <Border Grid.Column="0" Background="White" CornerRadius="7" Padding="5" VerticalAlignment="Top" Margin="0,0,14,0">
+            <Image Name="PairQr" Width="184" Height="184" RenderOptions.BitmapInterpolationMode="None" />
           </Border>
           <StackPanel Grid.Column="1" Spacing="9">
             <DockPanel>

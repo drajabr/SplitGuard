@@ -92,9 +92,14 @@ public class SgVpnService : Android.Net.VpnService
         var routes = new HashSet<string>();
         foreach (var p in cfg.Peers)
             foreach (var cidr in p.AllowedIps)
-                if (WireGuardConf.TryParseCidr(cidr, out var net, out var prefix)
-                    && routes.Add($"{net}/{prefix}"))
-                    builder.AddRoute(net.ToString(), prefix);
+                if (WireGuardConf.TryParseCidr(cidr, out var net, out var prefix))
+                {
+                    // Mask host bits: addRoute rejects "10.7.0.1/24" as a "Bad address" (Windows
+                    // masks it silently), which otherwise fails the whole connect on import.
+                    net = WireGuardConf.MaskNetwork(net, prefix);
+                    if (routes.Add($"{net}/{prefix}"))
+                        builder.AddRoute(net.ToString(), prefix);
+                }
         var split = SplitDnsEnabled;
         if (split)
         {

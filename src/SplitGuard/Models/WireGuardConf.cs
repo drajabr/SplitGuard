@@ -139,11 +139,13 @@ public static class WireGuardConf
         return true;
     }
 
-    // Canonical "network/prefix" key (host bits masked) so equivalent entries compare
-    // equal — used to detect overlapping allowed IPs across peers/tunnels.
-    public static string CanonicalCidr(string cidr)
+    // Zero the host bits of an address for its prefix, giving the network (route) address.
+    // Android's VpnService.Builder.addRoute throws IllegalArgumentException("Bad address") when a
+    // route address has any bit set beyond the prefix; Windows (Netio.MaskToNetwork) masks silently.
+    // So a working "AllowedIPs = 10.7.0.1/24" desktop config must be masked to 10.7.0.0/24 for the
+    // Android route builder. NOT for interface Addresses — those legitimately keep their host bits.
+    public static IPAddress MaskNetwork(IPAddress ip, int prefix)
     {
-        if (!TryParseCidr(cidr, out var ip, out var prefix)) return cidr.Trim();
         var bytes = ip.GetAddressBytes();
         int bits = prefix;
         for (int i = 0; i < bytes.Length; i++, bits -= 8)
@@ -151,7 +153,15 @@ public static class WireGuardConf
             if (bits >= 8) continue;
             bytes[i] = bits <= 0 ? (byte)0 : (byte)(bytes[i] & (0xFF << (8 - bits)));
         }
-        return $"{new IPAddress(bytes)}/{prefix}";
+        return new IPAddress(bytes);
+    }
+
+    // Canonical "network/prefix" key (host bits masked) so equivalent entries compare
+    // equal — used to detect overlapping allowed IPs across peers/tunnels.
+    public static string CanonicalCidr(string cidr)
+    {
+        if (!TryParseCidr(cidr, out var ip, out var prefix)) return cidr.Trim();
+        return $"{MaskNetwork(ip, prefix)}/{prefix}";
     }
 
     // A bare IP means a single host: make the /32 (or /128) explicit so every stored

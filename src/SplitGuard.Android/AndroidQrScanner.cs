@@ -47,6 +47,7 @@ public class AndroidQrScanner : Java.Lang.Object, IQrScanner
     volatile bool _done;
     bool _askedPermission;
     long _lastPreviewMs;
+    int _sensorOrientation = 90; // degrees the sensor is rotated vs the device's natural portrait
 
     public void Start()
     {
@@ -77,6 +78,11 @@ public class AndroidQrScanner : Java.Lang.Object, IQrScanner
             id ??= c;
         }
         if (id is null) { Failed?.Invoke("No camera found"); return; }
+
+        // Sensor frames come out in the sensor's native (landscape) orientation; rotate the preview
+        // by this so it's upright when the phone is held in portrait (decode uses AutoRotate anyway).
+        var chosen = _mgr.GetCameraCharacteristics(id);
+        _sensorOrientation = ((Java.Lang.Integer?)chosen.Get(CameraCharacteristics.SensorOrientation))?.IntValue() ?? 90;
 
         _thread = new HandlerThread("sg-qr");
         _thread.Start();
@@ -161,18 +167,36 @@ public class AndroidQrScanner : Java.Lang.Object, IQrScanner
         var now = SystemClock.ElapsedRealtime();
         if (now - _lastPreviewMs < 66) return; // ~15 fps
         _lastPreviewMs = now;
-        // Grayscale RGBA from luminance (cheap; a QR aiming view doesn't need color).
-        var rgba = new byte[w * h * 4];
-        for (int i = 0, j = 0; i < luma.Length; i++, j += 4)
-        {
-            var v = luma[i];
-            rgba[j] = v; rgba[j + 1] = v; rgba[j + 2] = v; rgba[j + 3] = 255;
-        }
+        // Grayscale RGBA from luminance (cheap; a QR aiming view doesn't need color), rotated by the
+        // sensor orientation so the preview is upright in portrait. 90/270 swap width and height.
+        var rot = ((_sensorOrientation % 360) + 360) % 360;
+        int ow = (rot == 90 || rot == 270) ? h : w;
+        int oh = (rot == 90 || rot == 270) ? w : h;
+        var rgba = new byte[ow * oh * 4];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                int dx, dy;
+                switch (rot)
+                {
+                    case 90:  dx = h - 1 - y; dy = x; break;            // clockwise
+                    case 180: dx = w - 1 - x; dy = h - 1 - y; break;
+                    case 270: dx = y;         dy = w - 1 - x; break;    // counter-clockwise
+                    default:  dx = x;         dy = y; break;
+                }
+                var v = luma[y * w + x];
+                int di = (dy * ow + dx) * 4;
+                rgba[di] = v; rgba[di + 1] = v; rgba[di + 2] = v; rgba[di + 3] = 255;
+            }
         Dispatcher.UIThread.Post(() =>
         {
             if (_done) return;
-            _bmp ??= new WriteableBitmap(new PixelSize(w, h), new Vector(96, 96),
-                Avalonia.Platform.PixelFormat.Rgba8888, AlphaFormat.Opaque);
+            if (_bmp is null || _bmp.PixelSize.Width != ow || _bmp.PixelSize.Height != oh)
+            {
+                _bmp?.Dispose();
+                _bmp = new WriteableBitmap(new PixelSize(ow, oh), new Vector(96, 96),
+                    Avalonia.Platform.PixelFormat.Rgba8888, AlphaFormat.Opaque);
+            }
             using (var fb = _bmp.Lock())
                 System.Runtime.InteropServices.Marshal.Copy(rgba, 0, fb.Address, rgba.Length);
             if (!ReferenceEquals(_image.Source, _bmp)) _image.Source = _bmp;
