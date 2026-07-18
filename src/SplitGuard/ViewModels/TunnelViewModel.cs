@@ -115,28 +115,23 @@ public class TunnelViewModel : ObservableObject
         }
     }
 
-    // The whole tunnel serialized to a wg-quick .conf (Interface private key + address + every
-    // peer). Empty if the private key can't be unprotected (handled by the callers above).
-    public string TunnelExportConf
-    {
-        get
-        {
-            var c = Config;
-            if (c is null) return "";
-            string priv;
-            try { priv = RuleStore.Unprotect(c.PrivateKeyProtected); }
-            catch { return ""; }
-            return WireGuardConf.Serialize(priv, c, p =>
-                string.IsNullOrEmpty(p.PresharedKeyProtected) ? null : SafeUnprotect(p.PresharedKeyProtected));
-        }
-    }
+    // Export what's ON SCREEN — the staged edit values — so unsaved edits, a just-regenerated key,
+    // and the per-peer split-DNS (DNS/Domains, plus ping/metric) all travel to the clone. The
+    // export button only shows while editing (ExportButtonVisible), so PrivateKeyEdit and the peer
+    // fields are live; SerializeStaged is the same text the raw-config editor round-trips.
+    public string TunnelExportConf => IsEditing && StagedExportReady() ? SerializeStaged() : "";
 
-    static string? SafeUnprotect(string prot) { try { return RuleStore.Unprotect(prot); } catch { return null; } }
+    // Exportable once the staged config could actually stand up on the other device: a valid
+    // interface key, at least one address, and at least one peer with a valid public key.
+    bool StagedExportReady() =>
+        PeerViewModel.IsValidKey(PrivateKeyEdit.Trim())
+        && AddressValues.Any()
+        && Peers.Any(p => PeerViewModel.IsValidKey(p.PublicKey.Trim()));
 
     public string ExportFileName => $"{(string.IsNullOrWhiteSpace(Name) ? "tunnel" : Name.Trim())}.conf";
 
     void ReportExportFailure() =>
-        Host.ReportError(this, "Couldn't export this tunnel — its private key couldn't be read on this device.");
+        Host.ReportError(this, "Add a private key, an address and a peer's public key before exporting.");
 
     public RelayCommand ShowExportCommand { get; private set; } = null!;
     public RelayCommand HideExportCommand { get; private set; } = null!;

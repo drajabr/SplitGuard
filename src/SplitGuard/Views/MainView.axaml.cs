@@ -125,6 +125,12 @@ public partial class MainView : UserControl
         if (!e.GetCurrentPoint(TitleStrip).Properties.IsLeftButtonPressed) return;
         for (var el = e.Source as Visual; el is not null && el != TitleStrip; el = el.GetVisualParent())
             if (el is Button) return;                                 // let the update button click through
+        if (e.ClickCount >= 2)                                        // double-click toggles maximize, like a native caption
+        {
+            w.WindowState = w.WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+            e.Handled = true;
+            return;
+        }
         w.BeginMoveDrag(e);
     }
 
