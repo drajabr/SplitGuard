@@ -5,7 +5,7 @@
              xmlns:views="clr-namespace:SplitGuard.Views"
              xmlns:ae="using:AvaloniaEdit"
              x:Class="SplitGuard.Views.TunnelCard"
-             ClipToBounds="False">
+             ClipToBounds="False" DragDrop.AllowDrop="True">
   <Border Name="CardShell" Classes="card" Classes.editing="{Binding IsEditing}" Background="{DynamicResource SurfaceBrush}">
     <StackPanel>
       <DockPanel Name="HeaderRow" Background="Transparent" Margin="12,5" Height="{DynamicResource HeaderH}">
@@ -222,7 +222,14 @@
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
-            <Button Classes="link" Content="{Binding AddPeerLabel}" Command="{Binding AddPeerCommand}" Margin="12,0,0,6" FontSize="{DynamicResource Fs115}" />
+            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="12,0,0,6">
+              <Button Classes="link" Content="{Binding AddPeerLabel}" Command="{Binding AddPeerCommand}" FontSize="{DynamicResource Fs115}" />
+              <!-- Scan / paste a peer's descriptor QR to add it (drop a QR on the card works too). -->
+              <Button Classes="icon" Name="ScanPeerBtn" Click="OnScanPeerClick" IsVisible="{Binding ShowInterfaceSection}"
+                      ToolTip.Tip="Scan or paste a peer's code to add it">
+                <TextBlock Classes="glyph accentfg" Text="&#xE8B8;" FontSize="{DynamicResource Fs14}" />
+              </Button>
+            </StackPanel>
           </StackPanel>
         </StackPanel>
 

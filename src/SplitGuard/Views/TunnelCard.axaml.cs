@@ -9,6 +9,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Styling;
 using Avalonia.Threading;
@@ -99,6 +100,10 @@ public partial class TunnelCard : UserControl
         AddHandler(PointerPressedEvent, OnCardPressed, handledEventsToo: false);
         AddHandler(PointerReleasedEvent, OnCardPointerReleased, handledEventsToo: false);
         AddHandler(PointerCaptureLostEvent, OnCardCaptureLost, handledEventsToo: false);
+        // Drop a peer descriptor (or a QR / text) onto the card to add it as a peer.
+        AddHandler(DragDrop.DropEvent, OnCardDrop);
+        AddHandler(DragDrop.DragOverEvent, (_, e) =>
+        { if (e.Data.Contains(DataFormats.Text) || e.Data.Contains(DataFormats.Files)) e.DragEffects = DragDropEffects.Copy; });
 
         // Wrapping content (chips, wrap rows) changes height without any collection
         // event — e.g. a long value wraps to a second line, or the window narrows.
@@ -405,6 +410,34 @@ public partial class TunnelCard : UserControl
         if (_vm is null) return;
         try { var d = _vm.DescriptorConf; PairQr.Source = d.Length > 0 ? QrGen.Generate(d, 152) : null; }
         catch { PairQr.Source = null; }
+    }
+
+    // Scan / paste a peer's descriptor to add it (next to "Add peer"): routes to the shared scanner.
+    void OnScanPeerClick(object? sender, RoutedEventArgs e)
+    {
+        if (_vm is not null) this.FindAncestorOfType<MainView>()?.StartTunnelScan(_vm);
+    }
+
+    // Drop a peer descriptor (a [Peer] block, as text or a file) onto the card to add it as a peer.
+    // A full .conf ([Interface]+[Peer]) is left alone so the window still imports it as a tunnel.
+    async void OnCardDrop(object? sender, DragEventArgs e)
+    {
+        if (_vm is null || _vm.IsExternal || _vm.IsCustom) return;
+        var host = this.FindAncestorOfType<MainView>();
+        if (host is null) return;
+        var text = e.Data.GetText();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            var file = e.Data.GetFiles()?.OfType<Avalonia.Platform.Storage.IStorageFile>().FirstOrDefault();
+            if (file is not null)
+                try { await using var s = await file.OpenReadAsync(); using var r = new System.IO.StreamReader(s); text = await r.ReadToEndAsync(); }
+                catch { }
+        }
+        if (string.IsNullOrWhiteSpace(text)) return;
+        if (text.Contains("[Interface]", System.StringComparison.OrdinalIgnoreCase)) return; // a whole tunnel -> window imports it
+        if (!_vm.IsEditing) _vm.IsEditing = true;   // reveal the edit view so the new peer shows
+        host.AddPeerFromText(_vm, text, "dropped code");
+        e.Handled = true;
     }
 
     // Close any open card overlay (export or pair) synchronously — used when the card leaves edit

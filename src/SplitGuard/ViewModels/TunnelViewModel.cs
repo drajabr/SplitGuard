@@ -733,6 +733,17 @@ public class TunnelViewModel : ObservableObject
     // A freshly added peer opens expanded so it can be filled in immediately.
     void AddPeer() => Peers.Add(new PeerViewModel(this) { IsEditing = true, IsExpanded = true });
 
+    // Scanned/pasted/dropped a peer descriptor (a [Peer] block): add it as a NEW peer, filled in.
+    // Returns false if the descriptor carried no usable public key.
+    public bool AddPeerFromDescriptor(string text)
+    {
+        var peer = new PeerViewModel(this) { IsEditing = true, IsExpanded = true };
+        if (!peer.FillFromDescriptor(text)) return false;
+        Peers.Add(peer);
+        Host.ReconcileMetrics();
+        return true;
+    }
+
     public void RemovePeer(PeerViewModel peer)
     {
         if (Peers.Count > 1) Peers.Remove(peer);

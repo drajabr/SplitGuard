@@ -388,7 +388,7 @@ public partial class MainView : UserControl
     Drawer _openDrawer = Drawer.None;
     int _setGen, _addGen, _qrGen; // per-region guards cancelling a stale expand/collapse finalize
     IQrScanner? _scanner;
-    PeerViewModel? _pairTarget; // when set, the next decoded QR fills this peer instead of adding a tunnel
+    TunnelViewModel? _addPeerTarget; // when set, a decoded QR adds a peer to this tunnel (not a new tunnel)
 
     void OnSettingsToggleClick(object? sender, RoutedEventArgs e) =>
         SetDrawer(_openDrawer == Drawer.Settings ? Drawer.None : Drawer.Settings);
@@ -411,47 +411,39 @@ public partial class MainView : UserControl
         _scanner.Start();
     }
 
-    // Per-peer "Pair": fill this peer from another device's descriptor. Camera-scan where the
-    // platform has one (Android); otherwise pull a descriptor off the clipboard (desktop). Drop
-    // is handled separately on the peer block itself.
-    public async void StartPeerPairing(PeerViewModel peer)
+    // Scan-to-add-peer (from the tunnel's "scan" button next to Add peer): open the camera where
+    // the platform has one; otherwise pull a descriptor off the clipboard (desktop, until the
+    // webcam scanner lands). A decode adds a NEW peer to this tunnel.
+    public async void StartTunnelScan(TunnelViewModel tunnel)
     {
         if (DataContext is not MainViewModel vm) return;
         if (vm.Platform.SupportsQrScan)
         {
-            _pairTarget = peer;
+            _addPeerTarget = tunnel;
             OnScanQrClick(this, new RoutedEventArgs());
             return;
         }
         var clip = TopLevel.GetTopLevel(this)?.Clipboard;
         var text = clip is null ? null : await clip.GetTextAsync();
-        if (!string.IsNullOrWhiteSpace(text) && peer.FillFromDescriptor(text))
-        { vm.StatusText = "Peer filled from the pasted descriptor"; vm.StatusOk = true; }
-        else
-        { vm.StatusText = "Copy a peer descriptor (or drop one onto the peer) first"; vm.StatusOk = false; }
+        AddPeerFromText(tunnel, text, "pasted descriptor");
     }
 
-    // Fill a peer from descriptor text dropped onto it (a [Peer] block or a .conf), with feedback.
-    public void FillPeerFromText(PeerViewModel peer, string? text)
+    // Add a peer to a tunnel from descriptor text (scanned / pasted / dropped), with feedback.
+    public void AddPeerFromText(TunnelViewModel tunnel, string? text, string source)
     {
         if (DataContext is not MainViewModel vm) return;
-        if (!string.IsNullOrWhiteSpace(text) && peer.FillFromDescriptor(text))
-        { vm.StatusText = "Peer filled from the dropped descriptor"; vm.StatusOk = true; }
+        if (!string.IsNullOrWhiteSpace(text) && tunnel.AddPeerFromDescriptor(text))
+        { vm.StatusText = $"Peer added from the {source}"; vm.StatusOk = true; }
         else
-        { vm.StatusText = "That wasn't a peer descriptor"; vm.StatusOk = false; }
+        { vm.StatusText = "That wasn't a peer descriptor — copy or drop one first"; vm.StatusOk = false; }
     }
 
     void OnQrDecoded(string text) => Dispatcher.UIThread.Post(() =>
     {
-        var target = _pairTarget; _pairTarget = null;   // capture before SetDrawer disposes the scan
+        var target = _addPeerTarget; _addPeerTarget = null;   // capture before SetDrawer disposes the scan
         SetDrawer(Drawer.None); // stops + disposes the scanner
         if (DataContext is not MainViewModel vm) return;
-        if (target is not null)
-        {
-            if (target.FillFromDescriptor(text)) { vm.StatusText = "Peer paired from the scanned code"; vm.StatusOk = true; }
-            else { vm.StatusText = "That QR isn't a peer descriptor"; vm.StatusOk = false; }
-            return;
-        }
+        if (target is not null) { AddPeerFromText(target, text, "scanned code"); return; }
         if (MainViewModel.LooksLikeConfig(text)) vm.AddTunnelFromText(text, null);
         else { vm.StatusText = "That QR isn't a WireGuard configuration"; vm.StatusOk = false; }
     });
@@ -493,7 +485,7 @@ public partial class MainView : UserControl
     {
         // Leaving the QR drawer must release the camera (and drop any pending pair target — the
         // decode path captures it first, so a real scan still fills the peer).
-        if (_openDrawer == Drawer.Qr && which != Drawer.Qr) { DisposeScanner(); _pairTarget = null; }
+        if (_openDrawer == Drawer.Qr && which != Drawer.Qr) { DisposeScanner(); _addPeerTarget = null; }
         _openDrawer = which;
         if (which == Drawer.Settings) BuildSettingsPanel();
         // ".open" wears the floating shadow — a closed (zero-height) region must paint nothing.
