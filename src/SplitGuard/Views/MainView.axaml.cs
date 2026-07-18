@@ -404,6 +404,12 @@ public partial class MainView : UserControl
         DisposeScanner();
         _scanner = vm.Platform.CreateQrScanner();
         if (_scanner is null) return;
+        // Desktop's scanner owns the whole stage (its own reticle when a webcam streams, its own
+        // drop/paste panel when there isn't one), so drop the shared camera overlay there. Android
+        // keeps the accent frame + "point at a QR" hint over the live camera preview.
+        var desktop = TopLevel.GetTopLevel(this) is Window;
+        QrFrame.IsVisible = !desktop;
+        QrHint.IsVisible = !desktop;
         QrHost.Content = _scanner.Preview;
         _scanner.Decoded += OnQrDecoded;
         _scanner.Failed += OnQrFailed;

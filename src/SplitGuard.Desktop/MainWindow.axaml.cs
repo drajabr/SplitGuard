@@ -62,7 +62,12 @@ public partial class MainWindow : Window, IDialogs
             if (!item.Name.EndsWith(".conf", StringComparison.OrdinalIgnoreCase)) continue;
             await using var stream = await item.OpenReadAsync();
             using var reader = new StreamReader(stream);
-            vm.AddTunnelFromText(await reader.ReadToEndAsync(), Path.GetFileNameWithoutExtension(item.Name));
+            var conf = await reader.ReadToEndAsync();
+            // Only import whole tunnels here. A peer-descriptor .conf dropped onto a tunnel card is
+            // added there as a peer (TunnelCard.OnCardDrop); the card handler can't mark the bubbling
+            // drop handled before its async file read, so gate on content to avoid double-processing.
+            if (!conf.Contains("[Interface]", StringComparison.OrdinalIgnoreCase)) continue;
+            vm.AddTunnelFromText(conf, Path.GetFileNameWithoutExtension(item.Name));
         }
     }
 

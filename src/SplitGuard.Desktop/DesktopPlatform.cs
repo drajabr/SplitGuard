@@ -11,7 +11,7 @@ public class DesktopPlatform : IPlatform
 
     public IKeyProtector KeyProtector { get; } = new DpapiKeyProtector();
 
-    public IQrScanner? CreateQrScanner() => null; // no camera scan flow on desktop
+    public IQrScanner? CreateQrScanner() => new DesktopQrScanner(); // webcam, or a drop/paste fallback
     public ITunnelEngine CreateEngine() => new Services.TunnelManager();
     public ISplitDnsService CreateSplitDns() => new Services.NrptService();
     public IExternalTunnels? CreateExternalTunnels() => new Services.TunnelService();
@@ -19,7 +19,7 @@ public class DesktopPlatform : IPlatform
     public bool SupportsStartup => true;
     public bool SupportsInstallerUpdate => true;
     public bool SupportsSplitDnsToggle => false; // NRPT is always the mechanism here
-    public bool SupportsQrScan => false;
+    public bool SupportsQrScan => true; // webcam capture; falls back to drop/paste when there's no camera
 
     public void SetSplitDnsEnabled(bool on) { }
 

@@ -163,9 +163,9 @@
                 <Border CornerRadius="10" ClipToBounds="True" Background="#0A0A0A">
                   <ContentControl Name="QrHost" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
                 </Border>
-                <Border Width="150" Height="150" HorizontalAlignment="Center" VerticalAlignment="Center"
+                <Border Name="QrFrame" Width="150" Height="150" HorizontalAlignment="Center" VerticalAlignment="Center"
                         BorderBrush="{DynamicResource AccentBrush}" BorderThickness="2.5" CornerRadius="12" />
-                <TextBlock Text="Point at a WireGuard QR" Classes="muted" FontSize="{DynamicResource Fs11}"
+                <TextBlock Name="QrHint" Text="Point at a WireGuard QR" Classes="muted" FontSize="{DynamicResource Fs11}"
                            HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,8" />
               </Panel>
             </StackPanel>

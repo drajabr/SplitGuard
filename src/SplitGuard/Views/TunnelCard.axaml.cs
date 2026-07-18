@@ -418,23 +418,44 @@ public partial class TunnelCard : UserControl
         if (_vm is not null) this.FindAncestorOfType<MainView>()?.StartTunnelScan(_vm);
     }
 
-    // Drop a peer descriptor (a [Peer] block, as text or a file) onto the card to add it as a peer.
-    // A full .conf ([Interface]+[Peer]) is left alone so the window still imports it as a tunnel.
+    // Drop a peer descriptor (a [Peer] block, as text, QR image, or file) onto the card to add it as
+    // a peer. A whole tunnel ([Interface]+[Peer]) is imported instead — deferred to the window when it
+    // came from a .conf FILE (imported there by extension), imported here otherwise (raw text / a QR
+    // image the window would never see), so it's never silently dropped.
     async void OnCardDrop(object? sender, DragEventArgs e)
     {
         if (_vm is null || _vm.IsExternal || _vm.IsCustom) return;
         var host = this.FindAncestorOfType<MainView>();
         if (host is null) return;
         var text = e.Data.GetText();
+        Avalonia.Platform.Storage.IStorageFile? file = null;
         if (string.IsNullOrWhiteSpace(text))
         {
-            var file = e.Data.GetFiles()?.OfType<Avalonia.Platform.Storage.IStorageFile>().FirstOrDefault();
+            file = e.Data.GetFiles()?.OfType<Avalonia.Platform.Storage.IStorageFile>().FirstOrDefault();
             if (file is not null)
-                try { await using var s = await file.OpenReadAsync(); using var r = new System.IO.StreamReader(s); text = await r.ReadToEndAsync(); }
+                try
+                {
+                    using var ms = new System.IO.MemoryStream();
+                    await using (var s = await file.OpenReadAsync()) await s.CopyToAsync(ms);
+                    // A dropped QR picture → decode the descriptor out of it; a .conf / descriptor
+                    // file → read it as text.
+                    ms.Position = 0;
+                    text = QrDecode.FromImageStream(ms);
+                    if (string.IsNullOrWhiteSpace(text)) { ms.Position = 0; text = new System.IO.StreamReader(ms).ReadToEnd(); }
+                }
                 catch { }
         }
         if (string.IsNullOrWhiteSpace(text)) return;
-        if (text.Contains("[Interface]", System.StringComparison.OrdinalIgnoreCase)) return; // a whole tunnel -> window imports it
+        if (text.Contains("[Interface]", System.StringComparison.OrdinalIgnoreCase))
+        {
+            var confFile = file?.Name.EndsWith(".conf", System.StringComparison.OrdinalIgnoreCase) == true;
+            if (!confFile && host.DataContext is MainViewModel vm)   // window won't import raw text / a QR image
+            {
+                vm.AddTunnelFromText(text, file is null ? null : System.IO.Path.GetFileNameWithoutExtension(file.Name));
+                e.Handled = true;
+            }
+            return; // a .conf FILE falls through unhandled so the window imports it by extension
+        }
         if (!_vm.IsEditing) _vm.IsEditing = true;   // reveal the edit view so the new peer shows
         host.AddPeerFromText(_vm, text, "dropped code");
         e.Handled = true;
