@@ -471,6 +471,11 @@ public partial class TunnelCard : UserControl
         finally { _measuringAddr = false; }
     }
 
+    // Set by the Android head: reflow the collapsed detail for a narrow, thumb-driven
+    // screen — the cramped right-aligned peer-stats line becomes a 2-column label/value
+    // grid. Desktop leaves this false and keeps the single-line strip.
+    public static bool Compact;
+
     void BuildDetail()
     {
         DetailPanel.Children.Clear();
@@ -578,6 +583,33 @@ public partial class TunnelCard : UserControl
             };
         }
 
+        // Compact (mobile): the peer's live stats as a 2-column label/value grid instead of
+        // a single crowded right-aligned line. Each cell is a muted label over a mono value.
+        void StatGrid(IReadOnlyList<(string K, string V)> cells)
+        {
+            var grid = new Grid
+            {
+                Margin = new Avalonia.Thickness(0, 2, 0, 6),
+                ColumnDefinitions = new ColumnDefinitions("*,*"),
+            };
+            for (int r = 0; r <= (cells.Count - 1) / 2; r++) grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            for (int idx = 0; idx < cells.Count; idx++)
+            {
+                var cell = new StackPanel { Spacing = 1, Margin = new Avalonia.Thickness(0, 0, 10, 6) };
+                var kl = new TextBlock { Text = cells[idx].K };
+                kl.Classes.Add("lbl");
+                // Inherit the theme foreground (don't force a color) so the value reads as ink.
+                var vl = new TextBlock { Text = cells[idx].V, Opacity = 0.92 };
+                vl.Classes.Add("mono");
+                cell.Children.Add(kl);
+                cell.Children.Add(vl);
+                Grid.SetColumn(cell, idx % 2);
+                Grid.SetRow(cell, idx / 2);
+                grid.Children.Add(cell);
+            }
+            DetailPanel.Children.Add(grid);
+        }
+
         // A soft, self-fading divider between peers.
         void AddSeparator()
         {
@@ -607,17 +639,34 @@ public partial class TunnelCard : UserControl
                 var name = string.IsNullOrWhiteSpace(p.Name)
                     ? (_vm.Peers.Count > 1 ? $"peer {i + 1}" : "peer")
                     : p.Name.Trim();
-                string stats;
-                if (p.HasStats)
+                if (Compact)
                 {
-                    var parts = new List<string>();
-                    if (!string.IsNullOrEmpty(p.UptimeText)) parts.Add(p.UptimeText);
-                    parts.Add($"↑ {p.TxTotalText}  ↓ {p.RxTotalText}");
-                    if (p.HasPingHost && !string.IsNullOrEmpty(p.PingText)) parts.Add(p.PingText);
-                    stats = string.Join("   ·   ", parts);
+                    // Name on its own line; stats drop into a 2-column grid below (no crowding).
+                    NameLine(name, p.HasStats ? "" : "·····", accent);
+                    if (p.HasStats)
+                    {
+                        var cells = new List<(string, string)>();
+                        if (!string.IsNullOrEmpty(p.UptimeText)) cells.Add(("uptime", p.UptimeText));
+                        if (p.HasPingHost && !string.IsNullOrEmpty(p.PingText)) cells.Add(("rtt", p.PingText));
+                        cells.Add(("↑ sent", p.TxTotalText));
+                        cells.Add(("↓ recv", p.RxTotalText));
+                        StatGrid(cells);
+                    }
                 }
-                else stats = "·····";
-                NameLine(name, stats, accent);
+                else
+                {
+                    string stats;
+                    if (p.HasStats)
+                    {
+                        var parts = new List<string>();
+                        if (!string.IsNullOrEmpty(p.UptimeText)) parts.Add(p.UptimeText);
+                        parts.Add($"↑ {p.TxTotalText}  ↓ {p.RxTotalText}");
+                        if (p.HasPingHost && !string.IsNullOrEmpty(p.PingText)) parts.Add(p.PingText);
+                        stats = string.Join("   ·   ", parts);
+                    }
+                    else stats = "·····";
+                    NameLine(name, stats, accent);
+                }
 
                 var isActiveMember = p.FailoverRole == "active"
                     || (string.IsNullOrEmpty(p.FailoverRole) && _vm.Host.RouteGroupInfo(p) is { Position: 1 });

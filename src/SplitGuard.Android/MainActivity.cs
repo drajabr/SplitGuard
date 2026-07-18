@@ -23,6 +23,8 @@ public class MainActivity : AvaloniaMainActivity<App>
     protected override AppBuilder CustomizeAppBuilder(AppBuilder builder)
     {
         App.Platform = new AndroidPlatform();
+        // Mobile reflow of the collapsed card detail (2-column stat grid).
+        Views.TunnelCard.Compact = true;
         App.BuildHead = app =>
         {
             if (app.ApplicationLifetime is not ISingleViewApplicationLifetime single) return;
