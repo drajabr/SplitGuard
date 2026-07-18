@@ -367,9 +367,19 @@ public partial class TunnelCard : UserControl
     // Flip the card body to the export QR for `p` (its standalone .conf).
     void ShowExport(PeerViewModel p)
     {
+        // Claim first, then release any other peer that was still mid-export (e.g. its glyph was
+        // tapped during this one's flip, while the detail panel was briefly still hittable).
+        // Reassigning before clearing means the old peer's IsExporting=false is a no-op here
+        // (ReferenceEquals below fails), so it isn't stranded true and can be re-opened later.
+        var prev = _exportingPeer;
         _exportingPeer = p;
+        if (prev is not null && !ReferenceEquals(prev, p)) prev.IsExporting = false;
         ExportTitle.Text = string.IsNullOrWhiteSpace(p.Name) ? "Export config" : $"Export · {p.Name.Trim()}";
-        try { var conf = p.ExportConf; ExportQr.Source = conf.Length > 0 ? QrGen.Generate(conf) : null; }
+        // Generate at the ExportQr Image's own DIP size (220): the on-screen render then only ever
+        // upscales the crisp equal-module bitmap (or maps 1:1 on a 100%-scale desktop). Generating
+        // larger and letting the compositor downscale by a non-integer factor drops/merges modules
+        // and can make a dense config unscannable.
+        try { var conf = p.ExportConf; ExportQr.Source = conf.Length > 0 ? QrGen.Generate(conf, 220) : null; }
         catch { ExportQr.Source = null; }
         FlipExport(true);
     }

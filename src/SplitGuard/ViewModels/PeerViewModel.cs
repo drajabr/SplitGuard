@@ -250,7 +250,19 @@ public partial class PeerViewModel : ObservableObject
     public bool IsExporting
     {
         get => _isExporting;
-        set { if (Set(ref _isExporting, value) && value) Raise(nameof(ExportConf)); }
+        set
+        {
+            // Refuse to open export when we can't actually produce the config (the private key
+            // can't be unprotected on this machine, e.g. a config copied from another device):
+            // surface an error instead of a blank QR / empty clipboard / 0-byte file.
+            if (value && !_isExporting && ExportConf.Length == 0)
+            {
+                _tunnel.Host.ReportError(_tunnel,
+                    "Couldn't export this peer — its private key couldn't be read on this device.");
+                return;
+            }
+            if (Set(ref _isExporting, value) && value) Raise(nameof(ExportConf));
+        }
     }
 
     // The .conf a QR encodes / Copy and Save emit: this device's [Interface] + this one [Peer].
@@ -266,7 +278,9 @@ public partial class PeerViewModel : ObservableObject
             return Models.WireGuardConf.SerializePeer(
                 priv, cfg.Addresses, cfg.ListenPort, HasDns ? Dns.Trim() : null,
                 PublicKey.Trim(), string.IsNullOrWhiteSpace(PresharedKey) ? null : PresharedKey.Trim(),
-                Endpoint, AllowedIpValues.ToList(), ParsedKeepalive);
+                // Only emit a complete host:port endpoint — a half-filled "host:" (host typed,
+                // port blank) would produce a malformed 'Endpoint = host:' line a parser rejects.
+                IsValidEndpoint(Endpoint) ? Endpoint : "", AllowedIpValues.ToList(), ParsedKeepalive);
         }
     }
 

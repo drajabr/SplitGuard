@@ -108,10 +108,25 @@ public class AndroidDialogs : IDialogs
     readonly MainView _view;
     public AndroidDialogs(MainView view) => _view = view;
 
-    public async Task CopyToClipboardAsync(string text)
+    public Task CopyToClipboardAsync(string text)
     {
-        var clipboard = Avalonia.Controls.TopLevel.GetTopLevel(_view)?.Clipboard;
-        if (clipboard is not null) await clipboard.SetTextAsync(text);
+        // Use the native clipboard (not Avalonia's) so the clip can be flagged sensitive: an
+        // exported peer config carries the interface private key, and everything this app copies
+        // is crypto material. On Android 13+ the sensitive flag keeps it out of the clipboard
+        // preview/history so a background app or the paste UI can't skim the key.
+        var ctx = Android.App.Application.Context;
+        if (ctx?.GetSystemService(Android.Content.Context.ClipboardService) is Android.Content.ClipboardManager cm)
+        {
+            var clip = Android.Content.ClipData.NewPlainText("SplitGuard", text);
+            if (Build.VERSION.SdkInt >= BuildVersionCodes.Tiramisu && clip?.Description is not null)
+            {
+                var extras = new PersistableBundle();
+                extras.PutBoolean(Android.Content.ClipDescription.ExtraIsSensitive, true);
+                clip.Description.Extras = extras;
+            }
+            cm.PrimaryClip = clip;
+        }
+        return Task.CompletedTask;
     }
 
     public void Notify(string title, string message, bool isError) =>
@@ -135,6 +150,9 @@ public class AndroidDialogs : IDialogs
         });
         if (file is null) return;
         await using var stream = await file.OpenWriteAsync();
+        // Overwriting an existing (possibly longer) .conf: truncate first so no stale tail
+        // survives — SAF 'w' mode isn't guaranteed to truncate on every DocumentsProvider.
+        if (stream.CanSeek) stream.SetLength(0);
         await using var writer = new StreamWriter(stream);
         await writer.WriteAsync(text);
     }

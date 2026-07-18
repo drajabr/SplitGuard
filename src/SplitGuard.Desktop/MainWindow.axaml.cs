@@ -204,6 +204,7 @@ public partial class MainWindow : Window, IDialogs
         });
         if (file is null) return;
         await using var stream = await file.OpenWriteAsync();
+        if (stream.CanSeek) stream.SetLength(0); // truncate when overwriting a longer existing file
         await using var writer = new StreamWriter(stream);
         await writer.WriteAsync(text);
     }
