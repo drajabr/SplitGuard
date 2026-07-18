@@ -32,6 +32,7 @@ WANT = {
     0xE896: ["ic_fluent_arrow_download_20_regular", "ic_fluent_arrow_download_24_regular"],
     0xE8B5: ["ic_fluent_arrow_download_20_regular", "ic_fluent_arrow_download_24_regular"],
     0xE8C8: ["ic_fluent_copy_20_regular", "ic_fluent_copy_24_regular"],
+    0xE8B8: ["ic_fluent_qr_code_20_regular", "ic_fluent_qr_code_24_regular"],
 }
 
 names = json.load(open(MAP, encoding="utf-8"))  # name -> source codepoint

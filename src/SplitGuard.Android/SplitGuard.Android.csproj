@@ -35,6 +35,8 @@
   <ItemGroup>
     <PackageReference Include="Avalonia.Android" Version="11.2.3" />
     <PackageReference Include="Xamarin.AndroidX.Annotation" Version="1.7.1.1" />
+    <!-- Pure-managed QR decode; fed the camera's luminance plane directly. -->
+    <PackageReference Include="ZXing.Net" Version="0.16.9" />
   </ItemGroup>
   <ItemGroup>
     <!-- Official wireguard-android tunnel library (Apache-2.0) with libwg-go.so rebuilt

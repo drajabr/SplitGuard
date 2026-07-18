@@ -98,15 +98,22 @@
                 BorderThickness="1" CornerRadius="8" Margin="14,0,14,0" Height="0" IsVisible="False">
           <Panel ClipToBounds="True">
             <StackPanel Name="AddCard" Spacing="1" Margin="6" VerticalAlignment="Bottom">
+              <!-- Camera QR import (Android): leads the Add menu; hidden where there's no camera flow. -->
+              <Button Classes="actionrow" Name="ScanQrRow" Click="OnScanQrClick" IsVisible="False">
+                <DockPanel>
+                  <TextBlock DockPanel.Dock="Left" Classes="glyph accentfg" Text="&#xE8B8;" VerticalAlignment="Center" Margin="0,0,10,0" />
+                  <TextBlock Text="Scan QR code" Classes="setlabel" />
+                </DockPanel>
+              </Button>
               <Button Classes="actionrow" Click="OnImportClick">
                 <DockPanel>
-                  <TextBlock DockPanel.Dock="Right" Classes="muted" Text="Ctrl+O" VerticalAlignment="Center" />
+                  <TextBlock DockPanel.Dock="Right" Name="ImportShortcut" Classes="muted" Text="Ctrl+O" VerticalAlignment="Center" />
                   <TextBlock Text="Import configuration…" Classes="setlabel" />
                 </DockPanel>
               </Button>
               <Button Classes="actionrow" Click="OnNewTunnelClick">
                 <DockPanel>
-                  <TextBlock DockPanel.Dock="Right" Classes="muted" Text="Ctrl+N" VerticalAlignment="Center" />
+                  <TextBlock DockPanel.Dock="Right" Name="NewShortcut" Classes="muted" Text="Ctrl+N" VerticalAlignment="Center" />
                   <TextBlock Text="New empty tunnel" Classes="setlabel" />
                 </DockPanel>
               </Button>
@@ -129,6 +136,35 @@
               <Border Grid.Column="1" Width="1" Background="{DynamicResource SeparatorBrush}" Margin="14,0" />
               <StackPanel Grid.Column="2" Name="AppearanceList" Spacing="9" VerticalAlignment="Center" />
             </Grid>
+          </Panel>
+        </Border>
+
+        <!-- QR scan drawer (Android): a live camera preview lives in a card like the Settings
+             drawer. QrHost is filled by the platform's scanner preview; the corner frame + hint
+             overlay it. Grows up from the bar with the same mechanism. -->
+        <Border Name="QrRegion" Classes="drawer"
+                Background="{DynamicResource MenuSurfaceBrush}" BorderBrush="{DynamicResource HairlineBrush}"
+                BorderThickness="1" CornerRadius="8" Margin="14,0,14,0" Height="0" IsVisible="False">
+          <Panel ClipToBounds="True">
+            <StackPanel Name="QrCard" Spacing="10" Margin="12" VerticalAlignment="Bottom">
+              <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+                <TextBlock Grid.Column="0" Classes="glyph accentfg" Text="&#xE8B8;" FontSize="{DynamicResource Fs14}" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="Scan tunnel QR" Classes="setlabel" Margin="8,0,0,0" VerticalAlignment="Center" />
+                <Button Grid.Column="2" Classes="hdr" Click="OnQrCancelClick" Padding="10,4">
+                  <TextBlock Text="Cancel" Classes="setlabel" />
+                </Button>
+              </Grid>
+              <!-- 1:1 camera stage: preview fills, corner brackets frame the target. -->
+              <Panel Height="240" ClipToBounds="True">
+                <Border CornerRadius="10" ClipToBounds="True" Background="#0A0A0A">
+                  <ContentControl Name="QrHost" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+                </Border>
+                <Border Width="150" Height="150" HorizontalAlignment="Center" VerticalAlignment="Center"
+                        BorderBrush="{DynamicResource AccentBrush}" BorderThickness="2.5" CornerRadius="12" />
+                <TextBlock Text="Point at a WireGuard QR" Classes="muted" FontSize="{DynamicResource Fs11}"
+                           HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,8" />
+              </Panel>
+            </StackPanel>
           </Panel>
         </Border>
 

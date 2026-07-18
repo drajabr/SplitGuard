@@ -19,6 +19,20 @@ namespace SplitGuard.Droid;
 public class MainActivity : AvaloniaMainActivity<App>
 {
     const int VpnConsentRequest = 71;
+    const int CameraPermRequest = 72;
+    static Action? _cameraGranted;
+
+    // Called by the QR scanner when CAMERA isn't granted yet: prompt, then run the callback
+    // once (whether granted or denied — the scanner re-checks the permission).
+    public static void RequestCameraThen(Action then)
+    {
+        var act = Current;
+        if (act is null) { then(); return; }
+        _cameraGranted = then;
+        act.RequestPermissions(new[] { Android.Manifest.Permission.Camera }, CameraPermRequest);
+    }
+
+    public static MainActivity? Current { get; private set; }
 
     protected override AppBuilder CustomizeAppBuilder(AppBuilder builder)
     {
@@ -46,11 +60,23 @@ public class MainActivity : AvaloniaMainActivity<App>
     protected override void OnResume()
     {
         base.OnResume();
+        Current = this;
         // The VPN consent dialog (one-time, or again after revocation) must come from an
         // Activity. Ask up front so the connect toggle just works.
         var consent = Android.Net.VpnService.Prepare(this);
         if (consent is not null)
             StartActivityForResult(consent, VpnConsentRequest);
+    }
+
+    public override void OnRequestPermissionsResult(int requestCode, string[] permissions, Permission[] grantResults)
+    {
+        base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == CameraPermRequest)
+        {
+            var cb = _cameraGranted;
+            _cameraGranted = null;
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => cb?.Invoke());
+        }
     }
 }
 

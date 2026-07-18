@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
@@ -8,7 +8,9 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using Avalonia.Styling;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
+using SplitGuard.Services;
 using SplitGuard.ViewModels;
 
 namespace SplitGuard.Views;
@@ -161,6 +163,10 @@ public partial class MainView : UserControl
         BuildSettingsPanel();
         // The Add drawer's rescan row only makes sense where an external client exists.
         RescanRow.IsVisible = (DataContext as MainViewModel)?.HasExternalTunnels ?? true;
+        // The camera "Scan QR code" row only where the platform has a scan flow (Android).
+        ScanQrRow.IsVisible = (DataContext as MainViewModel)?.Platform.SupportsQrScan ?? false;
+        // Keyboard-shortcut hints are meaningless on the touch (compact) build.
+        ImportShortcut.IsVisible = NewShortcut.IsVisible = !TunnelCard.Compact;
     }
 
     void ApplyFont()
@@ -346,14 +352,57 @@ public partial class MainView : UserControl
     // ---- bottom-bar drawers: Settings and Add each grow their own card upward over the list;
     // only one is open at a time, and any outside press closes it. --------------------------------
 
-    enum Drawer { None, Settings, Add }
+    enum Drawer { None, Settings, Add, Qr }
     Drawer _openDrawer = Drawer.None;
-    int _setGen, _addGen; // per-region guards cancelling a stale expand/collapse finalize
+    int _setGen, _addGen, _qrGen; // per-region guards cancelling a stale expand/collapse finalize
+    IQrScanner? _scanner;
 
     void OnSettingsToggleClick(object? sender, RoutedEventArgs e) =>
         SetDrawer(_openDrawer == Drawer.Settings ? Drawer.None : Drawer.Settings);
     void OnAddToggleClick(object? sender, RoutedEventArgs e) =>
         SetDrawer(_openDrawer == Drawer.Add ? Drawer.None : Drawer.Add);
+    void OnQrCancelClick(object? sender, RoutedEventArgs e) => SetDrawer(Drawer.None);
+
+    // Add → Scan QR: close the Add menu, build the camera scanner, host its preview in the QR
+    // drawer, and open it. A decoded config imports exactly like the file/paste flows.
+    void OnScanQrClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        DisposeScanner();
+        _scanner = vm.Platform.CreateQrScanner();
+        if (_scanner is null) return;
+        QrHost.Content = _scanner.Preview;
+        _scanner.Decoded += OnQrDecoded;
+        _scanner.Failed += OnQrFailed;
+        SetDrawer(Drawer.Qr);
+        _scanner.Start();
+    }
+
+    void OnQrDecoded(string text) => Dispatcher.UIThread.Post(() =>
+    {
+        SetDrawer(Drawer.None); // stops + disposes the scanner
+        if (DataContext is MainViewModel vm)
+        {
+            if (MainViewModel.LooksLikeConfig(text)) vm.AddTunnelFromText(text, null);
+            else { vm.StatusText = "That QR isn't a WireGuard configuration"; vm.StatusOk = false; }
+        }
+    });
+
+    void OnQrFailed(string message) => Dispatcher.UIThread.Post(() =>
+    {
+        SetDrawer(Drawer.None);
+        if (DataContext is MainViewModel vm) { vm.StatusText = message; vm.StatusOk = false; }
+    });
+
+    void DisposeScanner()
+    {
+        if (_scanner is null) return;
+        _scanner.Decoded -= OnQrDecoded;
+        _scanner.Failed -= OnQrFailed;
+        try { _scanner.Stop(); _scanner.Dispose(); } catch { }
+        _scanner = null;
+        QrHost.Content = null;
+    }
 
     // Collapse the open drawer when a press lands outside both drawers and both toggles (a tunnel
     // card, the list, the title bar). Tunnelled + handledEventsToo so it fires even when a child
@@ -363,7 +412,8 @@ public partial class MainView : UserControl
         if (_openDrawer == Drawer.None) return;
         for (var el = e.Source as Visual; el is not null; el = el.GetVisualParent())
             if (ReferenceEquals(el, SettingsRegion) || ReferenceEquals(el, SettingsToggle)
-                || ReferenceEquals(el, AddRegion) || ReferenceEquals(el, AddToggle)) return;
+                || ReferenceEquals(el, AddRegion) || ReferenceEquals(el, AddToggle)
+                || ReferenceEquals(el, QrRegion)) return;
         SetDrawer(Drawer.None);
     }
 
@@ -371,20 +421,24 @@ public partial class MainView : UserControl
     // open so its state is fresh (e.g. after a tray toggle); the Add card is static.
     void SetDrawer(Drawer which)
     {
+        // Leaving the QR drawer must release the camera.
+        if (_openDrawer == Drawer.Qr && which != Drawer.Qr) DisposeScanner();
         _openDrawer = which;
         if (which == Drawer.Settings) BuildSettingsPanel();
         // ".open" wears the floating shadow — a closed (zero-height) region must paint nothing.
         SettingsRegion.Classes.Set("open", which == Drawer.Settings);
         AddRegion.Classes.Set("open", which == Drawer.Add);
+        QrRegion.Classes.Set("open", which == Drawer.Qr);
         AnimateRegion(SettingsRegion, SettingsCard, SettingsChevron, which == Drawer.Settings, ++_setGen, () => _setGen);
         AnimateRegion(AddRegion, AddCard, AddChevron, which == Drawer.Add, ++_addGen, () => _addGen);
+        AnimateRegion(QrRegion, QrCard, null, which == Drawer.Qr, ++_qrGen, () => _qrGen);
     }
 
     // Tween a region's Height between 0 and its card's natural height (shared Slow token), then
     // release to Auto when open so it follows content. gen/cur guard against rapid re-toggle.
-    void AnimateRegion(Border region, Control card, TextBlock chevron, bool open, int gen, Func<int> cur)
+    void AnimateRegion(Border region, Control card, TextBlock? chevron, bool open, int gen, Func<int> cur)
     {
-        chevron.Text = open ? "" : ""; // down = click to close; up = opens upward
+        if (chevron is not null) chevron.Text = open ? "" : ""; // down = click to close; up = opens upward
         // A closed drawer must leave the tab order entirely — a zero-height region still has
         // IsVisible children, so Tab would land on invisible toggles and Enter/Space would
         // activate them (e.g. silently flipping "Start on Windows startup"). Show before the

@@ -85,9 +85,25 @@ public sealed class PassThroughProtector : IKeyProtector
     public string Unprotect(string protectedBase64) => protectedBase64;
 }
 
+// A live camera QR scanner surfaced inside the app UI (a drawer card, not a screen).
+// The preview is an Avalonia control the host builds; Decoded fires with the raw text of
+// a scanned code (a WireGuard .conf) on the UI thread.
+public interface IQrScanner : IDisposable
+{
+    // The live preview control to drop into the QR drawer.
+    Avalonia.Controls.Control Preview { get; }
+    event Action<string>? Decoded;
+    event Action<string>? Failed;   // permission denied / camera error (message for a toast)
+    void Start();
+    void Stop();
+}
+
 // Everything the shared UI/view models need from the host platform.
 public interface IPlatform
 {
+    // Camera QR import (Android). Null where there's no camera scan flow (desktop).
+    IQrScanner? CreateQrScanner();
+
     string ConfigDirectory { get; }
     IKeyProtector KeyProtector { get; }
     ITunnelEngine CreateEngine();
@@ -98,6 +114,7 @@ public interface IPlatform
     bool SupportsStartup { get; }          // run-at-boot + UAC-skip launcher
     bool SupportsInstallerUpdate { get; }  // download-and-run installer self-update
     bool SupportsSplitDnsToggle { get; }   // Android: in-tunnel forwarder on/off fallback
+    bool SupportsQrScan { get; }           // camera "Scan QR code" add flow
 
     void SetStartOnBoot(bool on);
     void SetSkipUacLaunch(bool on);
