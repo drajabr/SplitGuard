@@ -54,9 +54,20 @@ public partial class TunnelCard : UserControl
     TunnelViewModel? _vm;
     bool _syncingEditor;
 
+    // Card-level export QR overlay (works from the collapsed detail AND the edit view — one
+    // mechanism, triggered by a peer's IsExporting). The body flips to reveal it.
+    readonly ScaleTransform _exportFlip = new(1, 1);
+    PeerViewModel? _exportingPeer;
+    int _exportGen;
+
     public TunnelCard()
     {
         InitializeComponent();
+        BodyContent.RenderTransform = _exportFlip;
+        BodyContent.RenderTransformOrigin = RelativePoint.Center;
+        ExportClose.Click += (_, _) => { if (_exportingPeer is not null) _exportingPeer.IsExporting = false; };
+        ExportCopy.Click += (_, _) => _exportingPeer?.CopyExportCommand.Execute(null);
+        ExportSave.Click += (_, _) => _exportingPeer?.SaveExportCommand.Execute(null);
         ConfEditor.SyntaxHighlighting = ConfHighlighting;
         ConfEditor.TextChanged += (_, _) =>
         {
@@ -216,6 +227,7 @@ public partial class TunnelCard : UserControl
         }
         if (e.PropertyName == nameof(TunnelViewModel.IsEditing) && _vm is not null)
         {
+            ResetExport(); // an open export overlay doesn't survive an edit-state change
             // Leaving edit: rebuild the detail first — theme/accent may have changed while the
             // detail was hidden (the StatsTick rebuild is skipped during edits), and the pills
             // snapshot brush instances, so an un-rebuilt detail would show the old palette.
@@ -225,13 +237,11 @@ public partial class TunnelCard : UserControl
         }
     }
 
-    // Swap the visible body pane and animate the card height to the new content.
-    // EXPAND (detail -> edit): the edit pane becomes visible immediately and the growing clip
-    // reveals it while it fades/slides in — a curtain opening.
-    // COLLAPSE (edit -> detail): the edit pane STAYS visible while the card shrinks (the clip
-    // eats it bottom-up — a curtain closing), and only at the settled height does the detail
-    // swap in with the fade. Hiding the edit pane up front left the card animating a blank
-    // void under the early-shown detail for the whole tween.
+    // Swap the visible body pane and animate the card height to the new content. Both
+    // directions are symmetric: the outgoing pane hides and the incoming one starts its
+    // fade/slide-in the instant the height tween begins, so collapse reveals the detail
+    // immediately (it used to keep the edit pane up and swap the detail in only once the card
+    // had settled, which read as a delayed jump). The height rides from -> to underneath.
     void SwapBody(bool editing)
     {
         var show = editing ? (Control)ExpandContent : DetailPanel;
@@ -241,12 +251,9 @@ public partial class TunnelCard : UserControl
         var w = Body.Bounds.Width;
         if (w < 1) w = 400;
 
-        // Measure the target pane (it must be visible for Measure to see its content; for the
-        // collapse path flip it back immediately — nothing renders between the two writes).
-        var wasVisible = show.IsVisible;
+        // Measure the target pane (it must be visible for Measure to see its content).
         show.IsVisible = true;
         var to = NaturalHeight(show, w);
-        if (!editing && !wasVisible) show.IsVisible = false;
 
         if (to < 1 || from < 1 || Math.Abs(to - from) < 0.5)
         {
@@ -277,22 +284,15 @@ public partial class TunnelCard : UserControl
                 });
         }
 
-        if (editing)
-        {
-            hide.IsVisible = false;
-            RevealShow();               // reveal rides the growing clip
-        }
+        // Hide the outgoing pane and reveal the incoming one immediately, in BOTH directions.
+        hide.IsVisible = false;
+        RevealShow();
         Body.Height = from;
         Tween(from, to, AnimMs,
             v => { if (_animGen == gen) Body.Height = v; },
             () =>
             {
                 if (_animGen != gen) return;
-                if (!editing)
-                {
-                    hide.IsVisible = false; // the curtain has fully closed over the edit pane
-                    RevealShow();           // detail fades in at the settled height
-                }
                 Body.Height = double.NaN;
                 _postTween.Restart();
             });
@@ -353,8 +353,66 @@ public partial class TunnelCard : UserControl
 
     void HookPeer(PeerViewModel p, bool add)
     {
-        if (add) { p.Domains.CollectionChanged += OnContentChanged; p.AllowedIps.CollectionChanged += OnContentChanged; }
-        else { p.Domains.CollectionChanged -= OnContentChanged; p.AllowedIps.CollectionChanged -= OnContentChanged; }
+        if (add) { p.Domains.CollectionChanged += OnContentChanged; p.AllowedIps.CollectionChanged += OnContentChanged; p.PropertyChanged += OnPeerPropertyChanged; }
+        else { p.Domains.CollectionChanged -= OnContentChanged; p.AllowedIps.CollectionChanged -= OnContentChanged; p.PropertyChanged -= OnPeerPropertyChanged; }
+    }
+
+    void OnPeerPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(PeerViewModel.IsExporting) || sender is not PeerViewModel p) return;
+        if (p.IsExporting) ShowExport(p);
+        else if (ReferenceEquals(_exportingPeer, p)) HideExport();
+    }
+
+    // Flip the card body to the export QR for `p` (its standalone .conf).
+    void ShowExport(PeerViewModel p)
+    {
+        _exportingPeer = p;
+        ExportTitle.Text = string.IsNullOrWhiteSpace(p.Name) ? "Export config" : $"Export · {p.Name.Trim()}";
+        try { var conf = p.ExportConf; ExportQr.Source = conf.Length > 0 ? QrGen.Generate(conf) : null; }
+        catch { ExportQr.Source = null; }
+        FlipExport(true);
+    }
+
+    void HideExport() => FlipExport(false);
+
+    void FlipExport(bool toExport)
+    {
+        var gen = ++_exportGen;
+        Tween(_exportFlip.ScaleX, 0, Motion.FastMs, v => { if (_exportGen == gen) _exportFlip.ScaleX = v; }, () =>
+        {
+            if (_exportGen != gen) return;
+            if (toExport)
+            {
+                DetailPanel.IsVisible = false;
+                ExpandContent.IsVisible = false;
+                ExportOverlay.IsVisible = true;
+            }
+            else
+            {
+                ExportOverlay.IsVisible = false;
+                ExportQr.Source = null;
+                var editing = _vm?.IsEditing ?? false;
+                ExpandContent.IsVisible = editing;
+                DetailPanel.IsVisible = !editing;
+                _exportingPeer = null;
+            }
+            Body.Height = double.NaN; // auto — resize to the new face
+            Tween(0, 1, Motion.FastMs, v => { if (_exportGen == gen) _exportFlip.ScaleX = v; });
+        });
+    }
+
+    // Cancel an open export overlay immediately (no flip) — used when the card's edit state
+    // changes underneath it.
+    void ResetExport()
+    {
+        if (_exportingPeer is null) return;
+        _exportingPeer.IsExporting = false;
+        _exportingPeer = null;
+        ++_exportGen;
+        ExportOverlay.IsVisible = false;
+        ExportQr.Source = null;
+        _exportFlip.ScaleX = 1;
     }
 
     void OnPeersChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -532,19 +590,32 @@ public partial class TunnelCard : UserControl
             DetailPanel.Children.Add(grid);
         }
 
-        // The peer's name (bold accent) with its live status flushed right — uptime, transfer
-        // totals and RTT while connected, or dots when it isn't.
-        void NameLine(string name, string stats, IBrush accent)
+        // The peer's name (bold accent) then a small export-QR icon, with its live status
+        // flushed right — uptime, transfer totals and RTT while connected, or dots when it isn't.
+        void NameLine(string name, string stats, IBrush accent, PeerViewModel? peer)
         {
             var grid = new Grid
             {
                 Margin = new Avalonia.Thickness(0, 0, 0, 4),
-                ColumnDefinitions = new ColumnDefinitions("Auto,*"),
+                ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*"),
             };
             var nm = Mono(name, accent);
             nm.FontWeight = Avalonia.Media.FontWeight.Bold;
             Grid.SetColumn(nm, 0);
             grid.Children.Add(nm);
+            // Export this peer's config for another device (flips the card to a QR).
+            if (peer is { CanExport: true })
+            {
+                var glyph = new TextBlock { Text = "", Foreground = accent, FontSize = 13, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center };
+                glyph.Classes.Add("glyph");
+                var btn = new Button { Content = glyph, Margin = new Avalonia.Thickness(8, 0, 0, 0), VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center };
+                btn.Classes.Add("icon");
+                ToolTip.SetTip(btn, "Export this peer's configuration (QR · copy · save)");
+                var captured = peer;
+                btn.Click += (_, _) => captured.IsExporting = true;
+                Grid.SetColumn(btn, 1);
+                grid.Children.Add(btn);
+            }
             var st = new TextBlock
             {
                 Text = stats, Opacity = 0.65,
@@ -552,7 +623,7 @@ public partial class TunnelCard : UserControl
                 TextAlignment = Avalonia.Media.TextAlignment.Right,
             };
             st.Classes.Add("mono");
-            Grid.SetColumn(st, 1);
+            Grid.SetColumn(st, 2);
             grid.Children.Add(st);
             DetailPanel.Children.Add(grid);
         }
@@ -642,7 +713,7 @@ public partial class TunnelCard : UserControl
                 if (Compact)
                 {
                     // Name on its own line; stats drop into a 2-column grid below (no crowding).
-                    NameLine(name, p.HasStats ? "" : "·····", accent);
+                    NameLine(name, p.HasStats ? "" : "·····", accent, p);
                     if (p.HasStats)
                     {
                         var cells = new List<(string, string)>();
@@ -665,7 +736,7 @@ public partial class TunnelCard : UserControl
                         stats = string.Join("   ·   ", parts);
                     }
                     else stats = "·····";
-                    NameLine(name, stats, accent);
+                    NameLine(name, stats, accent, p);
                 }
 
                 var isActiveMember = p.FailoverRole == "active"

@@ -6,8 +6,7 @@
              x:Class="SplitGuard.Views.PeerBlock"
              ClipToBounds="False">
   <Border Classes="peerblock" Margin="12,4,12,8">
-    <Panel Name="FlipHost">
-    <StackPanel Name="FrontContent">
+    <StackPanel>
       <!-- Header (always visible; clicking its empty space toggles the body, like the
            tunnel card): name on the left, live status on the right. -->
       <DockPanel Name="HeaderRow" Background="Transparent" Margin="0,9,14,3">
@@ -171,40 +170,5 @@
                 HorizontalAlignment="Right" Margin="0,0,14,6" FontSize="{DynamicResource Fs115}" />
       </StackPanel>
     </StackPanel>
-
-    <!-- Export face: the peer card flips to show a QR of a standalone .conf that replicates
-         this connection on another device, with Copy-to-clipboard and Save-to-file. -->
-    <StackPanel Name="BackContent" IsVisible="False" Margin="14,10,14,12" Spacing="11">
-      <DockPanel>
-        <Button DockPanel.Dock="Right" Classes="icon" Command="{Binding HideExportCommand}"
-                VerticalAlignment="Center" ToolTip.Tip="Back">
-          <TextBlock Classes="glyph" Text="&#xE711;" FontSize="{DynamicResource Fs14}" Opacity="0.7" />
-        </Button>
-        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-          <TextBlock Classes="glyph accentfg" Text="&#xE8B8;" FontSize="{DynamicResource Fs14}" VerticalAlignment="Center" />
-          <TextBlock Text="Export config" Classes="accentfg" FontWeight="Bold" FontSize="{DynamicResource Fs14}" VerticalAlignment="Center" />
-        </StackPanel>
-      </DockPanel>
-      <Border Background="White" CornerRadius="10" Padding="12" HorizontalAlignment="Center" BoxShadow="{DynamicResource CardShadow}">
-        <Image Name="QrImage" Width="220" Height="220" RenderOptions.BitmapInterpolationMode="None" />
-      </Border>
-      <TextBlock Classes="muted" HorizontalAlignment="Center" FontSize="{DynamicResource Fs11}"
-                 Text="Scan on another device, or:" />
-      <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
-        <Button Classes="hdr" Command="{Binding CopyExportCommand}" Padding="12,7">
-          <StackPanel Orientation="Horizontal" Spacing="7">
-            <TextBlock Classes="glyph accentfg" Text="&#xE8C8;" FontSize="{DynamicResource Fs13}" />
-            <TextBlock Text="Copy" Classes="setlabel" />
-          </StackPanel>
-        </Button>
-        <Button Classes="hdr" Command="{Binding SaveExportCommand}" Padding="12,7">
-          <StackPanel Orientation="Horizontal" Spacing="7">
-            <TextBlock Classes="glyph accentfg" Text="&#xE896;" FontSize="{DynamicResource Fs13}" />
-            <TextBlock Text="Save file" Classes="setlabel" />
-          </StackPanel>
-        </Button>
-      </StackPanel>
-    </StackPanel>
-    </Panel>
   </Border>
 </UserControl>

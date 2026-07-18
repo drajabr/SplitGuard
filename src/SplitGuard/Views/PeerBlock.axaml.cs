@@ -16,16 +16,13 @@ public partial class PeerBlock : UserControl
 
     PeerViewModel? _vm;
     readonly TranslateTransform _shift = new(0, 0);
-    readonly ScaleTransform _flip = new(1, 1);
-    int _revealGen, _flipGen;
+    int _revealGen;
 
     public PeerBlock()
     {
         InitializeComponent();
         PeerBody.RenderTransform = _shift;
         PeerBody.ClipToBounds = true; // clip its own animated-height curtain
-        FlipHost.RenderTransform = _flip;
-        FlipHost.RenderTransformOrigin = RelativePoint.Center;
 
         DataContextChanged += (_, _) =>
         {
@@ -40,11 +37,6 @@ public partial class PeerBlock : UserControl
             PeerBody.Opacity = exp ? 1 : 0;
             PeerBody.Height = exp ? double.NaN : 0;
             _shift.Y = 0;
-            // Reset the flip when the row is rebound to a different peer.
-            _flip.ScaleX = 1;
-            FrontContent.IsVisible = true;
-            BackContent.IsVisible = false;
-            QrImage.Source = null;
         };
 
         // Clicking the header's empty space toggles the peer body, like the tunnel card;
@@ -64,29 +56,6 @@ public partial class PeerBlock : UserControl
     {
         if (e.PropertyName == nameof(PeerViewModel.IsExpanded) && _vm is not null)
             AnimateReveal(_vm.IsExpanded);
-        else if (e.PropertyName == nameof(PeerViewModel.IsExporting) && _vm is not null)
-            Flip(_vm.IsExporting);
-    }
-
-    // Flip the peer card between its normal face and the export QR: a quick horizontal
-    // squash to zero, swap the visible face (rendering the QR the first time), unsquash.
-    void Flip(bool toExport)
-    {
-        var gen = ++_flipGen;
-        TunnelCard.Tween(_flip.ScaleX, 0, Motion.FastMs, v => { if (_flipGen == gen) _flip.ScaleX = v; }, () =>
-        {
-            if (_flipGen != gen) return;
-            FrontContent.IsVisible = !toExport;
-            BackContent.IsVisible = toExport;
-            if (toExport)
-            {
-                var conf = _vm?.ExportConf ?? "";
-                try { QrImage.Source = conf.Length > 0 ? QrGen.Generate(conf) : null; }
-                catch { QrImage.Source = null; }
-            }
-            else QrImage.Source = null;
-            TunnelCard.Tween(0, 1, Motion.FastMs, v => { if (_flipGen == gen) _flip.ScaleX = v; });
-        });
     }
 
     // The peer body runs its own clipped height curtain, symmetric both ways: expand grows its

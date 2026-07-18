@@ -13,7 +13,7 @@ namespace SplitGuard.Droid;
 [Activity(
     Label = "SplitGuard",
     Theme = "@style/SplitGuardTheme",
-    Icon = "@mipmap/appicon",
+    Icon = "@drawable/icon",
     MainLauncher = true,
     Exported = true,
     ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.UiMode)]
