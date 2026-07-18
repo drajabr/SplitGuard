@@ -2,12 +2,16 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:views="clr-namespace:SplitGuard.Views"
              x:Class="SplitGuard.Views.MainView">
-  <DockPanel>
-    <!-- Title strip inside the extended-client title bar. No background of its own — the
-         window's page background shows through, so the strip is the same color as the view.
-         The strip content has no background either, so empty areas still fall through to the
-         OS caption and drag the window natively; only the update button captures the pointer. -->
-    <Panel DockPanel.Dock="Top">
+  <!-- PageRoot carries the themed page background. It must live on a control that actually
+       renders its Background: a Window under ExtendClientAreaToDecorationsHint does NOT paint its
+       own Background behind a UserControl child (the page went black on light themes), so the
+       shared view paints the page itself. Because the strip is now opaque, native caption
+       fall-through can't drag the window, so the title strip drives BeginMoveDrag explicitly. -->
+  <DockPanel Name="PageRoot">
+    <!-- Title strip inside the extended-client title bar: same color as the page (PageRoot paints
+         it), and empty areas start a window move-drag (code-behind); the update button and logo
+         opt out (button captures the pointer, logo/text are hit-test-invisible). -->
+    <Panel DockPanel.Dock="Top" Name="TitleStrip" Background="Transparent">
       <Border Padding="14,5,146,5">
         <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
           <Image Name="LogoImage" Source="avares://SplitGuard.Core/Assets/app.ico" Width="24" Height="24"

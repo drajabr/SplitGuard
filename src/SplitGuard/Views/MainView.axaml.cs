@@ -112,6 +112,20 @@ public partial class MainView : UserControl
             TopLevel.GetTopLevel(this)?.RemoveHandler(PointerPressedEvent, OnHostPointerPressed);
             DisposeScanner(); // release the camera if the QR drawer is open when the view leaves
         };
+        // Window move-drag from the title strip. The strip is opaque now (PageRoot paints it), so
+        // empty areas can't fall through to the native caption — start the drag ourselves. Only a
+        // desktop Window responds (Android's VisualRoot isn't a Window → no-op); the update button
+        // opts out so its click isn't swallowed by the drag.
+        TitleStrip.AddHandler(PointerPressedEvent, OnTitleStripPressed, RoutingStrategies.Tunnel);
+    }
+
+    void OnTitleStripPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (VisualRoot is not Window w) return;                       // desktop only
+        if (!e.GetCurrentPoint(TitleStrip).Properties.IsLeftButtonPressed) return;
+        for (var el = e.Source as Visual; el is not null && el != TitleStrip; el = el.GetVisualParent())
+            if (el is Button) return;                                 // let the update button click through
+        w.BeginMoveDrag(e);
     }
 
     bool _clusterHover;
@@ -208,8 +222,13 @@ public partial class MainView : UserControl
         }
         var resources = Avalonia.Application.Current!.Resources;
 
-        if (t.Page is null) ChromeTarget.ClearValue(BackgroundProperty);
-        else ChromeTarget.Background = new SolidColorBrush(Color.Parse(t.Page));
+        // The page background paints on PageRoot (the view's own root), NOT on ChromeTarget: on
+        // desktop ChromeTarget is the Window, and a Window under ExtendClientAreaToDecorationsHint
+        // does not render its Background behind the UserControl content (the whole page, title
+        // strip included, went black on the light/white themes). PageRoot is a Panel, so it always
+        // paints. Foreground/font stay on ChromeTarget (they inherit down into the view either way).
+        if (t.Page is null) PageRoot.ClearValue(BackgroundProperty);
+        else PageRoot.Background = new SolidColorBrush(Color.Parse(t.Page));
         // Light themes: Fluent's default foreground is a softened ~89% black that reads dull on
         // the bright pages — force a crisp near-black. Dark themes keep the theme default.
         if (EffectiveVariant() == ThemeVariant.Light) ChromeTarget.Foreground = new SolidColorBrush(Color.Parse("#17191B"));
