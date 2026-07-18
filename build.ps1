@@ -1,6 +1,9 @@
 ﻿# Builds the SplitGuard installer: dist\SplitGuard-Setup-<version>.exe (x64 only).
 # Requires the .NET 8 SDK and Inno Setup 6. The repo-root VERSION file is the single
 # source of truth for the version (csproj, installer, and CI release tag all read it).
+# Also builds the signed Android APK into dist\ when the android toolchain is present;
+# pass -SkipAndroid for a Windows-only build.
+param([switch]$SkipAndroid)
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
 $WgNtVersion = "0.10.1"
@@ -84,4 +87,73 @@ if ($iscc) {
 }
 else {
     Write-Host "Done (no installer): $out\SplitGuard.exe"
+}
+
+# --- Android APK -----------------------------------------------------------------------
+# Publishes the signed Release APK into dist\SplitGuard-<version>.apk (same keystore and
+# version scheme as CI). Best-effort: needs the `android` workload, JDK 17, and the Android
+# SDK, so a Windows-only checkout skips it with a warning and still ships the installer.
+# Pass -SkipAndroid to skip it deliberately.
+if (-not $SkipAndroid) {
+    $androidProj = Join-Path $root "src\SplitGuard.Android\SplitGuard.Android.csproj"
+    $hasAndroid = $false
+    try { $hasAndroid = [bool](((& $dotnetExe workload list) -join "`n") -match '(?im)^\s*android\b') } catch {}
+
+    if (-not $hasAndroid) {
+        Write-Warning "Android workload not installed - skipping APK. Install with: dotnet workload install android"
+    }
+    else {
+        Write-Host "Building Android APK..."
+        # Locate JDK 17 (skip a stray JDK 21) and the Android SDK; pass them when found,
+        # otherwise let MSBuild auto-detect.
+        $androidProps = @()
+        $jdk = @(
+            $env:JAVA_HOME,
+            "$env:ProgramFiles\Microsoft\jdk-17*",
+            "$env:ProgramFiles\Eclipse Adoptium\jdk-17*",
+            "$env:ProgramFiles\Java\jdk-17*",
+            "$env:ProgramFiles\Android\Android Studio\jbr"
+        ) | Where-Object { $_ } | ForEach-Object { Get-Item $_ -ErrorAction SilentlyContinue } |
+            Where-Object { $_ -and (Test-Path (Join-Path $_.FullName "bin\java.exe")) } | Select-Object -First 1
+        if ($jdk) { $androidProps += "-p:JavaSdkDirectory=$($jdk.FullName)" }
+
+        $sdk = @($env:ANDROID_HOME, $env:ANDROID_SDK_ROOT, "$env:LOCALAPPDATA\Android\Sdk") |
+            Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+        if ($sdk) { $androidProps += "-p:AndroidSdkDirectory=$sdk" }
+
+        # OneDrive can hold a lock on obj\...\generated, failing the bindings clean; drop the
+        # stale APK and generated sources so the signed Release publish starts clean.
+        $abin = Join-Path $root "src\SplitGuard.Android\bin\Release"
+        $agen = Join-Path $root "src\SplitGuard.Android\obj\Release\net8.0-android34.0\generated"
+        Remove-Item -Recurse -Force $abin -ErrorAction SilentlyContinue
+        Remove-Item -Recurse -Force $agen -ErrorAction SilentlyContinue
+
+        $code = 1
+        foreach ($attempt in 1..2) {   # one retry for the transient OneDrive lock
+            & $dotnetExe publish $androidProj -c Release @androidProps -v q
+            $code = $LASTEXITCODE
+            if ($code -eq 0) { break }
+            if ($attempt -eq 1) {
+                Write-Warning "Android publish failed (retrying once - OneDrive lock?)..."
+                Remove-Item -Recurse -Force $agen -ErrorAction SilentlyContinue
+                Start-Sleep -Seconds 2
+            }
+        }
+
+        if ($code -ne 0) {
+            Write-Warning "Android APK build failed - the Windows installer is still in $dist."
+        }
+        else {
+            $apk = Get-ChildItem $abin -Recurse -Filter "*-Signed.apk" -ErrorAction SilentlyContinue |
+                Sort-Object LastWriteTime -Descending | Select-Object -First 1
+            if ($apk) {
+                $apkOut = Join-Path $dist "SplitGuard-$version.apk"
+                Copy-Item $apk.FullName $apkOut -Force
+                Write-Host "Done: $apkOut"
+            }
+            else {
+                Write-Warning "Signed APK not found under $abin."
+            }
+        }
+    }
 }
