@@ -13,7 +13,7 @@ namespace SplitGuard.Droid;
 [Activity(
     Label = "SplitGuard",
     Theme = "@style/SplitGuardTheme",
-    Icon = "@drawable/icon",
+    Icon = "@mipmap/appicon",
     MainLauncher = true,
     Exported = true,
     ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.UiMode)]
@@ -118,4 +118,24 @@ public class AndroidDialogs : IDialogs
         Dispatcher.UIThread.Post(() =>
             Android.Widget.Toast.MakeText(Android.App.Application.Context,
                 $"{title}: {message}", Android.Widget.ToastLength.Short)?.Show());
+
+    public async Task ExportTextAsync(string suggestedName, string text)
+    {
+        var storage = Avalonia.Controls.TopLevel.GetTopLevel(_view)?.StorageProvider;
+        if (storage is null) return;
+        // DefaultExtension appends ".conf"; strip it from the suggested name so a
+        // ".conf" filename doesn't become "name.conf.conf" in the save sheet.
+        var baseName = suggestedName.EndsWith(".conf", StringComparison.OrdinalIgnoreCase)
+            ? suggestedName[..^5] : suggestedName;
+        var file = await storage.SaveFilePickerAsync(new Avalonia.Platform.Storage.FilePickerSaveOptions
+        {
+            Title = "Export WireGuard configuration",
+            SuggestedFileName = baseName,
+            DefaultExtension = "conf",
+        });
+        if (file is null) return;
+        await using var stream = await file.OpenWriteAsync();
+        await using var writer = new StreamWriter(stream);
+        await writer.WriteAsync(text);
+    }
 }

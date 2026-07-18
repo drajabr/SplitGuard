@@ -28,6 +28,8 @@ public interface ITunnelHost
     void TunnelSaved(TunnelViewModel tunnel, bool connectionChanged);
     void RequestDelete(TunnelViewModel tunnel);
     void CopyText(string text);
+    // Save (or share, on mobile) a config file the user chose to export.
+    void ExportConfig(string suggestedName, string content);
     void CustomActiveChanged(TunnelViewModel tunnel);
     void ReportError(TunnelViewModel tunnel, string message);
 }

@@ -9,6 +9,8 @@ public interface IDialogs
 {
     Task CopyToClipboardAsync(string text);
     void Notify(string title, string message, bool isError);
+    // Save a text file (a config export) via the platform's file picker / share sheet.
+    Task ExportTextAsync(string suggestedName, string text);
 }
 
 public class MainViewModel : ObservableObject, ITunnelHost
@@ -847,6 +849,9 @@ public class MainViewModel : ObservableObject, ITunnelHost
     }
 
     public void CopyText(string text) => _ = _dialogs.CopyToClipboardAsync(text);
+
+    public void ExportConfig(string suggestedName, string content) =>
+        _ = _dialogs.ExportTextAsync(suggestedName, content);
 
     // Ctrl+N: fresh keypair, one empty peer, straight into edit; cancel deletes it.
     public void CreateEmptyTunnel()

@@ -188,4 +188,23 @@ public partial class MainWindow : Window, IDialogs
 
     public void Notify(string title, string message, bool isError) =>
         NotificationService.Show(title, message, isError);
+
+    public async Task ExportTextAsync(string suggestedName, string text)
+    {
+        // DefaultExtension appends ".conf"; strip it from the suggested name so a
+        // ".conf" filename doesn't become "name.conf.conf".
+        var baseName = suggestedName.EndsWith(".conf", StringComparison.OrdinalIgnoreCase)
+            ? suggestedName[..^5] : suggestedName;
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export WireGuard configuration",
+            SuggestedFileName = baseName,
+            DefaultExtension = "conf",
+            FileTypeChoices = new[] { new FilePickerFileType("WireGuard config") { Patterns = new[] { "*.conf" } } },
+        });
+        if (file is null) return;
+        await using var stream = await file.OpenWriteAsync();
+        await using var writer = new StreamWriter(stream);
+        await writer.WriteAsync(text);
+    }
 }

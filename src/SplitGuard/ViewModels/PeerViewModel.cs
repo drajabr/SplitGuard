@@ -20,6 +20,10 @@ public partial class PeerViewModel : ObservableObject
         RemoveAllowedIpCommand = new RelayCommand(p => { AllowedIps.Remove((string)p!); _tunnel.Host.ReconcileMetrics(); });
         TogglePinCommand = new RelayCommand(() => _tunnel.Host.TogglePin(_tunnel, this));
         RemovePeerCommand = new RelayCommand(() => _tunnel.RemovePeer(this));
+        ShowExportCommand = new RelayCommand(() => IsExporting = true);
+        HideExportCommand = new RelayCommand(() => IsExporting = false);
+        CopyExportCommand = new RelayCommand(() => _tunnel.Host.CopyText(ExportConf));
+        SaveExportCommand = new RelayCommand(() => _tunnel.Host.ExportConfig(ExportFileName, ExportConf));
         AllowedIps.CollectionChanged += (_, _) => { Raise(nameof(MetricEnabled)); Raise(nameof(MetricRankText)); };
         // DNS-only cards (external/custom) have only this body, so keep it open; real
         // WireGuard peers start collapsed so a multi-peer tunnel opens as a tidy list.
@@ -235,6 +239,45 @@ public partial class PeerViewModel : ObservableObject
     public RelayCommand RemoveAllowedIpCommand { get; }
     public RelayCommand TogglePinCommand { get; }
     public RelayCommand RemovePeerCommand { get; }
+
+    // ---- config export (per-peer QR / copy / save) ----------------------------------
+
+    // The peer card can flip to show a QR of a standalone .conf that replicates exactly this
+    // connection on another device. Only real WireGuard peers with a public key can export.
+    public bool CanExport => ShowWgFields && _tunnel.Config is not null && IsValidKey(PublicKey.Trim());
+
+    bool _isExporting;
+    public bool IsExporting
+    {
+        get => _isExporting;
+        set { if (Set(ref _isExporting, value) && value) Raise(nameof(ExportConf)); }
+    }
+
+    // The .conf a QR encodes / Copy and Save emit: this device's [Interface] + this one [Peer].
+    public string ExportConf
+    {
+        get
+        {
+            var cfg = _tunnel.Config;
+            if (cfg is null) return "";
+            string priv;
+            try { priv = Services.RuleStore.Unprotect(cfg.PrivateKeyProtected); }
+            catch { return ""; }
+            return Models.WireGuardConf.SerializePeer(
+                priv, cfg.Addresses, cfg.ListenPort, HasDns ? Dns.Trim() : null,
+                PublicKey.Trim(), string.IsNullOrWhiteSpace(PresharedKey) ? null : PresharedKey.Trim(),
+                Endpoint, AllowedIpValues.ToList(), ParsedKeepalive);
+        }
+    }
+
+    // Suggested filename for the saved/shared config.
+    public string ExportFileName =>
+        $"{(string.IsNullOrWhiteSpace(_tunnel.Name) ? "tunnel" : _tunnel.Name)}.conf";
+
+    public RelayCommand ShowExportCommand { get; }
+    public RelayCommand HideExportCommand { get; }
+    public RelayCommand CopyExportCommand { get; }
+    public RelayCommand SaveExportCommand { get; }
 
     void AddDomain()
     {

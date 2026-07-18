@@ -203,6 +203,29 @@ public static class WireGuardConf
         return sb.ToString();
     }
 
+    // A standalone .conf for ONE peer of a tunnel — the exact format the importer/QR scanner
+    // accepts. Used by the per-peer "export configuration for another device" flow: the [Interface]
+    // is this device's identity (private key + address + optional port/DNS) and the single [Peer]
+    // is the chosen remote. Another device imports it to replicate exactly this connection.
+    public static string SerializePeer(string privateKey, IReadOnlyList<string> addresses, ushort listenPort,
+        string? dns, string publicKey, string? presharedKey, string endpoint,
+        IReadOnlyList<string> allowedIps, ushort keepalive)
+    {
+        var sb = new StringBuilder();
+        sb.Append("[Interface]\n");
+        sb.Append($"PrivateKey = {privateKey.Trim()}\n");
+        if (addresses.Count > 0) sb.Append($"Address = {string.Join(", ", addresses)}\n");
+        if (listenPort > 0) sb.Append($"ListenPort = {listenPort}\n");
+        if (!string.IsNullOrWhiteSpace(dns)) sb.Append($"DNS = {dns!.Trim()}\n");
+        sb.Append("\n[Peer]\n");
+        sb.Append($"PublicKey = {publicKey.Trim()}\n");
+        if (!string.IsNullOrWhiteSpace(presharedKey)) sb.Append($"PresharedKey = {presharedKey!.Trim()}\n");
+        if (!string.IsNullOrWhiteSpace(endpoint)) sb.Append($"Endpoint = {endpoint.Trim()}\n");
+        if (allowedIps.Count > 0) sb.Append($"AllowedIPs = {string.Join(", ", allowedIps)}\n");
+        if (keepalive > 0) sb.Append($"PersistentKeepalive = {keepalive}\n");
+        return sb.ToString();
+    }
+
     static IEnumerable<string> SplitList(string value) =>
         value.Split(',').Select(s => s.Trim()).Where(s => s.Length > 0);
 }
