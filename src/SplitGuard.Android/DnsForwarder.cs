@@ -24,15 +24,18 @@ class DnsForwarder
         var qname = ParseQName(query);
         var (rules, catchAll) = AndroidSplitDnsService.Instance.Snapshot();
 
-        // Longest-namespace match: ".x" matches "x" and anything under it; bare = exact.
+        // Longest-namespace match: "." matches everything (NRPT catch-all), ".x" matches "x"
+        // and anything under it, bare = exact.
         string? server = null; var best = -1;
         if (qname is not null)
             foreach (var (ns, srv) in rules)
             {
-                var match = ns.StartsWith('.')
-                    ? qname.EndsWith(ns, StringComparison.OrdinalIgnoreCase)
-                      || qname.Equals(ns[1..], StringComparison.OrdinalIgnoreCase)
-                    : qname.Equals(ns, StringComparison.OrdinalIgnoreCase);
+                var match = ns == "."
+                    ? true
+                    : ns.StartsWith('.')
+                        ? qname.EndsWith(ns, StringComparison.OrdinalIgnoreCase)
+                          || qname.Equals(ns[1..], StringComparison.OrdinalIgnoreCase)
+                        : qname.Equals(ns, StringComparison.OrdinalIgnoreCase);
                 if (match && ns.Length > best) { best = ns.Length; server = srv; }
             }
 
@@ -53,19 +56,20 @@ class DnsForwarder
 
     byte[]? Ask(string server, byte[] query, bool protect)
     {
-        if (!IPAddress.TryParse(server, out var ip)
-            || ip.AddressFamily != AddressFamily.InterNetwork) return null;
+        if (!IPAddress.TryParse(server, out var ip)) return null;
         try
         {
-            using var sock = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            using var sock = new Socket(ip.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
             if (protect) _vpn.Protect((int)sock.Handle);
             sock.ReceiveTimeout = UpstreamTimeoutMs;
             sock.SendTo(query, new IPEndPoint(ip, 53));
-            var buf = new byte[1500];
+            // Full UDP-DNS max — a smaller buffer would silently truncate a large datagram
+            // (Linux discards the remainder without setting TC), defeating the TCP retry.
+            var buf = new byte[65535];
             var n = sock.Receive(buf);
             if (n < 12) return null;
             var resp = buf[..n];
-            // Truncated → retry over TCP for the full answer.
+            // Truncated (TC bit) → retry over TCP for the full answer.
             if ((resp[2] & 0x02) != 0 && AskTcp(ip, query, protect) is { } full) return full;
             return resp;
         }
@@ -76,11 +80,18 @@ class DnsForwarder
     {
         try
         {
-            using var sock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            using var sock = new Socket(ip.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             if (protect) _vpn.Protect((int)sock.Handle);
             sock.ReceiveTimeout = UpstreamTimeoutMs * 2;
             sock.SendTimeout = UpstreamTimeoutMs;
-            sock.Connect(new IPEndPoint(ip, 53));
+            // Connect() ignores Receive/SendTimeout — bound it explicitly so a black-holed
+            // server doesn't stall this worker for the OS default connect timeout.
+            var connect = sock.ConnectAsync(new IPEndPoint(ip, 53));
+            if (!connect.Wait(UpstreamTimeoutMs))
+            {
+                connect.ContinueWith(t => { _ = t.Exception; }, TaskScheduler.Default); // observe on dispose
+                return null;
+            }
             var framed = new byte[query.Length + 2];
             framed[0] = (byte)(query.Length >> 8);
             framed[1] = (byte)query.Length;

@@ -23,8 +23,14 @@ static class Uapi
             sb.Append("public_key=").Append(Hex(p.PublicKey)).Append('\n');
             if (!string.IsNullOrEmpty(p.PresharedKeyProtected))
                 sb.Append("preshared_key=").Append(Hex(RuleStore.Unprotect(p.PresharedKeyProtected))).Append('\n');
-            if (ResolveEndpoint(p.Endpoint) is { } ep)
-                sb.Append("endpoint=").Append(ep).Append('\n');
+            // One unresolvable endpoint must not abort the whole config — that peer just
+            // stays roaming-only (wireguard-go learns its endpoint from an inbound handshake).
+            try
+            {
+                if (ResolveEndpoint(p.Endpoint) is { } ep)
+                    sb.Append("endpoint=").Append(ep).Append('\n');
+            }
+            catch { }
             if (p.PersistentKeepalive != 0)
                 sb.Append("persistent_keepalive_interval=").Append(p.PersistentKeepalive).Append('\n');
             sb.Append("replace_allowed_ips=true\n");

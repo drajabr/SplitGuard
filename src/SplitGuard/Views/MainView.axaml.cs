@@ -108,7 +108,10 @@ public partial class MainView : UserControl
             TopLevel.GetTopLevel(this)?.AddHandler(PointerPressedEvent, OnHostPointerPressed,
                 RoutingStrategies.Tunnel, handledEventsToo: true);
         DetachedFromVisualTree += (_, _) =>
+        {
             TopLevel.GetTopLevel(this)?.RemoveHandler(PointerPressedEvent, OnHostPointerPressed);
+            DisposeScanner(); // release the camera if the QR drawer is open when the view leaves
+        };
     }
 
     bool _clusterHover;
@@ -399,9 +402,11 @@ public partial class MainView : UserControl
         if (_scanner is null) return;
         _scanner.Decoded -= OnQrDecoded;
         _scanner.Failed -= OnQrFailed;
-        try { _scanner.Stop(); _scanner.Dispose(); } catch { }
+        var scanner = _scanner;
         _scanner = null;
         QrHost.Content = null;
+        // Camera device/session Close() can briefly stall — never on the UI thread.
+        Task.Run(() => { try { scanner.Stop(); scanner.Dispose(); } catch { } });
     }
 
     // Collapse the open drawer when a press lands outside both drawers and both toggles (a tunnel

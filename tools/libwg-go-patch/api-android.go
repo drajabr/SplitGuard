@@ -18,6 +18,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"unsafe"
 
 	"golang.org/x/sys/unix"
@@ -98,7 +99,14 @@ func makeDgramTun(fd int) (tun.Device, error) {
 	}, nil
 }
 
-var tunnelHandles map[int32]TunnelHandle
+// SplitGuard patch: SplitGuard polls wgGetConfig for stats from a background thread while
+// connect/disconnect run on the service thread. Upstream assumes a single caller and leaves
+// the handle map unguarded, so those concurrent map read+write would trip Go's map-race
+// detector and fatally abort the whole process. Serialize all handle-map access.
+var (
+	handlesMu     sync.RWMutex
+	tunnelHandles map[int32]TunnelHandle
+)
 
 func init() {
 	tunnelHandles = make(map[int32]TunnelHandle)
@@ -147,7 +155,12 @@ func wgTurnOn(interfaceName string, tunFd int32, settings string) int32 {
 
 	err = device.IpcSet(settings)
 	if err != nil {
-		unix.Close(int(tunFd))
+		// SplitGuard patch: close the tun.Device we actually built, not the raw tunFd.
+		// On the dgram path tunFd is already owned by the os.File that the failed
+		// CreateUnmonitoredTUNFromFD wrapped, so a raw unix.Close(tunFd) here would be a
+		// double-close of that fd number (risking closing an unrelated reused fd).
+		// device.Close() closes the native tun (real fd) or the dgram dup exactly once.
+		device.Close()
 		logger.Errorf("IpcSet: %v", err)
 		return -1
 	}
@@ -185,6 +198,7 @@ func wgTurnOn(interfaceName string, tunFd int32, settings string) int32 {
 	}
 	logger.Verbosef("Device started")
 
+	handlesMu.Lock()
 	var i int32
 	for i = 0; i < math.MaxInt32; i++ {
 		if _, exists := tunnelHandles[i]; !exists {
@@ -192,31 +206,44 @@ func wgTurnOn(interfaceName string, tunFd int32, settings string) int32 {
 		}
 	}
 	if i == math.MaxInt32 {
+		handlesMu.Unlock()
 		logger.Errorf("Unable to find empty handle")
 		uapiFile.Close()
 		device.Close()
 		return -1
 	}
 	tunnelHandles[i] = TunnelHandle{device: device, uapi: uapi}
+	handlesMu.Unlock()
 	return i
 }
 
 //export wgTurnOff
 func wgTurnOff(tunnelHandle int32) {
+	handlesMu.Lock()
 	handle, ok := tunnelHandles[tunnelHandle]
+	if ok {
+		delete(tunnelHandles, tunnelHandle)
+	}
+	handlesMu.Unlock()
 	if !ok {
 		return
 	}
-	delete(tunnelHandles, tunnelHandle)
 	if handle.uapi != nil {
 		handle.uapi.Close()
 	}
 	handle.device.Close()
 }
 
+func lookupHandle(tunnelHandle int32) (TunnelHandle, bool) {
+	handlesMu.RLock()
+	handle, ok := tunnelHandles[tunnelHandle]
+	handlesMu.RUnlock()
+	return handle, ok
+}
+
 //export wgGetSocketV4
 func wgGetSocketV4(tunnelHandle int32) int32 {
-	handle, ok := tunnelHandles[tunnelHandle]
+	handle, ok := lookupHandle(tunnelHandle)
 	if !ok {
 		return -1
 	}
@@ -233,7 +260,7 @@ func wgGetSocketV4(tunnelHandle int32) int32 {
 
 //export wgGetSocketV6
 func wgGetSocketV6(tunnelHandle int32) int32 {
-	handle, ok := tunnelHandles[tunnelHandle]
+	handle, ok := lookupHandle(tunnelHandle)
 	if !ok {
 		return -1
 	}
@@ -250,7 +277,7 @@ func wgGetSocketV6(tunnelHandle int32) int32 {
 
 //export wgGetConfig
 func wgGetConfig(tunnelHandle int32) *C.char {
-	handle, ok := tunnelHandles[tunnelHandle]
+	handle, ok := lookupHandle(tunnelHandle)
 	if !ok {
 		return nil
 	}

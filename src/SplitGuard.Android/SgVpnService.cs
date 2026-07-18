@@ -79,6 +79,11 @@ public class SgVpnService : Android.Net.VpnService
 
     void Establish(TunnelConfig cfg)
     {
+        // Resolve peer endpoint hostnames NOW, before the tun exists — once builder.Establish()
+        // installs the tun routes, a DNS lookup would be routed into a tunnel that has no live
+        // wireguard/forwarder yet and would hang until it times out, failing the connect.
+        var uapi = Uapi.BuildSettings(cfg);
+
         var builder = new Builder(this);
         builder.SetSession(cfg.Name).SetMtu(1280);
         foreach (var addr in cfg.Addresses)
@@ -123,7 +128,7 @@ public class SgVpnService : Android.Net.VpnService
             wgFd = _tun.DetachFd();
             _tun = null; // wireguard-go owns it now
         }
-        var handle = WgGo.TurnOn(cfg.Name, wgFd, Uapi.BuildSettings(cfg));
+        var handle = WgGo.TurnOn(cfg.Name, wgFd, uapi);
         if (handle < 0)
             throw new InvalidOperationException($"wireguard-go failed to start (code {handle})");
         Handle = handle;

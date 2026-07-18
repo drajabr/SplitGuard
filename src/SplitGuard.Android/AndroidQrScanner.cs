@@ -188,6 +188,14 @@ public class AndroidQrScanner : Java.Lang.Object, IQrScanner
         try { _imgReader?.Close(); } catch { }
         try { _thread?.QuitSafely(); } catch { }
         _session = null; _device = null; _imgReader = null; _thread = null; _handler = null;
+        // Release the preview bitmap's native buffer (a new scanner/bitmap is created each
+        // time the drawer reopens — otherwise ~1.2 MB leaks per scan session).
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            _image.Source = null;
+            try { _bmp?.Dispose(); } catch { }
+            _bmp = null;
+        });
     }
 
     protected override void Dispose(bool disposing)

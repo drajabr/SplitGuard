@@ -1,5 +1,6 @@
 using Android.App;
 using Android.Content.PM;
+using Android.OS;
 using Avalonia;
 using Avalonia.Android;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -20,7 +21,10 @@ public class MainActivity : AvaloniaMainActivity<App>
 {
     const int VpnConsentRequest = 71;
     const int CameraPermRequest = 72;
+    const int NotifPermRequest = 73;
     static Action? _cameraGranted;
+    static bool _askedNotif;
+    static MainView? _view; // for pause-time drawer close (releases the camera)
 
     // Called by the QR scanner when CAMERA isn't granted yet: prompt, then run the callback
     // once (whether granted or denied — the scanner re-checks the permission).
@@ -47,6 +51,7 @@ public class MainActivity : AvaloniaMainActivity<App>
             app.Resources["GlyphFontFamily"] =
                 new Avalonia.Media.FontFamily("avares://SplitGuard.Core/Assets/Fonts#SplitGuard Symbols");
             var view = new MainView();
+            _view = view;
             var vm = new MainViewModel(new AndroidDialogs(view), App.Platform!);
             SgVpnService.SplitDnsEnabled = vm.Prefs.AndroidSplitDns;
             view.DataContext = vm;
@@ -66,6 +71,22 @@ public class MainActivity : AvaloniaMainActivity<App>
         var consent = Android.Net.VpnService.Prepare(this);
         if (consent is not null)
             StartActivityForResult(consent, VpnConsentRequest);
+        // Android 13+ needs a runtime grant for the VPN foreground-service notification to
+        // show; ask once (Android suppresses repeat prompts after the user responds).
+        if (!_askedNotif && Build.VERSION.SdkInt >= BuildVersionCodes.Tiramisu
+            && CheckSelfPermission(Android.Manifest.Permission.PostNotifications) != Permission.Granted)
+        {
+            _askedNotif = true;
+            RequestPermissions(new[] { Android.Manifest.Permission.PostNotifications }, NotifPermRequest);
+        }
+    }
+
+    protected override void OnPause()
+    {
+        base.OnPause();
+        // Backgrounding mid-scan must release the camera — close any open drawer (the QR
+        // drawer's close path disposes the scanner).
+        _view?.CloseDrawers();
     }
 
     public override void OnRequestPermissionsResult(int requestCode, string[] permissions, Permission[] grantResults)
