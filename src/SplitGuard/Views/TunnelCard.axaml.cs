@@ -382,7 +382,7 @@ public partial class TunnelCard : UserControl
         ExportTitle.Text = string.IsNullOrWhiteSpace(_vm.Name) ? "Export configuration" : $"Export · {_vm.Name.Trim()}";
         // Generate at the ExportQr Image's 220 DIP size so the render only upscales the crisp
         // equal-module bitmap (a non-integer downscale drops modules and can make it unscannable).
-        try { var conf = _vm.TunnelExportConf; ExportQr.Source = conf.Length > 0 ? QrGen.Generate(conf, 220) : null; }
+        try { var conf = _vm.TunnelExportConf; ExportQr.Source = conf.Length > 0 ? QrGen.Generate(conf, 152) : null; }
         catch { ExportQr.Source = null; }
         AnimateSwap(ExportOverlay, ExpandContent);
     }
@@ -403,7 +403,7 @@ public partial class TunnelCard : UserControl
     void RenderPairQr()
     {
         if (_vm is null) return;
-        try { var d = _vm.DescriptorConf; PairQr.Source = d.Length > 0 ? QrGen.Generate(d, 220) : null; }
+        try { var d = _vm.DescriptorConf; PairQr.Source = d.Length > 0 ? QrGen.Generate(d, 152) : null; }
         catch { PairQr.Source = null; }
     }
 

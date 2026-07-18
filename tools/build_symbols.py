@@ -17,6 +17,9 @@ WANT = {
     0xE711: ["ic_fluent_dismiss_20_regular", "ic_fluent_dismiss_24_regular"],
     0xE713: ["ic_fluent_settings_20_regular", "ic_fluent_settings_24_regular"],
     0xE718: ["ic_fluent_pin_20_regular", "ic_fluent_pin_24_regular"],
+    0xE71B: ["ic_fluent_link_20_regular", "ic_fluent_link_24_regular"],           # Pair (chain)
+    0xE72D: ["ic_fluent_share_20_regular", "ic_fluent_share_24_regular",          # Export (share)
+             "ic_fluent_share_android_24_regular"],
     0xE72C: ["ic_fluent_arrow_clockwise_20_regular", "ic_fluent_arrow_clockwise_24_regular"],
     0xE73E: ["ic_fluent_checkmark_20_regular", "ic_fluent_checkmark_24_regular"],
     0xE74A: ["ic_fluent_arrow_up_20_regular", "ic_fluent_arrow_up_24_regular"],

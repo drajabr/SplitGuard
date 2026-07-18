@@ -6,3 +6,8 @@ dist/
 *.dll
 !src/**/Assets/**
 .cache/
+
+# build_symbols.py source (fetched from microsoft/fluentui-system-icons; not vendored)
+tools/FluentSystemIcons-Resizable.ttf
+tools/FluentSystemIcons-Resizable.json
+tools/SplitGuardSymbols.ttf
