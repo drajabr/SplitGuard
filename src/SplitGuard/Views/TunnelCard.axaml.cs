@@ -65,6 +65,8 @@ public partial class TunnelCard : UserControl
         ExportClose.Click += (_, _) => { if (_vm is not null) _vm.IsExporting = false; };
         ExportCopy.Click += (_, _) => _vm?.CopyExportCommand.Execute(null);
         ExportSave.Click += (_, _) => _vm?.SaveExportCommand.Execute(null);
+        PairClose.Click += (_, _) => { if (_vm is not null) _vm.IsPairing = false; };
+        PairCopy.Click += (_, _) => _vm?.CopyDescriptorCommand.Execute(null);
         ConfEditor.SyntaxHighlighting = ConfHighlighting;
         ConfEditor.TextChanged += (_, _) =>
         {
@@ -85,6 +87,7 @@ public partial class TunnelCard : UserControl
             BuildDetail();
             // Initial state (no animation): show the right content at its natural height.
             var editing = _vm?.IsEditing ?? false;
+            ExportOverlay.IsVisible = false; PairOverlay.IsVisible = false; // never inherit an overlay across a rebind
             ExpandContent.IsVisible = editing;
             DetailPanel.IsVisible = !editing;
             ExpandContent.Opacity = 1; // never leave a pane sub-opacity if a reveal was superseded
@@ -224,7 +227,7 @@ public partial class TunnelCard : UserControl
         }
         if (e.PropertyName == nameof(TunnelViewModel.IsEditing) && _vm is not null)
         {
-            ResetExport(); // an open export overlay doesn't survive an edit-state change
+            ResetOverlays(); // an open export/pair overlay doesn't survive an edit-state change
             // Leaving edit: rebuild the detail first — theme/accent may have changed while the
             // detail was hidden (the StatsTick rebuild is skipped during edits), and the pills
             // snapshot brush instances, so an un-rebuilt detail would show the old palette.
@@ -237,6 +240,14 @@ public partial class TunnelCard : UserControl
             if (_vm.IsExporting) ShowExport();
             else HideExport();
         }
+        if (e.PropertyName == nameof(TunnelViewModel.IsPairing) && _vm is not null && !_suppressExportAnim)
+        {
+            if (_vm.IsPairing) ShowPair();
+            else HidePair();
+        }
+        // Editing the "reachable at" endpoint re-bakes the descriptor — refresh the QR live.
+        if (e.PropertyName == nameof(TunnelViewModel.DescriptorConf) && _vm is { IsPairing: true } && PairOverlay.IsVisible)
+            RenderPairQr();
     }
 
     // Swap the visible body pane and animate the card height to the new content. Both
@@ -378,22 +389,41 @@ public partial class TunnelCard : UserControl
 
     void HideExport() => AnimateSwap(ExpandContent, ExportOverlay);
 
-    // Close an open export overlay synchronously (no swap) — used when the card leaves edit mode
-    // underneath it. Suppress the IsExporting property-change animation so clearing the flag
-    // doesn't kick off a competing swap; the outer IsEditing handler runs SwapBody right after.
-    void ResetExport()
+    // Reveal the pairing descriptor QR (this device's [Peer] block), same swap as export/edit.
+    void ShowPair()
     {
-        if (!ExportOverlay.IsVisible) return;
-        ++_animGen;                                   // cancel any in-flight export swap
-        ExportOverlay.IsVisible = false;
-        ExportQr.Source = null;
+        if (_vm is null) return;
+        PairTitle.Text = string.IsNullOrWhiteSpace(_vm.Name) ? "Pair" : $"Pair · {_vm.Name.Trim()}";
+        RenderPairQr();
+        AnimateSwap(PairOverlay, ExpandContent);
+    }
+
+    void HidePair() => AnimateSwap(ExpandContent, PairOverlay);
+
+    void RenderPairQr()
+    {
+        if (_vm is null) return;
+        try { var d = _vm.DescriptorConf; PairQr.Source = d.Length > 0 ? QrGen.Generate(d, 220) : null; }
+        catch { PairQr.Source = null; }
+    }
+
+    // Close any open card overlay (export or pair) synchronously — used when the card leaves edit
+    // mode underneath it. Suppress the property-change animation so clearing the flags doesn't kick
+    // off a competing swap; the outer IsEditing handler runs SwapBody right after.
+    void ResetOverlays()
+    {
+        if (!ExportOverlay.IsVisible && !PairOverlay.IsVisible) return;
+        ++_animGen;                                   // cancel any in-flight overlay swap
+        ExportOverlay.IsVisible = false; ExportQr.Source = null;
+        PairOverlay.IsVisible = false;   PairQr.Source = null;
         ExpandContent.IsVisible = true;               // the pane the overlay was covering
         ExpandContent.Opacity = 1;
         if (ExpandContent.RenderTransform is TranslateTransform t) t.Y = 0;
-        if (_vm is { IsExporting: true })
+        if (_vm is not null)
         {
             _suppressExportAnim = true;
             _vm.IsExporting = false;
+            _vm.IsPairing = false;
             _suppressExportAnim = false;
         }
     }

@@ -5,7 +5,7 @@
              xmlns:views="clr-namespace:SplitGuard.Views"
              x:Class="SplitGuard.Views.PeerBlock"
              ClipToBounds="False">
-  <Border Classes="peerblock" Margin="12,4,12,8">
+  <Border Classes="peerblock" Margin="12,4,12,8" DragDrop.AllowDrop="True">
     <StackPanel>
       <!-- Header (always visible; clicking its empty space toggles the body, like the
            tunnel card): name on the left, live status on the right. -->
@@ -21,6 +21,11 @@
           <TextBox Classes="plainname" MinWidth="60" MaxWidth="220" Text="{Binding Name}" Watermark="Peer"
                    IsVisible="{Binding ShowWgFields}"
                    Foreground="{DynamicResource AccentTextBrush}" FontWeight="Bold" FontSize="{DynamicResource Fs17}" VerticalAlignment="Center" />
+          <!-- Pair: fill this peer from another device's descriptor — scan (camera), paste, or drop. -->
+          <Button Classes="icon" Name="PeerPairBtn" VerticalAlignment="Center" IsVisible="{Binding ShowWgFields}"
+                  Click="OnPeerPairClick" ToolTip.Tip="Pair — scan / paste / drop another device's code to fill this peer">
+            <TextBlock Classes="glyph accentfg" Text="&#xE895;" FontSize="{DynamicResource Fs13}" />
+          </Button>
           <!-- Failover rank, only while this peer's routes actually overlap another's. -->
           <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center" IsVisible="{Binding MetricEnabled}">
             <TextBlock Classes="lbl" Text="metric" ToolTip.Tip="{Binding MetricRankText}" />

@@ -325,6 +325,26 @@ public partial class PeerViewModel : ObservableObject
     // auto-resolved to the next free number so a group never has two equal metrics.
     public void CommitMetric() => _tunnel.Host.ReconcileMetrics();
 
+    // ---- pairing: fill this peer from another device's descriptor -----------------------
+    // A descriptor is a WireGuard [Peer] block (scanned via QR, pasted, or dropped). Filling adopts
+    // its public key, endpoint, allowed IPs, preshared key and name. Returns false if it carried no
+    // usable public key (so the caller can warn instead of silently doing nothing).
+    public bool FillFromDescriptor(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return false;
+        var pd = Models.WireGuardConf.Parse(text).Peers.FirstOrDefault();
+        if (pd is null || !IsValidKey(pd.PublicKey.Trim())) return false;
+        PublicKey = pd.PublicKey.Trim();
+        // Endpoint is a computed "host:port" over EndpointHost/EndpointPort and doesn't raise its
+        // own change, so a bound (realized-but-collapsed) field wouldn't refresh — raise it.
+        if (!string.IsNullOrWhiteSpace(pd.Endpoint)) { Endpoint = pd.Endpoint.Trim(); Raise(nameof(Endpoint)); }
+        if (!string.IsNullOrWhiteSpace(pd.PresharedKey)) PresharedKey = pd.PresharedKey!.Trim();
+        if (!string.IsNullOrWhiteSpace(pd.Name) && Name.Trim().Length == 0) Name = pd.Name!.Trim();
+        if (pd.AllowedIps.Count > 0) Fill(AllowedIps, pd.AllowedIps);
+        _tunnel.Host.ReconcileMetrics();
+        return true;
+    }
+
     public string? DnsRouteWarning()
     {
         if (!HasDns || IsDnsOnly || !IPAddress.TryParse(Dns.Trim(), out var ip)) return null;

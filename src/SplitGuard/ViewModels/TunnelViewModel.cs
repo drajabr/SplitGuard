@@ -95,6 +95,9 @@ public class TunnelViewModel : ObservableObject
         HideExportCommand = new RelayCommand(() => IsExporting = false);
         CopyExportCommand = new RelayCommand(() => { var c = TunnelExportConf; if (c.Length == 0) ReportExportFailure(); else Host.CopyText(c); });
         SaveExportCommand = new RelayCommand(() => { var c = TunnelExportConf; if (c.Length == 0) ReportExportFailure(); else Host.ExportConfig(ExportFileName, c); });
+        ShowPairCommand = new RelayCommand(() => IsPairing = true);
+        HidePairCommand = new RelayCommand(() => IsPairing = false);
+        CopyDescriptorCommand = new RelayCommand(() => { var d = DescriptorConf; if (d.Length > 0) Host.CopyText(d); });
     }
 
     // ---- whole-tunnel config export (QR / copy / save) --------------------------------
@@ -111,6 +114,7 @@ public class TunnelViewModel : ObservableObject
             // Refuse to open export if the private key can't be unprotected on this machine —
             // surface an error rather than a blank QR / empty clipboard / 0-byte file.
             if (value && !_isExporting && TunnelExportConf.Length == 0) { ReportExportFailure(); return; }
+            if (value) IsPairing = false;   // one card overlay at a time
             if (Set(ref _isExporting, value) && value) Raise(nameof(TunnelExportConf));
         }
     }
@@ -137,6 +141,43 @@ public class TunnelViewModel : ObservableObject
     public RelayCommand HideExportCommand { get; private set; } = null!;
     public RelayCommand CopyExportCommand { get; private set; } = null!;
     public RelayCommand SaveExportCommand { get; private set; } = null!;
+
+    // ---- pairing: show THIS device as a [Peer] descriptor for another device to scan/paste ----
+    public bool PairButtonVisible => IsEditing && CanExport;
+
+    bool _isPairing;
+    public bool IsPairing
+    {
+        get => _isPairing;
+        set { if (value) IsExporting = false; if (Set(ref _isPairing, value) && value) Raise(nameof(DescriptorConf)); }
+    }
+
+    // Optional reachable endpoint baked into the descriptor (this device's public host:port).
+    string _pairEndpoint = "";
+    public string PairEndpoint { get => _pairEndpoint; set { if (Set(ref _pairEndpoint, value)) Raise(nameof(DescriptorConf)); } }
+    public string PairEndpointHint => ListenPortText.Trim().Length > 0 ? $"host:{ListenPortText.Trim()} (optional)" : "host:port (optional)";
+
+    // A public-only [Peer] block another device imports to add THIS device as a peer: our public
+    // key, the addresses we own (the routes to send here), and — if given — a reachable endpoint.
+    // No private key. Parses straight back via WireGuardConf.Parse on the other side.
+    public string DescriptorConf
+    {
+        get
+        {
+            if (!PeerViewModel.IsValidKey(PublicKeyFull.Trim())) return "";
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("[Peer]");
+            if (!string.IsNullOrWhiteSpace(Name)) sb.AppendLine($"Name = {Name.Trim()}");
+            sb.AppendLine($"PublicKey = {PublicKeyFull.Trim()}");
+            if (PeerViewModel.IsValidEndpoint(PairEndpoint.Trim())) sb.AppendLine($"Endpoint = {PairEndpoint.Trim()}");
+            if (AddressValues.Any()) sb.AppendLine($"AllowedIPs = {string.Join(", ", AddressValues)}");
+            return sb.ToString();
+        }
+    }
+
+    public RelayCommand ShowPairCommand { get; private set; } = null!;
+    public RelayCommand HidePairCommand { get; private set; } = null!;
+    public RelayCommand CopyDescriptorCommand { get; private set; } = null!;
 
     // The interface shows the derived public key by default; the reveal toggle (bound to
     // this) swaps in the private-key field so it can be pasted or regenerated. Reset each
@@ -354,6 +395,7 @@ public class TunnelViewModel : ObservableObject
             if (!Set(ref _isEditing, value)) return;
             Raise(nameof(NameEditable));
             Raise(nameof(ExportButtonVisible));
+            Raise(nameof(PairButtonVisible));
             foreach (var p in Peers) p.IsEditing = value;
         }
     }

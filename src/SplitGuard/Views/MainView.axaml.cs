@@ -266,14 +266,11 @@ public partial class MainView : UserControl
         // shadow. Dark themes: a subtle WHITE glow — a black shadow is invisible on an
         // already-dark page. Reach (offset+blur+spread) must stay under the cards' 14px side
         // inset and the 16px stack gap, or the fade gets cut into a hard edge.
-        // Blur radius dominates shadow raster cost (~radius^2), and this brush is on every card,
-        // every nested peer block, the drawers and the bottom bar — all re-blurred each frame while
-        // a card's Height tweens. That's the biggest single drag on the Android GPU. Compact
-        // (Android) gets a cheap, tight shadow (blur 3-4 ≈ 10-16x less work); desktop keeps the soft
-        // blur-12 elevation it can easily afford.
-        var shadow = TunnelCard.Compact
-            ? BoxShadows.Parse(lightFill ? "0 1 3 0 #30000000" : "0 0 4 0 #30FFFFFF")
-            : BoxShadows.Parse(lightFill ? "0 1 12 0 #3C000000" : "0 0 12 1 #38FFFFFF");
+        // Barely-there elevation: a whisper of a shadow (~30% of the old blur, ~half the alpha) so
+        // cards lift off the page without the heavy halo — which also had to be re-rasterized every
+        // frame while a card's Height tweens (the big Android GPU drag). Same tight shadow on both
+        // heads now; the cards' hairline border does most of the separating.
+        var shadow = BoxShadows.Parse(lightFill ? "0 1 4 0 #20000000" : "0 0 4 0 #20FFFFFF");
         resources["FloatShadow"] = shadow;
         resources["CardShadow"] = shadow;
         // Menus/popups need an opaque backing (cards may be translucent overlays under "auto").
@@ -391,6 +388,7 @@ public partial class MainView : UserControl
     Drawer _openDrawer = Drawer.None;
     int _setGen, _addGen, _qrGen; // per-region guards cancelling a stale expand/collapse finalize
     IQrScanner? _scanner;
+    PeerViewModel? _pairTarget; // when set, the next decoded QR fills this peer instead of adding a tunnel
 
     void OnSettingsToggleClick(object? sender, RoutedEventArgs e) =>
         SetDrawer(_openDrawer == Drawer.Settings ? Drawer.None : Drawer.Settings);
@@ -413,14 +411,49 @@ public partial class MainView : UserControl
         _scanner.Start();
     }
 
+    // Per-peer "Pair": fill this peer from another device's descriptor. Camera-scan where the
+    // platform has one (Android); otherwise pull a descriptor off the clipboard (desktop). Drop
+    // is handled separately on the peer block itself.
+    public async void StartPeerPairing(PeerViewModel peer)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        if (vm.Platform.SupportsQrScan)
+        {
+            _pairTarget = peer;
+            OnScanQrClick(this, new RoutedEventArgs());
+            return;
+        }
+        var clip = TopLevel.GetTopLevel(this)?.Clipboard;
+        var text = clip is null ? null : await clip.GetTextAsync();
+        if (!string.IsNullOrWhiteSpace(text) && peer.FillFromDescriptor(text))
+        { vm.StatusText = "Peer filled from the pasted descriptor"; vm.StatusOk = true; }
+        else
+        { vm.StatusText = "Copy a peer descriptor (or drop one onto the peer) first"; vm.StatusOk = false; }
+    }
+
+    // Fill a peer from descriptor text dropped onto it (a [Peer] block or a .conf), with feedback.
+    public void FillPeerFromText(PeerViewModel peer, string? text)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        if (!string.IsNullOrWhiteSpace(text) && peer.FillFromDescriptor(text))
+        { vm.StatusText = "Peer filled from the dropped descriptor"; vm.StatusOk = true; }
+        else
+        { vm.StatusText = "That wasn't a peer descriptor"; vm.StatusOk = false; }
+    }
+
     void OnQrDecoded(string text) => Dispatcher.UIThread.Post(() =>
     {
+        var target = _pairTarget; _pairTarget = null;   // capture before SetDrawer disposes the scan
         SetDrawer(Drawer.None); // stops + disposes the scanner
-        if (DataContext is MainViewModel vm)
+        if (DataContext is not MainViewModel vm) return;
+        if (target is not null)
         {
-            if (MainViewModel.LooksLikeConfig(text)) vm.AddTunnelFromText(text, null);
-            else { vm.StatusText = "That QR isn't a WireGuard configuration"; vm.StatusOk = false; }
+            if (target.FillFromDescriptor(text)) { vm.StatusText = "Peer paired from the scanned code"; vm.StatusOk = true; }
+            else { vm.StatusText = "That QR isn't a peer descriptor"; vm.StatusOk = false; }
+            return;
         }
+        if (MainViewModel.LooksLikeConfig(text)) vm.AddTunnelFromText(text, null);
+        else { vm.StatusText = "That QR isn't a WireGuard configuration"; vm.StatusOk = false; }
     });
 
     void OnQrFailed(string message) => Dispatcher.UIThread.Post(() =>
@@ -458,8 +491,9 @@ public partial class MainView : UserControl
     // open so its state is fresh (e.g. after a tray toggle); the Add card is static.
     void SetDrawer(Drawer which)
     {
-        // Leaving the QR drawer must release the camera.
-        if (_openDrawer == Drawer.Qr && which != Drawer.Qr) DisposeScanner();
+        // Leaving the QR drawer must release the camera (and drop any pending pair target — the
+        // decode path captures it first, so a real scan still fills the peer).
+        if (_openDrawer == Drawer.Qr && which != Drawer.Qr) { DisposeScanner(); _pairTarget = null; }
         _openDrawer = which;
         if (which == Drawer.Settings) BuildSettingsPanel();
         // ".open" wears the floating shadow — a closed (zero-height) region must paint nothing.

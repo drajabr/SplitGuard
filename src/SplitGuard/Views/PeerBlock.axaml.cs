@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -50,6 +51,34 @@ public partial class PeerBlock : UserControl
             vm.IsExpanded = !vm.IsExpanded;
             e.Handled = true;
         });
+
+        // Pair by drop: a descriptor text or a .conf dropped onto the peer fills its fields.
+        AddHandler(DragDrop.DragOverEvent, (_, e) => e.DragEffects = DragDropEffects.Copy);
+        AddHandler(DragDrop.DropEvent, OnPeerDrop);
+    }
+
+    // Pair button: fill this peer from another device's descriptor (camera / paste, per platform).
+    void OnPeerPairClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is PeerViewModel vm)
+            this.FindAncestorOfType<MainView>()?.StartPeerPairing(vm);
+    }
+
+    async void OnPeerDrop(object? sender, DragEventArgs e)
+    {
+        if (DataContext is not PeerViewModel vm) return;
+        var host = this.FindAncestorOfType<MainView>();
+        if (host is null) return;
+        var text = e.Data.GetText();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            // Dropped a file: read the first item as descriptor / .conf text.
+            var file = e.Data.GetFiles()?.OfType<Avalonia.Platform.Storage.IStorageFile>().FirstOrDefault();
+            if (file is not null)
+                try { await using var s = await file.OpenReadAsync(); using var r = new System.IO.StreamReader(s); text = await r.ReadToEndAsync(); }
+                catch { /* unreadable drop — falls through to the "not a descriptor" toast */ }
+        }
+        host.FillPeerFromText(vm, text);
     }
 
     void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
