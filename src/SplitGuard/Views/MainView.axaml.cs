@@ -260,7 +260,14 @@ public partial class MainView : UserControl
         // shadow. Dark themes: a subtle WHITE glow — a black shadow is invisible on an
         // already-dark page. Reach (offset+blur+spread) must stay under the cards' 14px side
         // inset and the 16px stack gap, or the fade gets cut into a hard edge.
-        var shadow = BoxShadows.Parse(lightFill ? "0 1 12 0 #3C000000" : "0 0 12 1 #38FFFFFF");
+        // Blur radius dominates shadow raster cost (~radius^2), and this brush is on every card,
+        // every nested peer block, the drawers and the bottom bar — all re-blurred each frame while
+        // a card's Height tweens. That's the biggest single drag on the Android GPU. Compact
+        // (Android) gets a cheap, tight shadow (blur 3-4 ≈ 10-16x less work); desktop keeps the soft
+        // blur-12 elevation it can easily afford.
+        var shadow = TunnelCard.Compact
+            ? BoxShadows.Parse(lightFill ? "0 1 3 0 #30000000" : "0 0 4 0 #30FFFFFF")
+            : BoxShadows.Parse(lightFill ? "0 1 12 0 #3C000000" : "0 0 12 1 #38FFFFFF");
         resources["FloatShadow"] = shadow;
         resources["CardShadow"] = shadow;
         // Menus/popups need an opaque backing (cards may be translucent overlays under "auto").
