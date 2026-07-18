@@ -23,17 +23,23 @@
                           ToolTip.Tip="Connect / disconnect (saves &amp; applies while editing)" />
           </StackPanel>
         </StackPanel>
-        <Grid VerticalAlignment="Center" ColumnDefinitions="Auto,Auto,*">
+        <Grid VerticalAlignment="Center" ColumnDefinitions="Auto,Auto,Auto,*">
           <TextBox Grid.Column="0" MinWidth="60" MaxWidth="240" HorizontalAlignment="Left" VerticalAlignment="Center"
                    FontSize="{DynamicResource Fs17}" FontWeight="Bold"
                    Foreground="{DynamicResource AccentTextBrush}" Text="{Binding Name}"
                    Classes="plainname"
                    IsReadOnly="{Binding !NameEditable}" IsHitTestVisible="{Binding NameEditable}" />
-          <Border Grid.Column="1" Background="{DynamicResource ItemBrush}" CornerRadius="4" Padding="6,2" Margin="10,0,0,0"
+          <!-- Export the whole tunnel's .conf (QR / copy / save). Shown by the name while editing. -->
+          <Button Grid.Column="1" Classes="icon" Name="ExportBtn" Margin="6,0,0,0" VerticalAlignment="Center"
+                  Command="{Binding ShowExportCommand}" IsVisible="{Binding ExportButtonVisible}"
+                  ToolTip.Tip="Export tunnel configuration (QR · copy · save)">
+            <TextBlock Classes="glyph accentfg" Text="&#xE8B8;" FontSize="{DynamicResource Fs14}" />
+          </Button>
+          <Border Grid.Column="2" Background="{DynamicResource ItemBrush}" CornerRadius="4" Padding="6,2" Margin="10,0,0,0"
                   IsVisible="{Binding IsExternal}" VerticalAlignment="Center">
             <TextBlock FontSize="{DynamicResource Fs11}" Opacity="0.7" Text="External" />
           </Border>
-          <TextBlock Grid.Column="2" Classes="mono synip" Margin="10,0,0,0" VerticalAlignment="Center"
+          <TextBlock Grid.Column="3" Classes="mono synip" Margin="10,0,0,0" VerticalAlignment="Center"
                      TextTrimming="CharacterEllipsis" Text="{Binding CollapsedSummary}" IsVisible="{Binding !IsEditing}" />
         </Grid>
       </DockPanel>
@@ -42,8 +48,9 @@
       <Panel Name="BodyContent">
       <StackPanel Name="DetailPanel" Margin="20,0,12,8" IsHitTestVisible="{Binding !IsEditing}" />
 
-      <!-- Export face (collapsed view): a QR of the chosen peer's standalone .conf, drawn over
-           the detail. Shown by a peer's export icon; Copy / Save file below. Wired in code. -->
+      <!-- Export pane: a QR of the WHOLE tunnel's standalone .conf (Interface + every Peer).
+           Opened from the header's export button (edit view); swaps in like the edit pane.
+           Copy / Save file below. Wired in code. -->
       <Border Name="ExportOverlay" IsVisible="False" Background="{DynamicResource SurfaceBrush}" ClipToBounds="True">
         <StackPanel Margin="16,8,16,14" Spacing="11">
           <DockPanel>

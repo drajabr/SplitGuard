@@ -91,7 +91,57 @@ public class TunnelViewModel : ObservableObject
         RemoveAddressCommand = new RelayCommand(p => Addresses.Remove((string)p!));
         GenerateKeyCommand = new RelayCommand(GenerateKey);
         ToggleTextModeCommand = new RelayCommand(ToggleTextMode);
+        ShowExportCommand = new RelayCommand(() => IsExporting = true);
+        HideExportCommand = new RelayCommand(() => IsExporting = false);
+        CopyExportCommand = new RelayCommand(() => { var c = TunnelExportConf; if (c.Length == 0) ReportExportFailure(); else Host.CopyText(c); });
+        SaveExportCommand = new RelayCommand(() => { var c = TunnelExportConf; if (c.Length == 0) ReportExportFailure(); else Host.ExportConfig(ExportFileName, c); });
     }
+
+    // ---- whole-tunnel config export (QR / copy / save) --------------------------------
+    // The card can reveal a QR of this tunnel's FULL standalone .conf (Interface + every Peer)
+    // to clone it onto another device. Only real WireGuard tunnels with a saved config export.
+    public bool CanExport => Config is not null && !IsExternal && !IsCustom;
+
+    bool _isExporting;
+    public bool IsExporting
+    {
+        get => _isExporting;
+        set
+        {
+            // Refuse to open export if the private key can't be unprotected on this machine —
+            // surface an error rather than a blank QR / empty clipboard / 0-byte file.
+            if (value && !_isExporting && TunnelExportConf.Length == 0) { ReportExportFailure(); return; }
+            if (Set(ref _isExporting, value) && value) Raise(nameof(TunnelExportConf));
+        }
+    }
+
+    // The whole tunnel serialized to a wg-quick .conf (Interface private key + address + every
+    // peer). Empty if the private key can't be unprotected (handled by the callers above).
+    public string TunnelExportConf
+    {
+        get
+        {
+            var c = Config;
+            if (c is null) return "";
+            string priv;
+            try { priv = RuleStore.Unprotect(c.PrivateKeyProtected); }
+            catch { return ""; }
+            return WireGuardConf.Serialize(priv, c, p =>
+                string.IsNullOrEmpty(p.PresharedKeyProtected) ? null : SafeUnprotect(p.PresharedKeyProtected));
+        }
+    }
+
+    static string? SafeUnprotect(string prot) { try { return RuleStore.Unprotect(prot); } catch { return null; } }
+
+    public string ExportFileName => $"{(string.IsNullOrWhiteSpace(Name) ? "tunnel" : Name.Trim())}.conf";
+
+    void ReportExportFailure() =>
+        Host.ReportError(this, "Couldn't export this tunnel — its private key couldn't be read on this device.");
+
+    public RelayCommand ShowExportCommand { get; private set; } = null!;
+    public RelayCommand HideExportCommand { get; private set; } = null!;
+    public RelayCommand CopyExportCommand { get; private set; } = null!;
+    public RelayCommand SaveExportCommand { get; private set; } = null!;
 
     // The interface shows the derived public key by default; the reveal toggle (bound to
     // this) swaps in the private-key field so it can be pasted or regenerated. Reset each
@@ -308,9 +358,14 @@ public class TunnelViewModel : ObservableObject
         {
             if (!Set(ref _isEditing, value)) return;
             Raise(nameof(NameEditable));
+            Raise(nameof(ExportButtonVisible));
             foreach (var p in Peers) p.IsEditing = value;
         }
     }
+
+    // The "Export configuration" affordance sits by the tunnel name, but only while editing
+    // (that's when you're configuring the tunnel) and only for real, exportable WG tunnels.
+    public bool ExportButtonVisible => IsEditing && CanExport;
 
     // Collapsed: our address(es) sit right next to the tunnel name, no label.
     public string CollapsedSummary => string.Join(", ", AddressValues);

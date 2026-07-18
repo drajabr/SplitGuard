@@ -54,20 +54,17 @@ public partial class TunnelCard : UserControl
     TunnelViewModel? _vm;
     bool _syncingEditor;
 
-    // Card-level export QR overlay (works from the collapsed detail AND the edit view — one
-    // mechanism, triggered by a peer's IsExporting). The body flips to reveal it.
-    readonly ScaleTransform _exportFlip = new(1, 1);
-    PeerViewModel? _exportingPeer;
-    int _exportGen;
+    // Whole-tunnel export QR overlay: a third body pane (alongside detail + edit) revealed with
+    // the SAME height-swap the edit toggle uses (no flip). Driven by TunnelViewModel.IsExporting,
+    // shown from the edit view via the header's export button.
+    bool _suppressExportAnim;
 
     public TunnelCard()
     {
         InitializeComponent();
-        BodyContent.RenderTransform = _exportFlip;
-        BodyContent.RenderTransformOrigin = RelativePoint.Center;
-        ExportClose.Click += (_, _) => { if (_exportingPeer is not null) _exportingPeer.IsExporting = false; };
-        ExportCopy.Click += (_, _) => _exportingPeer?.CopyExportCommand.Execute(null);
-        ExportSave.Click += (_, _) => _exportingPeer?.SaveExportCommand.Execute(null);
+        ExportClose.Click += (_, _) => { if (_vm is not null) _vm.IsExporting = false; };
+        ExportCopy.Click += (_, _) => _vm?.CopyExportCommand.Execute(null);
+        ExportSave.Click += (_, _) => _vm?.SaveExportCommand.Execute(null);
         ConfEditor.SyntaxHighlighting = ConfHighlighting;
         ConfEditor.TextChanged += (_, _) =>
         {
@@ -235,6 +232,11 @@ public partial class TunnelCard : UserControl
             SwapBody(_vm.IsEditing);
             if (_vm.IsEditing) ScrollSelfIntoView(); // starts now, in sync with the expand
         }
+        if (e.PropertyName == nameof(TunnelViewModel.IsExporting) && _vm is not null && !_suppressExportAnim)
+        {
+            if (_vm.IsExporting) ShowExport();
+            else HideExport();
+        }
     }
 
     // Swap the visible body pane and animate the card height to the new content. Both
@@ -242,10 +244,14 @@ public partial class TunnelCard : UserControl
     // fade/slide-in the instant the height tween begins, so collapse reveals the detail
     // immediately (it used to keep the edit pane up and swap the detail in only once the card
     // had settled, which read as a delayed jump). The height rides from -> to underneath.
-    void SwapBody(bool editing)
+    void SwapBody(bool editing) =>
+        AnimateSwap(editing ? ExpandContent : DetailPanel, editing ? (Control)DetailPanel : ExpandContent);
+
+    // Swap one visible body pane for another, riding the card height between their natural sizes.
+    // Shared by the detail<->edit toggle AND the edit<->export overlay, so all three panes swap
+    // with one identical motion.
+    void AnimateSwap(Control show, Control hide)
     {
-        var show = editing ? (Control)ExpandContent : DetailPanel;
-        var hide = editing ? (Control)DetailPanel : ExpandContent;
         var gen = ++_animGen;
         var from = Body.Bounds.Height;
         var w = Body.Bounds.Width;
@@ -353,76 +359,43 @@ public partial class TunnelCard : UserControl
 
     void HookPeer(PeerViewModel p, bool add)
     {
-        if (add) { p.Domains.CollectionChanged += OnContentChanged; p.AllowedIps.CollectionChanged += OnContentChanged; p.PropertyChanged += OnPeerPropertyChanged; }
-        else { p.Domains.CollectionChanged -= OnContentChanged; p.AllowedIps.CollectionChanged -= OnContentChanged; p.PropertyChanged -= OnPeerPropertyChanged; }
+        if (add) { p.Domains.CollectionChanged += OnContentChanged; p.AllowedIps.CollectionChanged += OnContentChanged; }
+        else { p.Domains.CollectionChanged -= OnContentChanged; p.AllowedIps.CollectionChanged -= OnContentChanged; }
     }
 
-    void OnPeerPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    // Reveal the whole-tunnel export QR, swapping the edit pane out with the standard height
+    // animation (same motion as the edit toggle — no flip).
+    void ShowExport()
     {
-        if (e.PropertyName != nameof(PeerViewModel.IsExporting) || sender is not PeerViewModel p) return;
-        if (p.IsExporting) ShowExport(p);
-        else if (ReferenceEquals(_exportingPeer, p)) HideExport();
-    }
-
-    // Flip the card body to the export QR for `p` (its standalone .conf).
-    void ShowExport(PeerViewModel p)
-    {
-        // Claim first, then release any other peer that was still mid-export (e.g. its glyph was
-        // tapped during this one's flip, while the detail panel was briefly still hittable).
-        // Reassigning before clearing means the old peer's IsExporting=false is a no-op here
-        // (ReferenceEquals below fails), so it isn't stranded true and can be re-opened later.
-        var prev = _exportingPeer;
-        _exportingPeer = p;
-        if (prev is not null && !ReferenceEquals(prev, p)) prev.IsExporting = false;
-        ExportTitle.Text = string.IsNullOrWhiteSpace(p.Name) ? "Export config" : $"Export · {p.Name.Trim()}";
-        // Generate at the ExportQr Image's own DIP size (220): the on-screen render then only ever
-        // upscales the crisp equal-module bitmap (or maps 1:1 on a 100%-scale desktop). Generating
-        // larger and letting the compositor downscale by a non-integer factor drops/merges modules
-        // and can make a dense config unscannable.
-        try { var conf = p.ExportConf; ExportQr.Source = conf.Length > 0 ? QrGen.Generate(conf, 220) : null; }
+        if (_vm is null) return;
+        ExportTitle.Text = string.IsNullOrWhiteSpace(_vm.Name) ? "Export configuration" : $"Export · {_vm.Name.Trim()}";
+        // Generate at the ExportQr Image's 220 DIP size so the render only upscales the crisp
+        // equal-module bitmap (a non-integer downscale drops modules and can make it unscannable).
+        try { var conf = _vm.TunnelExportConf; ExportQr.Source = conf.Length > 0 ? QrGen.Generate(conf, 220) : null; }
         catch { ExportQr.Source = null; }
-        FlipExport(true);
+        AnimateSwap(ExportOverlay, ExpandContent);
     }
 
-    void HideExport() => FlipExport(false);
+    void HideExport() => AnimateSwap(ExpandContent, ExportOverlay);
 
-    void FlipExport(bool toExport)
-    {
-        var gen = ++_exportGen;
-        Tween(_exportFlip.ScaleX, 0, Motion.FastMs, v => { if (_exportGen == gen) _exportFlip.ScaleX = v; }, () =>
-        {
-            if (_exportGen != gen) return;
-            if (toExport)
-            {
-                DetailPanel.IsVisible = false;
-                ExpandContent.IsVisible = false;
-                ExportOverlay.IsVisible = true;
-            }
-            else
-            {
-                ExportOverlay.IsVisible = false;
-                ExportQr.Source = null;
-                var editing = _vm?.IsEditing ?? false;
-                ExpandContent.IsVisible = editing;
-                DetailPanel.IsVisible = !editing;
-                _exportingPeer = null;
-            }
-            Body.Height = double.NaN; // auto — resize to the new face
-            Tween(0, 1, Motion.FastMs, v => { if (_exportGen == gen) _exportFlip.ScaleX = v; });
-        });
-    }
-
-    // Cancel an open export overlay immediately (no flip) — used when the card's edit state
-    // changes underneath it.
+    // Close an open export overlay synchronously (no swap) — used when the card leaves edit mode
+    // underneath it. Suppress the IsExporting property-change animation so clearing the flag
+    // doesn't kick off a competing swap; the outer IsEditing handler runs SwapBody right after.
     void ResetExport()
     {
-        if (_exportingPeer is null) return;
-        _exportingPeer.IsExporting = false;
-        _exportingPeer = null;
-        ++_exportGen;
+        if (!ExportOverlay.IsVisible) return;
+        ++_animGen;                                   // cancel any in-flight export swap
         ExportOverlay.IsVisible = false;
         ExportQr.Source = null;
-        _exportFlip.ScaleX = 1;
+        ExpandContent.IsVisible = true;               // the pane the overlay was covering
+        ExpandContent.Opacity = 1;
+        if (ExpandContent.RenderTransform is TranslateTransform t) t.Y = 0;
+        if (_vm is { IsExporting: true })
+        {
+            _suppressExportAnim = true;
+            _vm.IsExporting = false;
+            _suppressExportAnim = false;
+        }
     }
 
     void OnPeersChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -600,8 +573,9 @@ public partial class TunnelCard : UserControl
             DetailPanel.Children.Add(grid);
         }
 
-        // The peer's name (bold accent) then a small export-QR icon, with its live status
-        // flushed right — uptime, transfer totals and RTT while connected, or dots when it isn't.
+        // The peer's name (bold accent) with its live status flushed right — uptime, transfer
+        // totals and RTT while connected, or dots when it isn't. The middle grid column is
+        // reserved for the upcoming per-peer Pair/scan button.
         void NameLine(string name, string stats, IBrush accent, PeerViewModel? peer)
         {
             var grid = new Grid
@@ -613,19 +587,6 @@ public partial class TunnelCard : UserControl
             nm.FontWeight = Avalonia.Media.FontWeight.Bold;
             Grid.SetColumn(nm, 0);
             grid.Children.Add(nm);
-            // Export this peer's config for another device (flips the card to a QR).
-            if (peer is { CanExport: true })
-            {
-                var glyph = new TextBlock { Text = "", Foreground = accent, FontSize = 13, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center };
-                glyph.Classes.Add("glyph");
-                var btn = new Button { Content = glyph, Margin = new Avalonia.Thickness(8, 0, 0, 0), VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center };
-                btn.Classes.Add("icon");
-                ToolTip.SetTip(btn, "Export this peer's configuration (QR · copy · save)");
-                var captured = peer;
-                btn.Click += (_, _) => captured.IsExporting = true;
-                Grid.SetColumn(btn, 1);
-                grid.Children.Add(btn);
-            }
             var st = new TextBlock
             {
                 Text = stats, Opacity = 0.65,

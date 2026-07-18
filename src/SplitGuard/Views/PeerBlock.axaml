@@ -11,12 +11,6 @@
            tunnel card): name on the left, live status on the right. -->
       <DockPanel Name="HeaderRow" Background="Transparent" Margin="0,9,14,3">
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-          <!-- Export this peer's config for another device: flips the card to a QR. -->
-          <Button Classes="icon" Command="{Binding ShowExportCommand}" IsVisible="{Binding CanExport}"
-                  VerticalAlignment="Center" Margin="0,0,2,0"
-                  ToolTip.Tip="Export this peer's configuration (QR · copy · save)">
-            <TextBlock Classes="glyph accentfg" Text="&#xE8B8;" FontSize="{DynamicResource Fs14}" />
-          </Button>
           <TextBlock Classes="muted" Text="{Binding HandshakeText, Converter={x:Static views:Syntax.OrDots}}" />
           <TextBlock Classes="muted" Text="{Binding PingText, Converter={x:Static views:Syntax.OrDots}}"
                      IsVisible="{Binding HasPingHost}" />
