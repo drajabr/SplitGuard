@@ -192,10 +192,12 @@
                                   Command="{Binding $parent[ItemsControl].DataContext.RemoveAddressCommand}" CommandParameter="{Binding}">
                             <TextBlock Classes="glyph" Text="&#xE711;" FontSize="{DynamicResource Fs9}" Opacity="0.6" />
                           </Button>
-                          <WrapPanel VerticalAlignment="Center">
-                            <TextBlock Classes="mono synip" TextWrapping="Wrap" Text="{Binding Converter={x:Static views:Syntax.IpPart}}" />
-                            <TextBlock Classes="mono synnum" Text="{Binding Converter={x:Static views:Syntax.MaskPart}}" />
-                          </WrapPanel>
+                          <!-- Horizontal + NoWrap: an IP is one token, so keep it on a single line
+                               (the outer WrapPanel flows whole chips to the next line instead). -->
+                          <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Classes="mono synip" TextWrapping="NoWrap" Text="{Binding Converter={x:Static views:Syntax.IpPart}}" />
+                            <TextBlock Classes="mono synnum" TextWrapping="NoWrap" Text="{Binding Converter={x:Static views:Syntax.MaskPart}}" />
+                          </StackPanel>
                         </DockPanel>
                       </Border>
                     </DataTemplate>

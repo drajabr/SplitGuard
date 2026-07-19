@@ -86,35 +86,44 @@ public class SgVpnService : Android.Net.VpnService
 
         var builder = new Builder(this);
         builder.SetSession(cfg.Name).SetMtu(1280);
+        // Every builder call names the offending value on failure — the VpnService.Builder throws a
+        // bare "Bad address" with no context, which is impossible to diagnose from the config alone.
         foreach (var addr in cfg.Addresses)
-            if (WireGuardConf.TryParseCidr(addr, out var ip, out var prefix))
-                builder.AddAddress(ip.ToString(), prefix);
+        {
+            if (!WireGuardConf.TryParseCidr(addr, out var ip, out var prefix))
+                throw new InvalidOperationException($"Interface address '{addr}' isn't a valid IP/CIDR");
+            try { builder.AddAddress(ip.ToString(), prefix); }
+            catch (Exception ex) { throw new InvalidOperationException($"Interface address {addr}: {ex.Message}"); }
+        }
         var routes = new HashSet<string>();
         foreach (var p in cfg.Peers)
             foreach (var cidr in p.AllowedIps)
-                if (WireGuardConf.TryParseCidr(cidr, out var net, out var prefix))
-                {
-                    // Mask host bits: addRoute rejects "10.7.0.1/24" as a "Bad address" (Windows
-                    // masks it silently), which otherwise fails the whole connect on import.
-                    net = WireGuardConf.MaskNetwork(net, prefix);
-                    if (routes.Add($"{net}/{prefix}"))
-                        builder.AddRoute(net.ToString(), prefix);
-                }
+            {
+                if (!WireGuardConf.TryParseCidr(cidr, out var net, out var prefix))
+                    throw new InvalidOperationException($"Peer '{p.Name}' AllowedIP '{cidr}' isn't a valid CIDR");
+                // Mask host bits: addRoute rejects "10.7.0.1/24" as a "Bad address" (Windows
+                // masks it silently), which otherwise fails the whole connect on import.
+                net = WireGuardConf.MaskNetwork(net, prefix);
+                if (routes.Add($"{net}/{prefix}"))
+                    try { builder.AddRoute(net.ToString(), prefix); }
+                    catch (Exception ex) { throw new InvalidOperationException($"AllowedIP {cidr} (route {net}/{prefix}): {ex.Message}"); }
+            }
         var split = SplitDnsEnabled;
         if (split)
         {
             // All DNS goes to the in-tunnel forwarder: the OS resolver sends queries to
             // the virtual IP, the relay peels them off the tun and answers per-domain
             // (peer DNS through the tunnel, system DNS around it) with NRPT semantics.
-            builder.AddDnsServer(DnsForwarder.VirtualDns);
-            builder.AddRoute(DnsForwarder.VirtualDns, 32);
+            try { builder.AddDnsServer(DnsForwarder.VirtualDns); builder.AddRoute(DnsForwarder.VirtualDns, 32); }
+            catch (Exception ex) { throw new InvalidOperationException($"DNS forwarder {DnsForwarder.VirtualDns}: {ex.Message}"); }
         }
         else
         {
-            // Stock behavior: tunnel-wide DNS straight from the config.
+            // Stock behavior: tunnel-wide DNS straight from the config. A bad DNS entry names itself.
             foreach (var dns in cfg.Peers.Where(p => !string.IsNullOrWhiteSpace(p.Dns))
                          .Select(p => p.Dns!.Trim()).Distinct())
-                try { builder.AddDnsServer(dns); } catch { }
+                try { builder.AddDnsServer(dns); }
+                catch (Exception ex) { throw new InvalidOperationException($"DNS server {dns}: {ex.Message}"); }
         }
 
         _tun = builder.Establish() ?? throw new InvalidOperationException("VPN establish failed (consent revoked?)");

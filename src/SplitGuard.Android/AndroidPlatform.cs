@@ -28,6 +28,9 @@ public class AndroidPlatform : IPlatform
     public void SetSkipUacLaunch(bool on) { }
     public void SetSplitDnsEnabled(bool on) => SgVpnService.SplitDnsEnabled = on;
 
+    public void SetSystemBarColor(uint argb, bool lightBackground) =>
+        MainActivity.Current?.SetSystemBars(unchecked((int)argb), lightBackground);
+
     sealed class NullSplitDns : ISplitDnsService
     {
         public bool IsPolicyManaged => false;

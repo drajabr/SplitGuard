@@ -14,7 +14,7 @@
     <Panel DockPanel.Dock="Top" Name="TitleStrip" Background="Transparent">
       <Border Padding="14,5,146,5">
         <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-          <Image Name="LogoImage" Source="avares://SplitGuard.Core/Assets/app.ico" Width="24" Height="24"
+          <Image Name="LogoImage" Source="avares://SplitGuard.Core/Assets/app.ico" Width="30" Height="30"
                  VerticalAlignment="Center" IsHitTestVisible="False" />
           <TextBlock Text="SplitGuard" FontSize="{DynamicResource Fs17}" FontWeight="SemiBold"
                      VerticalAlignment="Center" IsHitTestVisible="False" />
@@ -112,17 +112,20 @@
               <Button Classes="actionrow" Click="OnImportClick">
                 <DockPanel>
                   <TextBlock DockPanel.Dock="Right" Name="ImportShortcut" Classes="muted" Text="Ctrl+O" VerticalAlignment="Center" />
+                  <TextBlock DockPanel.Dock="Left" Classes="glyph accentfg" Text="&#xE80A;" VerticalAlignment="Center" Margin="0,0,10,0" />
                   <TextBlock Text="Import configuration…" Classes="setlabel" />
                 </DockPanel>
               </Button>
               <Button Classes="actionrow" Click="OnNewTunnelClick">
                 <DockPanel>
                   <TextBlock DockPanel.Dock="Right" Name="NewShortcut" Classes="muted" Text="Ctrl+N" VerticalAlignment="Center" />
+                  <TextBlock DockPanel.Dock="Left" Classes="glyph accentfg" Text="&#xE710;" VerticalAlignment="Center" Margin="0,0,10,0" />
                   <TextBlock Text="New empty tunnel" Classes="setlabel" />
                 </DockPanel>
               </Button>
               <Button Classes="actionrow" Click="OnRescanClick" Name="RescanRow">
                 <DockPanel>
+                  <TextBlock DockPanel.Dock="Left" Classes="glyph accentfg" Text="&#xE72C;" VerticalAlignment="Center" Margin="0,0,10,0" />
                   <TextBlock Text="Rescan external tunnels" Classes="setlabel" />
                 </DockPanel>
               </Button>

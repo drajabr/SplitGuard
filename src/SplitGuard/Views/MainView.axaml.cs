@@ -235,6 +235,13 @@ public partial class MainView : UserControl
         // paints. Foreground/font stay on ChromeTarget (they inherit down into the view either way).
         if (t.Page is null) PageRoot.ClearValue(BackgroundProperty);
         else PageRoot.Background = new SolidColorBrush(Color.Parse(t.Page));
+        // Tint the OS system bars (Android) to the page background so the status/navigation bars
+        // don't read as a hard white/black band against the light/graphite page. No-op on desktop.
+        if (DataContext is MainViewModel barVm)
+        {
+            var barColor = Color.Parse(t.Page ?? (EffectiveVariant() == ThemeVariant.Light ? "#FFFFFF" : "#000000"));
+            barVm.Platform.SetSystemBarColor(barColor.ToUInt32(), EffectiveVariant() == ThemeVariant.Light);
+        }
         // Light themes: Fluent's default foreground is a softened ~89% black that reads dull on
         // the bright pages — force a crisp near-black. Dark themes keep the theme default.
         if (EffectiveVariant() == ThemeVariant.Light) ChromeTarget.Foreground = new SolidColorBrush(Color.Parse("#17191B"));

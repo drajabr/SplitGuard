@@ -119,4 +119,8 @@ public interface IPlatform
     void SetStartOnBoot(bool on);
     void SetSkipUacLaunch(bool on);
     void SetSplitDnsEnabled(bool on);      // applies on the NEXT connect
+
+    // Tint the OS system bars (Android status/navigation bars) to match the app theme's page
+    // background, with dark glyphs on a light background. No-op where the OS chrome isn't ours.
+    void SetSystemBarColor(uint argb, bool lightBackground) { }
 }

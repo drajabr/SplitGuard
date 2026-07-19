@@ -38,6 +38,21 @@ public class MainActivity : AvaloniaMainActivity<App>
 
     public static MainActivity? Current { get; private set; }
 
+    // Tint the status + navigation bars to the app theme's page color, with dark glyphs on a light
+    // background — so the system bars blend into the light/graphite page instead of sitting as a
+    // hard white/black band. Called from the shared ApplyTheme via IPlatform.SetSystemBarColor.
+    public void SetSystemBars(int color, bool lightBackground) => RunOnUiThread(() =>
+    {
+        var window = Window;
+        if (window?.DecorView is not { } decor) return;
+        var c = new Android.Graphics.Color(color);
+        window.SetStatusBarColor(c);
+        window.SetNavigationBarColor(c);
+        int flags = (int)(Android.Views.SystemUiFlags.LightStatusBar | Android.Views.SystemUiFlags.LightNavigationBar);
+        int v = (int)decor.SystemUiVisibility;
+        decor.SystemUiVisibility = (Android.Views.StatusBarVisibility)(lightBackground ? (v | flags) : (v & ~flags));
+    });
+
     protected override AppBuilder CustomizeAppBuilder(AppBuilder builder)
     {
         App.Platform = new AndroidPlatform();
