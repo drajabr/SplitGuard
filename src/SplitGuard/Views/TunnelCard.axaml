@@ -120,6 +120,31 @@
         </Grid>
       </Border>
 
+      <!-- In-card camera scan pane: the add-peer "scan" button opens the camera HERE (not the
+           bottom drawer). The platform scanner's preview fills ScanHost; a decode adds a peer.
+           The accent frame + hint overlay the camera on Android; desktop's scanner owns the stage. -->
+      <Border Name="ScanOverlay" IsVisible="False">
+        <StackPanel Margin="16,10,14,14" Spacing="9">
+          <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+            <TextBlock Grid.Column="0" Classes="glyph accentfg" Text="&#xE8B8;" FontSize="{DynamicResource Fs14}" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Name="ScanTitle" Text="Scan a peer QR" Classes="accentfg" FontWeight="Bold"
+                       FontSize="{DynamicResource Fs135}" Margin="8,0,0,0" VerticalAlignment="Center" />
+            <Button Grid.Column="2" Classes="hdr" Name="ScanClose" Padding="10,4">
+              <TextBlock Text="Cancel" Classes="setlabel" />
+            </Button>
+          </Grid>
+          <Panel Height="240" ClipToBounds="True">
+            <Border CornerRadius="10" ClipToBounds="True" Background="#0A0A0A">
+              <ContentControl Name="ScanHost" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+            </Border>
+            <Border Name="ScanFrame" Width="150" Height="150" HorizontalAlignment="Center" VerticalAlignment="Center"
+                    BorderBrush="{DynamicResource AccentBrush}" BorderThickness="2.5" CornerRadius="12" IsHitTestVisible="False" />
+            <TextBlock Name="ScanHint" Text="Point at a peer's QR" Classes="muted" FontSize="{DynamicResource Fs11}"
+                       HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,8" IsHitTestVisible="False" />
+          </Panel>
+        </StackPanel>
+      </Border>
+
       <StackPanel Name="ExpandContent" IsHitTestVisible="{Binding IsEditing}">
 
         <Border Name="EditorHost" Margin="12,8" CornerRadius="4" BorderBrush="{DynamicResource FieldBorderBrush}" BorderThickness="1"

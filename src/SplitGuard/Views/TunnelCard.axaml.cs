@@ -68,6 +68,7 @@ public partial class TunnelCard : UserControl
         ExportSave.Click += (_, _) => _vm?.SaveExportCommand.Execute(null);
         PairClose.Click += (_, _) => { if (_vm is not null) _vm.IsPairing = false; };
         PairCopy.Click += (_, _) => _vm?.CopyDescriptorCommand.Execute(null);
+        ScanClose.Click += (_, _) => HideScan();
         ConfEditor.SyntaxHighlighting = ConfHighlighting;
         ConfEditor.TextChanged += (_, _) =>
         {
@@ -412,10 +413,61 @@ public partial class TunnelCard : UserControl
         catch { PairQr.Source = null; }
     }
 
-    // Scan / paste a peer's descriptor to add it (next to "Add peer"): routes to the shared scanner.
-    void OnScanPeerClick(object? sender, RoutedEventArgs e)
+    // Scan a peer's descriptor to add it (the "scan" button next to Add peer): opens the camera
+    // scanner INSIDE this card (an overlay pane, like export/pair), not the bottom drawer.
+    SplitGuard.Services.IQrScanner? _scanner;
+
+    void OnScanPeerClick(object? sender, RoutedEventArgs e) => ShowScan();
+
+    void ShowScan()
     {
-        if (_vm is not null) this.FindAncestorOfType<MainView>()?.StartTunnelScan(_vm);
+        if (_vm is null || _vm.IsExternal || _vm.IsCustom) return;
+        var host = this.FindAncestorOfType<MainView>();
+        if (host?.DataContext is not MainViewModel mv) return;
+        DisposeScanner();
+        _scanner = mv.Platform.CreateQrScanner();
+        if (_scanner is null) { host.StartTunnelScan(_vm); return; }   // no in-app scanner: old path
+        ScanTitle.Text = string.IsNullOrWhiteSpace(_vm.Name) ? "Scan a peer QR" : $"Scan · {_vm.Name.Trim()}";
+        // Android keeps the accent frame + hint over the live camera; desktop's scanner owns the stage.
+        var desktop = TopLevel.GetTopLevel(this) is Window;
+        ScanFrame.IsVisible = !desktop;
+        ScanHint.IsVisible = !desktop;
+        ScanHost.Content = _scanner.Preview;
+        _scanner.Decoded += OnScanDecoded;
+        _scanner.Failed += OnScanFailed;
+        AnimateSwap(ScanOverlay, ExpandContent);
+        _scanner.Start();
+    }
+
+    void OnScanDecoded(string text) => Dispatcher.UIThread.Post(() =>
+    {
+        var vm = _vm; var host = this.FindAncestorOfType<MainView>();
+        HideScan();
+        if (vm is not null && host is not null) host.AddPeerFromText(vm, text, "scanned code");
+    });
+
+    void OnScanFailed(string message) => Dispatcher.UIThread.Post(() =>
+    {
+        HideScan();
+        if (this.FindAncestorOfType<MainView>()?.DataContext is MainViewModel mv) { mv.StatusText = message; mv.StatusOk = false; }
+    });
+
+    void HideScan()
+    {
+        if (!ScanOverlay.IsVisible) return;
+        DisposeScanner();
+        AnimateSwap(ExpandContent, ScanOverlay);
+    }
+
+    // Release the camera whenever the scan pane goes away (decode, cancel, or leaving edit mode).
+    void DisposeScanner()
+    {
+        if (_scanner is null) return;
+        _scanner.Decoded -= OnScanDecoded;
+        _scanner.Failed -= OnScanFailed;
+        var s = _scanner; _scanner = null;
+        ScanHost.Content = null;
+        System.Threading.Tasks.Task.Run(() => { try { s.Stop(); s.Dispose(); } catch { } });
     }
 
     // Drop a peer descriptor (a [Peer] block, as text, QR image, or file) onto the card to add it as
@@ -466,10 +518,12 @@ public partial class TunnelCard : UserControl
     // off a competing swap; the outer IsEditing handler runs SwapBody right after.
     void ResetOverlays()
     {
-        if (!ExportOverlay.IsVisible && !PairOverlay.IsVisible) return;
+        if (ScanOverlay.IsVisible) DisposeScanner();   // release the camera before tearing the pane down
+        if (!ExportOverlay.IsVisible && !PairOverlay.IsVisible && !ScanOverlay.IsVisible) return;
         ++_animGen;                                   // cancel any in-flight overlay swap
         ExportOverlay.IsVisible = false; ExportQr.Source = null;
         PairOverlay.IsVisible = false;   PairQr.Source = null;
+        ScanOverlay.IsVisible = false;
         ExpandContent.IsVisible = true;               // the pane the overlay was covering
         ExpandContent.Opacity = 1;
         if (ExpandContent.RenderTransform is TranslateTransform t) t.Y = 0;
