@@ -23,6 +23,7 @@ public class AndroidPlatform : IPlatform
     public bool SupportsInstallerUpdate => false;  // updates come from GitHub releases page
     public bool SupportsSplitDnsToggle => true;
     public bool SupportsQrScan => true;
+    public bool SupportsBootStart => true;   // BootReceiver reconnects the last-on tunnel
 
     public void SetStartOnBoot(bool on) { }
     public void SetSkipUacLaunch(bool on) { }

@@ -111,10 +111,11 @@ public interface IPlatform
     IExternalTunnels? CreateExternalTunnels(); // null where the concept doesn't exist
 
     // Feature gates for platform-only UI (rows/flows are hidden, not disabled).
-    bool SupportsStartup { get; }          // run-at-boot + UAC-skip launcher
+    bool SupportsStartup { get; }          // run-at-boot + UAC-skip launcher (Windows)
     bool SupportsInstallerUpdate { get; }  // download-and-run installer self-update
     bool SupportsSplitDnsToggle { get; }   // Android: in-tunnel forwarder on/off fallback
     bool SupportsQrScan { get; }           // camera "Scan QR code" add flow
+    bool SupportsBootStart => false;       // Android: reconnect the last tunnel after a reboot
 
     void SetStartOnBoot(bool on);
     void SetSkipUacLaunch(bool on);

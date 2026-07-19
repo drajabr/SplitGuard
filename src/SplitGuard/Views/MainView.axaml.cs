@@ -556,9 +556,28 @@ public partial class MainView : UserControl
     }
 
     // (Re)build the two columns. General = toggles with side effects; Appearance = inline pickers.
+    bool _settingsStacked;
+    // Android (narrow): reflow the two-column settings grid into one stacked full-width column so
+    // neither section is cramped (the appearance swatches/zoom labels were clipping). Runs once;
+    // desktop keeps the side-by-side layout.
+    void StackSettingsOnMobile()
+    {
+        if (_settingsStacked || TopLevel.GetTopLevel(this) is Window) return;
+        _settingsStacked = true;
+        SettingsCard.ColumnDefinitions = new ColumnDefinitions("*");
+        SettingsCard.RowDefinitions = new RowDefinitions("Auto,Auto,Auto");
+        Grid.SetColumn(GeneralList, 0); Grid.SetRow(GeneralList, 0);
+        GeneralList.HorizontalAlignment = HorizontalAlignment.Stretch;
+        SettingsSep.Width = double.NaN; SettingsSep.Height = 1; SettingsSep.Margin = new Thickness(0, 10);
+        Grid.SetColumn(SettingsSep, 0); Grid.SetRow(SettingsSep, 1);
+        Grid.SetColumn(AppearanceList, 0); Grid.SetRow(AppearanceList, 2);
+        AppearanceList.HorizontalAlignment = HorizontalAlignment.Stretch;
+    }
+
     void BuildSettingsPanel()
     {
         if (DataContext is not MainViewModel sv) return;
+        StackSettingsOnMobile();
         GeneralList.Children.Clear();
         GeneralList.Children.Add(ToggleRow("Custom DNS forwarding", () => sv.HasCustomDns, on => sv.ToggleCustomDns(on)));
         // Startup rows exist only where the platform has the concept (Windows: registry Run key +
@@ -579,6 +598,14 @@ public partial class MainView : UserControl
                     _ = Task.Run(() => sv.Platform.SetSkipUacLaunch(on));
             }));
         }
+        // Android: reconnect the last-on tunnel after a reboot (BootReceiver, gated on this pref).
+        // Only works once VPN consent has been granted at least once.
+        if (sv.Platform.SupportsBootStart)
+            GeneralList.Children.Add(ToggleRow("Reconnect on boot", () => sv.Prefs.StartOnBoot, on =>
+            {
+                sv.Prefs.StartOnBoot = on; sv.PersistPrefs();
+                sv.Platform.SetStartOnBoot(on);
+            }));
         // Android's split-DNS fallback: off = stock WireGuard DNS (no per-domain routing),
         // for devices where the in-tunnel forwarder misbehaves. Applies on the next connect.
         if (sv.Platform.SupportsSplitDnsToggle)
