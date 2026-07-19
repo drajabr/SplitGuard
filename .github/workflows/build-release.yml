@@ -23,7 +23,9 @@ jobs:
             choco install innosetup -y --no-progress
           }
       - name: Build installer
-        run: ./build.ps1
+        # -SkipAndroid: the APK is built by the dedicated `android` job below; this Windows
+        # job only needs the installer (and isn't set up for an Android build).
+        run: ./build.ps1 -SkipAndroid
       - uses: actions/upload-artifact@v4
         with:
           name: SplitGuard-Setup

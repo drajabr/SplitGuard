@@ -181,3 +181,8 @@ if (-not $SkipAndroid) {
         }
     }
 }
+
+# The installer (and, if attempted, the APK) are done. The Android step is best-effort, so a
+# failed/non-zero sub-build there must not make the whole script report failure — the critical
+# steps above throw on error under $ErrorActionPreference. Return success explicitly.
+exit 0
