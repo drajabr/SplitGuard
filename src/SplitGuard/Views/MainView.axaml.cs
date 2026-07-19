@@ -48,14 +48,21 @@ public partial class MainView : UserControl
     static (string Name, string Hex)[] AccentSteps => Accents.Steps;
 
     // Distinct UI fonts, applied to the whole window (including values/fields).
-    static readonly (string Name, string Family)[] FontSteps =
+    // (name, desktop faces, Android family). Android needs its own PRIMARY family per option:
+    // Avalonia only uses trailing comma names as glyph fallbacks for an EXISTING primary, so a
+    // desktop-only primary (Segoe / Cascadia …) that doesn't exist on Android just falls to the
+    // default Roboto and nothing changes. Naming a real Android family as the primary fixes it.
+    static readonly (string Name, string Desktop, string Droid)[] FontSteps =
     {
-        ("segoe",       "Segoe UI Variable Text, Segoe UI"),           // modern sans (default)
-        ("bahnschrift", "Bahnschrift, Segoe UI"),                      // condensed industrial
-        ("georgia",     "Georgia, Cambria, serif"),                    // serif
-        ("candara",     "Candara, Segoe UI"),                          // humanist sans
-        ("mono",        "Cascadia Mono, Consolas, Courier New, monospace"), // monospace
+        ("segoe",       "Segoe UI Variable Text, Segoe UI",                "sans-serif"),           // Roboto (default)
+        ("bahnschrift", "Bahnschrift, Segoe UI",                           "sans-serif-condensed"), // Roboto Condensed
+        ("georgia",     "Georgia, Cambria, serif",                         "serif"),                // Noto Serif
+        ("candara",     "Candara, Segoe UI",                               "sans-serif-medium"),    // Roboto Medium
+        ("mono",        "Cascadia Mono, Consolas, Courier New, monospace", "monospace"),            // Droid Sans Mono
     };
+
+    static string FontFamilyOf((string Name, string Desktop, string Droid) s) =>
+        Views.TunnelCard.Compact ? s.Droid : s.Desktop;
     static readonly (string Name, double Scale)[] ZoomSteps =
     {
         ("1x",   1.0),
@@ -98,15 +105,20 @@ public partial class MainView : UserControl
         // The floating cluster yields to content: while cards extend behind it, it fades out so
         // nothing is obscured, and fades back when the pointer enters its area (or the overlap
         // clears — short list, scrolled to the end, drawer closed).
+        // Drive the fade from the events that actually change the overlap — scrolling (also fires on
+        // extent changes when cards are added/removed) and hover — NOT every LayoutUpdated (that ran
+        // the calc on every frame, a real cost on mobile, and it re-evaluated mid-drawer-animation).
         MainScroll.ScrollChanged += (_, _) => UpdateClusterFade();
         BottomCluster.PointerEntered += (_, _) => { _clusterHover = true; UpdateClusterFade(); };
         BottomCluster.PointerExited += (_, _) => { _clusterHover = false; UpdateClusterFade(); };
-        LayoutUpdated += (_, _) => UpdateClusterFade();
         // Collapse the open drawer on any press outside it, wherever in the window it lands
         // (tunnelled + handledEventsToo so it still fires when a card handles the press first).
         AttachedToVisualTree += (_, _) =>
+        {
             TopLevel.GetTopLevel(this)?.AddHandler(PointerPressedEvent, OnHostPointerPressed,
                 RoutingStrategies.Tunnel, handledEventsToo: true);
+            Dispatcher.UIThread.Post(UpdateClusterFade); // first fade after the initial layout settles
+        };
         DetachedFromVisualTree += (_, _) =>
         {
             TopLevel.GetTopLevel(this)?.RemoveHandler(PointerPressedEvent, OnHostPointerPressed);
@@ -147,8 +159,10 @@ public partial class MainView : UserControl
             // Where the cards actually end, in ListHost coordinates: the reserved bottom margin
             // is part of the scroll extent but holds no content, so subtract it back out.
             var cardsBottom = MainScroll.Extent.Height - ListBottomPad - MainScroll.Offset.Y;
-            var clusterTop = ListHost.Bounds.Height - BottomCluster.Bounds.Height;
-            var overlap = cardsBottom > clusterTop + 1;
+            // The BAR's top, not the whole cluster's: the bar sits at the very bottom and doesn't
+            // move while a drawer above it animates, so this is stable (no flash on drawer close).
+            var barTop = BottomBar.TranslatePoint(default, ListHost)?.Y ?? (ListHost.Bounds.Height - BottomBar.Bounds.Height);
+            var overlap = cardsBottom > barTop + 1;
             op = !overlap || _clusterHover ? 1 : 0;
         }
         // Fade the shadow-casting Borders themselves, never their parent StackPanel — an opacity
@@ -190,12 +204,13 @@ public partial class MainView : UserControl
         ScanQrRow.IsVisible = (DataContext as MainViewModel)?.Platform.SupportsQrScan ?? false;
         // Keyboard-shortcut hints are meaningless on the touch (compact) build.
         ImportShortcut.IsVisible = NewShortcut.IsVisible = !TunnelCard.Compact;
+        // The "System · Updates · Appearance" hint is dropped on the narrow Android bar (no room).
+        SettingsSubtitle.IsVisible = !TunnelCard.Compact;
     }
 
     void ApplyFont()
     {
-        var (_, family) = FontSteps[_fontIndex];
-        ChromeTarget.FontFamily = new FontFamily(family);
+        ChromeTarget.FontFamily = new FontFamily(FontFamilyOf(FontSteps[_fontIndex]));
     }
 
     void ApplyZoom()
@@ -508,6 +523,7 @@ public partial class MainView : UserControl
         AnimateRegion(SettingsRegion, SettingsCard, SettingsChevron, which == Drawer.Settings, ++_setGen, () => _setGen);
         AnimateRegion(AddRegion, AddCard, AddChevron, which == Drawer.Add, ++_addGen, () => _addGen);
         AnimateRegion(QrRegion, QrCard, null, which == Drawer.Qr, ++_qrGen, () => _qrGen);
+        UpdateClusterFade(); // recompute now that LayoutUpdated no longer drives it (open=1, close re-checks)
     }
 
     // Tween a region's Height between 0 and its card's natural height (shared Slow token), then
@@ -682,11 +698,11 @@ public partial class MainView : UserControl
         for (int i = 0; i < FontSteps.Length; i++)
         {
             int idx = i;
-            var (name, family) = FontSteps[i];
-            var sample = new TextBlock { Text = "Ag", FontFamily = new FontFamily(family), FontSize = 14 };
+            var step = FontSteps[i];
+            var sample = new TextBlock { Text = "Ag", FontFamily = new FontFamily(FontFamilyOf(step)), FontSize = 14 };
             var b = new Button { Content = sample, Height = 26, Margin = new Thickness(2.5, 0) };
             b.Classes.Add("seg");
-            ToolTip.SetTip(b, name);
+            ToolTip.SetTip(b, step.Name);
             if (i == _fontIndex) b.Classes.Add("sel");
             b.Click += (_, _) =>
             {

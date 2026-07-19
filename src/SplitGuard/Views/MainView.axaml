@@ -192,8 +192,9 @@
                   <TextBlock Text="Settings" Classes="setlabel" />
                 </StackPanel>
                 <!-- Fill child: trims with an ellipsis instead of running under the chevron.
-                     Deliberately smaller than the muted default — it's a hint, not a label. -->
-                <TextBlock Classes="muted" Text="System · Updates · Appearance"
+                     Deliberately smaller than the muted default — it's a hint, not a label. Hidden on
+                     Android (Compact) where the narrow bar has no room for it. -->
+                <TextBlock Name="SettingsSubtitle" Classes="muted" Text="System · Updates · Appearance"
                            FontSize="{DynamicResource Fs11}" TextTrimming="CharacterEllipsis"
                            VerticalAlignment="Center" Margin="8,0,0,0" />
               </DockPanel>
