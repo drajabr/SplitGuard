@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Platform.Storage;
 using SplitGuard.Services;
 using SplitGuard.ViewModels;
@@ -35,10 +36,10 @@ public partial class MainWindow : Window, IDialogs
             catch { }
         };
         AddHandler(DragDrop.DragOverEvent, (_, e) =>
-            e.DragEffects = e.Data.Contains(DataFormats.Files) ? DragDropEffects.Copy : DragDropEffects.None);
+            e.DragEffects = e.DataTransfer.Contains(DataFormat.File) ? DragDropEffects.Copy : DragDropEffects.None);
         // "Drop to import" overlay while files hover anywhere over the window.
         AddHandler(DragDrop.DragEnterEvent, (_, e) =>
-            View.SetDropOverlay(e.Data.Contains(DataFormats.Files)));
+            View.SetDropOverlay(e.DataTransfer.Contains(DataFormat.File)));
         AddHandler(DragDrop.DragLeaveEvent, (_, _) => View.SetDropOverlay(false));
         AddHandler(DragDrop.DropEvent, OnDrop);
     }
@@ -56,7 +57,7 @@ public partial class MainWindow : Window, IDialogs
     {
         View.SetDropOverlay(false);
         if (DataContext is not MainViewModel vm) return;
-        var files = e.Data.GetFiles() ?? Enumerable.Empty<IStorageItem>();
+        var files = e.DataTransfer.TryGetFiles() ?? Enumerable.Empty<IStorageItem>();
         foreach (var item in files.OfType<IStorageFile>())
         {
             if (!item.Name.EndsWith(".conf", StringComparison.OrdinalIgnoreCase)) continue;
@@ -145,7 +146,7 @@ public partial class MainWindow : Window, IDialogs
             && FocusManager?.GetFocusedElement() is not TextBox
             && vm is not null && Clipboard is not null)
         {
-            var text = await Clipboard.GetTextAsync();
+            var text = await Clipboard.TryGetTextAsync();
             if (MainViewModel.LooksLikeConfig(text))
             {
                 vm.AddTunnelFromText(text!, null);

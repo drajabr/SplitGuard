@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -278,16 +279,16 @@ public sealed class DesktopQrScanner : IQrScanner
     }
 
     void OnDragOver(object? sender, DragEventArgs e) =>
-        e.DragEffects = (e.Data.Contains(DataFormats.Text) || e.Data.Contains(DataFormats.Files))
+        e.DragEffects = (e.DataTransfer.Contains(DataFormat.Text) || e.DataTransfer.Contains(DataFormat.File))
             ? DragDropEffects.Copy : DragDropEffects.None;
 
     async void OnDrop(object? sender, DragEventArgs e)
     {
         if (_done != 0) return;
-        var text = e.Data.GetText();
+        var text = e.DataTransfer.TryGetText();
         if (!string.IsNullOrWhiteSpace(text)) { Fire(text); return; }
 
-        foreach (var f in e.Data.GetFiles()?.OfType<IStorageFile>() ?? Enumerable.Empty<IStorageFile>())
+        foreach (var f in e.DataTransfer.TryGetFiles()?.OfType<IStorageFile>() ?? Enumerable.Empty<IStorageFile>())
         {
             try
             {
@@ -318,7 +319,7 @@ public sealed class DesktopQrScanner : IQrScanner
     {
         if (_done != 0) return;
         var clip = TopLevel.GetTopLevel(_root)?.Clipboard;
-        var text = clip is null ? null : await clip.GetTextAsync();
+        var text = clip is null ? null : await clip.TryGetTextAsync();
         if (!string.IsNullOrWhiteSpace(text)) Fire(text);
         else ReportMiss("Clipboard has no peer info — copy a descriptor first");
     }

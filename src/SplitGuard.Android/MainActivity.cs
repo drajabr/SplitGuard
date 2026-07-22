@@ -10,6 +10,48 @@ using SplitGuard.Views;
 
 namespace SplitGuard.Droid;
 
+// Avalonia 12: the AppBuilder is owned by the [Application] class, not the activity.
+[Application]
+public class SplitGuardApplication : AvaloniaAndroidApplication<App>
+{
+    public SplitGuardApplication(IntPtr handle, Android.Runtime.JniHandleOwnership ownership)
+        : base(handle, ownership) { }
+
+    protected override AppBuilder CustomizeAppBuilder(AppBuilder builder)
+    {
+        App.Platform = new AndroidPlatform();
+        // Mobile reflow of the collapsed card detail.
+        Views.TunnelCard.Compact = true;
+        App.BuildHead = app =>
+        {
+            if (app.ApplicationLifetime is not ISingleViewApplicationLifetime single) return;
+            // Segoe icon fonts don't exist on Android — swap in the bundled symbols font
+            // (same codepoints, open Fluent System Icons outlines).
+            app.Resources["GlyphFontFamily"] =
+                new Avalonia.Media.FontFamily("avares://SplitGuard.Core/Assets/Fonts#SplitGuard Symbols");
+            var view = new MainView();
+            MainActivity.SetView(view);
+            var vm = new MainViewModel(new AndroidDialogs(view), App.Platform!);
+            view.DataContext = vm;
+            view.ApplyUiPrefs(vm.Prefs);
+            single.MainView = view;
+            _ = vm.InitializeAsync();
+        };
+        // GPU rendering explicitly first: if EGL init quietly fails Avalonia falls back
+        // to SOFTWARE rendering, which is "laggy as hell" no matter what the app does —
+        // pinning the order makes the fallback deliberate and logcat-visible.
+        return base.CustomizeAppBuilder(builder)
+            .With(new Avalonia.AndroidPlatformOptions
+            {
+                RenderingMode = new[]
+                {
+                    Avalonia.AndroidRenderingMode.Egl,
+                    Avalonia.AndroidRenderingMode.Software,
+                },
+            });
+    }
+}
+
 [Activity(
     Label = "SplitGuard",
     Theme = "@style/SplitGuardTheme",
@@ -17,7 +59,7 @@ namespace SplitGuard.Droid;
     MainLauncher = true,
     Exported = true,
     ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.UiMode)]
-public class MainActivity : AvaloniaMainActivity<App>
+public class MainActivity : AvaloniaMainActivity
 {
     const int VpnConsentRequest = 71;
     const int CameraPermRequest = 72;
@@ -65,39 +107,9 @@ public class MainActivity : AvaloniaMainActivity<App>
         decor.SystemUiVisibility = (Android.Views.StatusBarVisibility)(_barLight ? (v | flags) : (v & ~flags));
     });
 
-    protected override AppBuilder CustomizeAppBuilder(AppBuilder builder)
-    {
-        App.Platform = new AndroidPlatform();
-        // Mobile reflow of the collapsed card detail (2-column stat grid).
-        Views.TunnelCard.Compact = true;
-        App.BuildHead = app =>
-        {
-            if (app.ApplicationLifetime is not ISingleViewApplicationLifetime single) return;
-            // Segoe icon fonts don't exist on Android — swap in the bundled symbols font
-            // (same codepoints, open Fluent System Icons outlines).
-            app.Resources["GlyphFontFamily"] =
-                new Avalonia.Media.FontFamily("avares://SplitGuard.Core/Assets/Fonts#SplitGuard Symbols");
-            var view = new MainView();
-            _view = view;
-            var vm = new MainViewModel(new AndroidDialogs(view), App.Platform!);
-            view.DataContext = vm;
-            view.ApplyUiPrefs(vm.Prefs);
-            single.MainView = view;
-            _ = vm.InitializeAsync();
-        };
-        // GPU rendering explicitly first: if EGL init quietly fails Avalonia falls back
-        // to SOFTWARE rendering, which is "laggy as hell" no matter what the app does —
-        // pinning the order makes the fallback deliberate and logcat-visible.
-        return base.CustomizeAppBuilder(builder)
-            .With(new Avalonia.AndroidPlatformOptions
-            {
-                RenderingMode = new[]
-                {
-                    Avalonia.AndroidRenderingMode.Egl,
-                    Avalonia.AndroidRenderingMode.Software,
-                },
-            });
-    }
+    // Exposed for SplitGuardApplication.CustomizeAppBuilder (the 12 API moves app-builder
+    // construction from the activity to the [Application] class below).
+    internal static void SetView(MainView view) => _view = view;
 
     protected override void OnResume()
     {

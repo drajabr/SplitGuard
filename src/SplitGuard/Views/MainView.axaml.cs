@@ -463,7 +463,9 @@ public partial class MainView : UserControl
             return;
         }
         var clip = TopLevel.GetTopLevel(this)?.Clipboard;
-        var text = clip is null ? null : await clip.GetTextAsync();
+        string? text = null;
+        if (clip is not null && await clip.TryGetDataAsync() is { } data)
+            text = await data.TryGetTextAsync();
         AddPeerFromText(tunnel, text, "pasted descriptor");
     }
 

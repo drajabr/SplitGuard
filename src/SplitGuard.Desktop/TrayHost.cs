@@ -182,7 +182,7 @@ public class TrayHost
             if (tunnel.IsCustom) continue; // the custom DNS card isn't a connection
             var item = new NativeMenuItem(TrayItemText(tunnel))
             {
-                ToggleType = NativeMenuItemToggleType.CheckBox,
+                ToggleType = MenuItemToggleType.CheckBox,
                 IsChecked = tunnel.IsConnected,
                 IsEnabled = !tunnel.IsExternal,
             };

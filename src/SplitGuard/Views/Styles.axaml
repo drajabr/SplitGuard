@@ -629,6 +629,13 @@
     <Setter Property="Opacity" Value="1" />
   </Style>
 
+  <!-- Avalonia 12's managed chrome draws the window title INSIDE the extended client area,
+       on top of our own title strip (logo + name + version + update). Hide the managed
+       text; the caption buttons stay. -->
+  <Style Selector="TitleBar /template/ TextBlock">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+
   <Style Selector="Separator">
     <Setter Property="Background" Value="{DynamicResource SeparatorBrush}" />
     <Setter Property="Height" Value="1" />

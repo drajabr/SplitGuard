@@ -7,7 +7,6 @@
         Width="520" Height="700"
         MinWidth="520" MinHeight="300"
         ExtendClientAreaToDecorationsHint="True"
-        ExtendClientAreaChromeHints="PreferSystemChrome"
         ExtendClientAreaTitleBarHeightHint="38"
         FontFamily="Segoe UI Variable Text, Segoe UI"
         RenderOptions.TextRenderingMode="SubpixelAntialias"

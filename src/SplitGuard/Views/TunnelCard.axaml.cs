@@ -105,7 +105,7 @@ public partial class TunnelCard : UserControl
         // Drop a peer descriptor (or a QR / text) onto the card to add it as a peer.
         AddHandler(DragDrop.DropEvent, OnCardDrop);
         AddHandler(DragDrop.DragOverEvent, (_, e) =>
-        { if (e.Data.Contains(DataFormats.Text) || e.Data.Contains(DataFormats.Files)) e.DragEffects = DragDropEffects.Copy; });
+        { if (e.DataTransfer.Contains(DataFormat.Text) || e.DataTransfer.Contains(DataFormat.File)) e.DragEffects = DragDropEffects.Copy; });
 
         // Wrapping content (chips, wrap rows) changes height without any collection
         // event — e.g. a long value wraps to a second line, or the window narrows.
@@ -484,11 +484,11 @@ public partial class TunnelCard : UserControl
         if (_vm is null || _vm.IsExternal || _vm.IsCustom) return;
         var host = this.FindAncestorOfType<MainView>();
         if (host is null) return;
-        var text = e.Data.GetText();
+        var text = e.DataTransfer.TryGetText();
         Avalonia.Platform.Storage.IStorageFile? file = null;
         if (string.IsNullOrWhiteSpace(text))
         {
-            file = e.Data.GetFiles()?.OfType<Avalonia.Platform.Storage.IStorageFile>().FirstOrDefault();
+            file = e.DataTransfer.TryGetFiles()?.OfType<Avalonia.Platform.Storage.IStorageFile>().FirstOrDefault();
             if (file is not null)
                 try
                 {
