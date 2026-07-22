@@ -129,6 +129,8 @@ public partial class MainView : UserControl
         // desktop Window responds (Android's VisualRoot isn't a Window → no-op); the update button
         // opts out so its click isn't swallowed by the drag.
         TitleStrip.AddHandler(PointerPressedEvent, OnTitleStripPressed, RoutingStrategies.Tunnel);
+        // The settings drawer's two-column/stacked shape follows the available width.
+        SizeChanged += (_, _) => UpdateSettingsLayout();
     }
 
     void OnTitleStripPressed(object? sender, PointerPressedEventArgs e)
@@ -211,6 +213,8 @@ public partial class MainView : UserControl
     void ApplyFont()
     {
         ChromeTarget.FontFamily = new FontFamily(FontFamilyOf(FontSteps[_fontIndex]));
+        // Label widths changed; re-judge stacked vs side-by-side once the new font lands.
+        Dispatcher.UIThread.Post(UpdateSettingsLayout);
     }
 
     void ApplyZoom()
@@ -219,6 +223,7 @@ public partial class MainView : UserControl
         var resources = Avalonia.Application.Current!.Resources;
         foreach (var (key, baseValue) in ZoomResources)
             resources[key] = baseValue * scale;
+        Dispatcher.UIThread.Post(UpdateSettingsLayout);
     }
 
     // Surface theme: page + card/chip fills + borders + text contrast.
@@ -572,28 +577,58 @@ public partial class MainView : UserControl
     }
 
     // (Re)build the two columns. General = toggles with side effects; Appearance = inline pickers.
-    bool _settingsStacked;
-    // Android (narrow): reflow the two-column settings grid into one stacked full-width column so
-    // neither section is cramped (the appearance swatches/zoom labels were clipping). Runs once;
-    // desktop keeps the side-by-side layout.
-    void StackSettingsOnMobile()
+    bool? _settingsSideBySide; // null until the first layout pass applies one of the two shapes
+    // Side-by-side only when BOTH columns get at least their natural width out of the grid's
+    // 1.3*/1* split — no truncated toggle labels, no clipped picker text. Anything narrower
+    // stacks General above Appearance full-width. Re-evaluated on every resize and on
+    // font/zoom/content changes, in both directions (any platform: a wide tablet goes
+    // side-by-side, a narrow desktop window stacks).
+    void UpdateSettingsLayout()
     {
-        if (_settingsStacked || TopLevel.GetTopLevel(this) is Window) return;
-        _settingsStacked = true;
-        SettingsCard.ColumnDefinitions = new ColumnDefinitions("*");
-        SettingsCard.RowDefinitions = new RowDefinitions("Auto,Auto,Auto");
-        Grid.SetColumn(GeneralList, 0); Grid.SetRow(GeneralList, 0);
+        if (GeneralList.Children.Count == 0) return; // panel not built yet
+        // Width the settings card's content actually gets: the view minus the drawer's side
+        // margins (14+14), its border (1+1), and the card's own margin (12+12).
+        var avail = Bounds.Width - 28 - 2 - 24;
+        if (avail <= 0) return;
+        GeneralList.Measure(Size.Infinity);
+        AppearanceList.Measure(Size.Infinity);
+        // 12px of hysteresis so a borderline width can't oscillate between the layouts.
+        var slack = _settingsSideBySide == true ? 0 : 12;
+        var cols = avail - 29; // separator + its 14px side margins
+        var fits = GeneralList.DesiredSize.Width + slack <= cols * 1.3 / 2.3
+                   && AppearanceList.DesiredSize.Width + slack <= cols / 2.3;
+        // The manual infinite measure above leaves a stale DesiredSize; re-measure against
+        // the real constraints either way.
+        GeneralList.InvalidateMeasure();
+        AppearanceList.InvalidateMeasure();
+        if (_settingsSideBySide == fits) return;
+        _settingsSideBySide = fits;
+        if (fits)
+        {
+            SettingsCard.RowDefinitions = new RowDefinitions("Auto");
+            SettingsCard.ColumnDefinitions = new ColumnDefinitions("1.3*,Auto,1*");
+            Grid.SetRow(GeneralList, 0); Grid.SetColumn(GeneralList, 0);
+            SettingsSep.Height = double.NaN; SettingsSep.Width = 1; SettingsSep.Margin = new Thickness(14, 0);
+            Grid.SetRow(SettingsSep, 0); Grid.SetColumn(SettingsSep, 1);
+            Grid.SetRow(AppearanceList, 0); Grid.SetColumn(AppearanceList, 2);
+        }
+        else
+        {
+            SettingsCard.ColumnDefinitions = new ColumnDefinitions("*");
+            SettingsCard.RowDefinitions = new RowDefinitions("Auto,Auto,Auto");
+            Grid.SetColumn(GeneralList, 0); Grid.SetRow(GeneralList, 0);
+            SettingsSep.Width = double.NaN; SettingsSep.Height = 1; SettingsSep.Margin = new Thickness(0, 10);
+            Grid.SetColumn(SettingsSep, 0); Grid.SetRow(SettingsSep, 1);
+            Grid.SetColumn(AppearanceList, 0); Grid.SetRow(AppearanceList, 2);
+        }
         GeneralList.HorizontalAlignment = HorizontalAlignment.Stretch;
-        SettingsSep.Width = double.NaN; SettingsSep.Height = 1; SettingsSep.Margin = new Thickness(0, 10);
-        Grid.SetColumn(SettingsSep, 0); Grid.SetRow(SettingsSep, 1);
-        Grid.SetColumn(AppearanceList, 0); Grid.SetRow(AppearanceList, 2);
         AppearanceList.HorizontalAlignment = HorizontalAlignment.Stretch;
+        // If the drawer is open mid-switch its height is auto (NaN) and simply re-fits.
     }
 
     void BuildSettingsPanel()
     {
         if (DataContext is not MainViewModel sv) return;
-        StackSettingsOnMobile();
         GeneralList.Children.Clear();
         GeneralList.Children.Add(ToggleRow("Custom DNS forwarding", () => sv.HasCustomDns, on => sv.ToggleCustomDns(on)));
         // Startup rows exist only where the platform has the concept (Windows: registry Run key +
@@ -644,6 +679,7 @@ public partial class MainView : UserControl
         AppearanceList.Children.Add(AccentGroup());
         AppearanceList.Children.Add(FontGroup());
         AppearanceList.Children.Add(PickerGroup(System.Array.ConvertAll(ZoomSteps, s => s.Name), _zoomIndex, SelectZoom));
+        UpdateSettingsLayout();
     }
 
     // "label [ switch ]" row: a pill switch (shared look with the connect toggle) flushed right.

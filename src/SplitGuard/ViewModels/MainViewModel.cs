@@ -49,6 +49,8 @@ public class MainViewModel : ObservableObject, ITunnelHost
                 Notify(vm.Name, "Connected", false);
                 NotifyStatus();
             }
+            // Health changes can hand a contested domain to another claimant.
+            MaybeRearbitrateDomains();
         });
         _tunnels.FailoverChanged += msg => Dispatcher.UIThread.Post(() =>
         {
@@ -318,8 +320,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
         _store.Save(_config);
         _ = Task.Run(() =>
         {
-            if (_config.Custom?.Active == true) ApplyCustomRules(tunnel);
-            else _nrpt.RemoveByTunnel(CustomName);
+            ReconcileDomainRules(); // active → its winners apply; inactive → its rules fall out
             RefreshCatchAll();
         });
         NotifyStatus();
@@ -375,58 +376,23 @@ public class MainViewModel : ObservableObject, ITunnelHost
         }
     }
 
-    // Startup crash recovery: drop tagged rules that no longer correspond to anything live.
+    // Startup crash recovery: drop tagged rules that don't correspond to anything live
+    // (WG rules re-arrive with RestoreConnections; the catch-all with RefreshCatchAll),
+    // then apply the current winners fresh — the in-session applied map starts empty, so
+    // ReconcileDomainRules replaces every desired rule in place, de-duplicating leftovers.
     void Reconcile()
     {
         try
         {
-            var tagged = _nrpt.GetTaggedRules();
-            var desired = DesiredExternalRuleIds();
-            var stale = tagged.Where(r => !desired.Contains(r.Id)).Select(r => r.Id).ToList();
+            var desired = DesiredDomainRules(Dispatcher.UIThread.Invoke(LiveDomainClaims));
+            var stale = _nrpt.GetTaggedRules().Where(r => !desired.ContainsKey(r.Id)).Select(r => r.Id).ToList();
             if (stale.Count > 0) _nrpt.RemoveTagged(stale);
-            foreach (var ext in _config.Externals)
-            {
-                var vm = Tunnels.FirstOrDefault(t => t.IsExternal && t.Name == ext.AdapterName);
-                if (vm is null || !vm.IsConnected || string.IsNullOrEmpty(ext.Dns)) continue;
-                foreach (var d in ext.Domains)
-                {
-                    var id = SplitDnsRules.RuleId(ExtName(ext.AdapterName), ext.AdapterName, d);
-                    if (!tagged.Any(r => r.Id == id))
-                        _nrpt.ApplyDomain(ExtName(ext.AdapterName), ext.AdapterName, d, ext.Dns);
-                }
-            }
-            // Re-apply any missing custom-card rules (only while active).
-            if (_config.Custom is { Active: true })
-                foreach (var role in _config.Custom.Roles.Where(r => !string.IsNullOrEmpty(r.Dns)))
-                    foreach (var d in role.Domains)
-                    {
-                        var id = SplitDnsRules.RuleId(CustomName, role.Id, d);
-                        if (!tagged.Any(r => r.Id == id))
-                            _nrpt.ApplyDomain(CustomName, role.Id, d, role.Dns!);
-                    }
+            ReconcileDomainRules();
         }
         catch (Exception ex)
         {
             Dispatcher.UIThread.Post(() => { StatusText = $"NRPT reconcile failed: {ex.Message}"; StatusOk = false; });
         }
-    }
-
-    HashSet<string> DesiredExternalRuleIds()
-    {
-        var set = new HashSet<string>();
-        foreach (var ext in _config.Externals)
-        {
-            var vm = Tunnels.FirstOrDefault(t => t.IsExternal && t.Name == ext.AdapterName);
-            if (vm is null || !vm.IsConnected || string.IsNullOrEmpty(ext.Dns)) continue;
-            foreach (var d in ext.Domains)
-                set.Add(SplitDnsRules.RuleId(ExtName(ext.AdapterName), ext.AdapterName, d));
-        }
-        // Custom card rules are desired while the card is active.
-        if (_config.Custom is { Active: true })
-            foreach (var role in _config.Custom.Roles.Where(r => !string.IsNullOrEmpty(r.Dns)))
-                foreach (var d in role.Domains)
-                    set.Add(SplitDnsRules.RuleId(CustomName, role.Id, d));
-        return set;
     }
 
     static string ExtName(string adapter) => $"ext:{adapter}";
@@ -443,15 +409,15 @@ public class MainViewModel : ObservableObject, ITunnelHost
     public void RequestConnect(TunnelViewModel vm)
     {
         // UI-review harness: never create a real adapter/routes from the fake demo tunnels —
-        // pretend the connect succeeded so the toggle stays interactive.
-        if (RuleStore.DemoMode) { vm.MarkEstablished(); return; }
+        // pretend the connect succeeded so the toggle stays interactive. Pins/details still
+        // refresh so contested-domain marking re-arbitrates like the real path would.
+        if (RuleStore.DemoMode) { vm.MarkEstablished(); RefreshPins(); return; }
         _ = Task.Run(() =>
     {
         try
         {
             _tunnels.Connect(vm.Config!);
-            foreach (var p in vm.Config!.Peers.Where(p => p.Dns is not null && p.Domains.Count > 0))
-                _nrpt.ApplyPeerRules(vm.Name, p.PublicKey, p.Domains, p.Dns!);
+            ReconcileDomainRules();
             RefreshCatchAll();
             // No "Connected" announcement yet — that fires on the first handshake.
             Dispatcher.UIThread.Post(() => { StatusText = ""; RefreshPins(); });
@@ -471,14 +437,15 @@ public class MainViewModel : ObservableObject, ITunnelHost
 
     public void RequestDisconnect(TunnelViewModel vm)
     {
-        if (RuleStore.DemoMode) return; // demo: the optimistic UI already flipped the toggle
+        if (RuleStore.DemoMode) { RefreshPins(); return; } // demo: the optimistic UI already flipped the toggle
         _ = Task.Run(() =>
     {
         try
         {
-            foreach (var p in vm.Config!.Peers)
-                _nrpt.RemovePeerRules(vm.Name, p.PublicKey);
             _tunnels.Disconnect(vm.Name);
+            // Its rules leave the desired set; a standby claimant takes over any
+            // contested domain it owned.
+            ReconcileDomainRules();
             RefreshCatchAll();
             Dispatcher.UIThread.Post(() => { RefreshPins(); Notify(vm.Name, "Disconnected", false); });
         }
@@ -578,11 +545,151 @@ public class MainViewModel : ObservableObject, ITunnelHost
     // Any number of cards may be expanded/editing at once (single-edit rule dropped).
     public void EditStarted(TunnelViewModel tunnel) { }
 
-    public bool IsDomainInUse(string domain, PeerViewModel except) =>
-        Tunnels.SelectMany(t => t.Peers)
-            .Where(p => !ReferenceEquals(p, except))
-            .SelectMany(p => p.DomainValues)
-            .Contains(domain, StringComparer.OrdinalIgnoreCase);
+    // ---- domain-group arbitration ------------------------------------------------
+
+    // The same domain on several peers is legal — it mirrors route failover: every
+    // claimant stays configured, but only the currently-active one gets the split-DNS
+    // rule (two live NRPT rules for one namespace would be undefined). Claimants order
+    // like route groups — metric, then custom → external → WG, then name/index — and the
+    // first HEALTHY claimant on a live card wins (or the best-ranked one when nothing is
+    // healthy, exactly like TunnelManager.ReconcileFailoverCore).
+    sealed record DomainClaim(string TunnelKey, string PeerKey, string Domain, string Dns,
+        int Metric, int CardRank, string SortName, int PeerIndex, bool Healthy);
+
+    // UI thread. Every (domain → dns) claim on a live card, from SAVED config values —
+    // staged edits must not steer real rules until the user saves.
+    List<DomainClaim> LiveDomainClaims()
+    {
+        var claims = new List<DomainClaim>();
+        foreach (var t in Tunnels)
+        {
+            if (!t.IsConnected) continue;
+            if (t.IsCustom)
+            {
+                var roles = t.Custom!.Roles;
+                for (int i = 0; i < roles.Count; i++)
+                {
+                    if (string.IsNullOrEmpty(roles[i].Dns)) continue;
+                    foreach (var d in roles[i].Domains)
+                        claims.Add(new(CustomName, roles[i].Id, d, roles[i].Dns!, 0, 0, CustomName, i, true));
+                }
+            }
+            else if (t.IsExternal)
+            {
+                var ext = t.External!;
+                if (string.IsNullOrEmpty(ext.Dns)) continue;
+                foreach (var d in ext.Domains)
+                    claims.Add(new(ExtName(ext.AdapterName), ext.AdapterName, d, ext.Dns!, 0, 1, ext.AdapterName, 0, true));
+            }
+            else if (t.Config is { } cfg)
+            {
+                for (int i = 0; i < cfg.Peers.Count; i++)
+                {
+                    var p = cfg.Peers[i];
+                    if (p.Dns is null || p.Domains.Count == 0) continue;
+                    // Health lives on the peer view-model (fed by the stats poll).
+                    var healthy = t.Peers.FirstOrDefault(v => v.PublicKey.Trim() == p.PublicKey)?.IsHealthy ?? true;
+                    foreach (var d in p.Domains)
+                        claims.Add(new(t.Name, p.PublicKey, d, p.Dns, p.Metric, 2, t.Name, i, healthy));
+                }
+            }
+        }
+        return claims;
+    }
+
+    static IOrderedEnumerable<T> OrderClaims<T>(IEnumerable<T> group, Func<T, (int Metric, int CardRank, string SortName, int PeerIndex)> key) =>
+        group.OrderBy(c => key(c).Metric).ThenBy(c => key(c).CardRank)
+            .ThenBy(c => key(c).SortName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(c => key(c).PeerIndex);
+
+    static DomainClaim PickWinner(IEnumerable<DomainClaim> group)
+    {
+        var ordered = OrderClaims(group, c => (c.Metric, c.CardRank, c.SortName, c.PeerIndex)).ToList();
+        return ordered.FirstOrDefault(c => c.Healthy) ?? ordered[0];
+    }
+
+    // Rule id → winning claim, one per distinct domain.
+    static Dictionary<string, DomainClaim> DesiredDomainRules(List<DomainClaim> claims)
+    {
+        var desired = new Dictionary<string, DomainClaim>();
+        foreach (var g in claims.GroupBy(c => c.Domain, StringComparer.OrdinalIgnoreCase))
+        {
+            var w = PickWinner(g);
+            desired[SplitDnsRules.RuleId(w.TunnelKey, w.PeerKey, w.Domain)] = w;
+        }
+        return desired;
+    }
+
+    // Applied per-domain rules this session (rule id → dns server). Owned exclusively by
+    // ReconcileDomainRules so the diff below is the only thing that mutates rule state;
+    // paths that remove rules directly (shutdown) don't need it — the map dies with us.
+    readonly object _domainRulesGate = new();
+    readonly Dictionary<string, string> _appliedDomainRules = new();
+
+    // The single owner of per-domain rule application: compute each domain's winner and
+    // diff against what's applied, so backend churn (and DNS cache flushes) only happens
+    // when ownership actually moved. Runs on background threads; every connect /
+    // disconnect / save / delete / external flip and any stats-driven winner change ends
+    // here. A (re)applied id is removed first so a pre-session copy of the same rule
+    // (previous run, crash) can't linger as a duplicate.
+    void ReconcileDomainRules()
+    {
+        var desired = DesiredDomainRules(Dispatcher.UIThread.Invoke(LiveDomainClaims));
+        lock (_domainRulesGate)
+        {
+            var stale = _appliedDomainRules.Keys.Where(id => !desired.ContainsKey(id)).ToList();
+            if (stale.Count > 0)
+            {
+                _nrpt.RemoveTagged(stale);
+                foreach (var id in stale) _appliedDomainRules.Remove(id);
+            }
+            foreach (var (id, w) in desired)
+            {
+                if (_appliedDomainRules.TryGetValue(id, out var dns) && dns == w.Dns) continue;
+                _nrpt.RemoveTagged(new[] { id });
+                _nrpt.ApplyDomain(w.TunnelKey, w.PeerKey, w.Domain, w.Dns);
+                _appliedDomainRules[id] = w.Dns;
+            }
+        }
+    }
+
+    // Called on every stats tick (UI thread): a health change can move a contested domain
+    // to another claimant, exactly like a route failing over. Winner computation is cheap
+    // and pure — the backend work only runs when some domain actually changed hands.
+    string _domainWinnersFingerprint = "";
+
+    void MaybeRearbitrateDomains()
+    {
+        var fp = string.Join("\n", DesiredDomainRules(LiveDomainClaims())
+            .OrderBy(kv => kv.Key, StringComparer.Ordinal)
+            .Select(kv => $"{kv.Key}={kv.Value.Dns}"));
+        if (fp == _domainWinnersFingerprint) return;
+        _domainWinnersFingerprint = fp;
+        if (!RuleStore.DemoMode) _ = Task.Run(ReconcileDomainRules);
+        RefreshDetails(); // contested-domain "· active" pills follow the new owner
+    }
+
+    // UI-side standing for the description panel, computed over the DISPLAYED (view-model)
+    // values with the same ordering as the rules engine. Live claimants outrank offline
+    // ones; with nothing live the best-ranked claimant is shown as the would-be resolver,
+    // mirroring the static Position-1 fallback the route pills use.
+    public (bool Contested, bool Owned) DomainStanding(PeerViewModel peer, string domain)
+    {
+        var claimants = new List<(TunnelViewModel T, PeerViewModel P)>();
+        foreach (var t in Tunnels)
+            foreach (var p in t.Peers)
+                if (p.HasDns && p.DomainValues.Contains(domain, StringComparer.OrdinalIgnoreCase))
+                    claimants.Add((t, p));
+        if (claimants.Count < 2) return (false, true);
+        var pool = claimants.Any(c => c.T.IsConnected)
+            ? claimants.Where(c => c.T.IsConnected).ToList()
+            : claimants;
+        var ordered = OrderClaims(pool, c =>
+            (c.P.ParsedMetric, c.T.IsCustom ? 0 : c.T.IsExternal ? 1 : 2, c.T.Name, c.T.Peers.IndexOf(c.P))).ToList();
+        var owner = ordered.FirstOrDefault(c => c.P.IsHealthy);
+        if (owner.P is null) owner = ordered[0];
+        return (true, ReferenceEquals(owner.P, peer));
+    }
 
     // ---- route-group metrics -------------------------------------------------
 
@@ -726,25 +833,21 @@ public class MainViewModel : ObservableObject, ITunnelHost
             vm.MarkReconnecting();
         _ = Task.Run(() =>
         {
-            if (vm.IsCustom)
+            if (vm.IsCustom || vm.IsExternal)
             {
-                if (vm.Custom!.Active) ApplyCustomRules(vm);
-                else _nrpt.RemoveByTunnel(CustomName);
-            }
-            else if (vm.IsExternal)
-            {
-                if (vm.IsConnected) ReapplyExternalRules(vm);
+                // Edited domains/DNS re-arbitrate; rules of an inactive card (and of
+                // roles/domains deleted by the edit) fall out of the desired set.
+                ReconcileDomainRules();
             }
             else if (vm.IsConnected)
             {
-                // DNS/domain-only edits refresh NRPT in place; connection edits need a quick reconnect.
-                foreach (var p in vm.Config!.Peers) _nrpt.RemovePeerRules(vm.Name, p.PublicKey);
+                // DNS/domain-only edits re-arbitrate in place; connection edits need a
+                // quick reconnect first.
                 if (connectionChanged) _tunnels.Disconnect(vm.Name);
                 try
                 {
-                    if (connectionChanged) _tunnels.Connect(vm.Config);
-                    foreach (var p in vm.Config.Peers.Where(p => p.Dns is not null && p.Domains.Count > 0))
-                        _nrpt.ApplyPeerRules(vm.Name, p.PublicKey, p.Domains, p.Dns!);
+                    if (connectionChanged) _tunnels.Connect(vm.Config!);
+                    ReconcileDomainRules();
                 }
                 catch (Exception ex)
                 {
@@ -753,27 +856,13 @@ public class MainViewModel : ObservableObject, ITunnelHost
                         vm.SetConnectedState(false);
                         StatusText = $"{vm.Name}: {ex.Message}";
                         StatusOk = false;
+                        // The card is off now — drop its rules once the flip is visible.
+                        _ = Task.Run(ReconcileDomainRules);
                     });
                 }
             }
             RefreshCatchAll();
         });
-    }
-
-    // Rewrite all custom-card NRPT rules from scratch (they're always active while running).
-    void ApplyCustomRules(TunnelViewModel vm)
-    {
-        _nrpt.RemoveByTunnel(CustomName);
-        foreach (var p in vm.Peers.Where(p => p.HasDns && p.DomainValues.Any()))
-            _nrpt.ApplyPeerRules(CustomName, p.PublicKey, p.DomainValues, p.Dns.Trim());
-    }
-
-    void ReapplyExternalRules(TunnelViewModel vm)
-    {
-        _nrpt.RemovePeerRules(ExtName(vm.Name), vm.Name);
-        var ext = vm.External!;
-        if (!string.IsNullOrEmpty(ext.Dns) && ext.Domains.Count > 0)
-            _nrpt.ApplyPeerRules(ExtName(vm.Name), vm.Name, ext.Domains, ext.Dns);
     }
 
     public void RequestDelete(TunnelViewModel vm)
@@ -784,7 +873,6 @@ public class MainViewModel : ObservableObject, ITunnelHost
         if (vm.IsCustom)
         {
             _config.Custom = null;
-            _ = Task.Run(() => _nrpt.RemoveByTunnel(CustomName));
         }
         else if (vm.IsExternal)
         {
@@ -795,7 +883,8 @@ public class MainViewModel : ObservableObject, ITunnelHost
         else _config.Tunnels.Remove(vm.Config!);
         _store.Save(_config);
         Tunnels.Remove(vm);
-        _ = Task.Run(RefreshCatchAll);
+        // The removed card's rules (custom roles, an external's domains) leave the desired set.
+        _ = Task.Run(() => { ReconcileDomainRules(); RefreshCatchAll(); });
     }
 
     // Settings toggle: the single standalone custom-DNS card. On → create it (top of the
@@ -947,15 +1036,11 @@ public class MainViewModel : ObservableObject, ITunnelHost
             var wasUp = vm.IsConnected;
             vm.SetConnectedState(adapter.IsUp);
             if (wasUp != adapter.IsUp)
-            {
-                var captured = vm;
                 _ = Task.Run(() =>
                 {
-                    if (adapter.IsUp) ReapplyExternalRules(captured);
-                    else _nrpt.RemovePeerRules(ExtName(captured.Name), captured.Name);
+                    ReconcileDomainRules(); // up → its winners apply; down → rules drop / hand over
                     RefreshCatchAll();
                 });
-            }
         }
         // Adapters that vanished (tunnel removed in the official client): mark down, keep config.
         foreach (var vm in Tunnels.Where(t => t.IsExternal && adapters.All(a => a.Name != t.Name)).ToList())
@@ -963,10 +1048,9 @@ public class MainViewModel : ObservableObject, ITunnelHost
             if (vm.IsConnected)
             {
                 vm.SetConnectedState(false);
-                var captured = vm;
                 _ = Task.Run(() =>
                 {
-                    _nrpt.RemovePeerRules(ExtName(captured.Name), captured.Name);
+                    ReconcileDomainRules();
                     RefreshCatchAll();
                 });
             }

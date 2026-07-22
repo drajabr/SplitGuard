@@ -138,8 +138,9 @@
                 Background="{DynamicResource MenuSurfaceBrush}" BorderBrush="{DynamicResource HairlineBrush}"
                 BorderThickness="1" CornerRadius="8" Margin="14,0,14,0" Height="0" IsVisible="False">
           <Panel ClipToBounds="True">
-            <!-- Desktop: two columns side by side. Android (narrow): the code-behind reflows this to
-                 a single stacked column (General above Appearance) so neither section is cramped. -->
+            <!-- Two columns side by side while BOTH fit at their natural width; anything narrower
+                 (a phone, or a slim desktop window) is reflowed by the code-behind into a single
+                 stacked column (General above Appearance) so no label is ever cut. -->
             <Grid Name="SettingsCard" ColumnDefinitions="1.3*,Auto,1*" Margin="12,8" VerticalAlignment="Bottom">
               <StackPanel Grid.Column="0" Name="GeneralList" Spacing="1" VerticalAlignment="Center" />
               <Border Grid.Column="1" Name="SettingsSep" Width="1" Background="{DynamicResource SeparatorBrush}" Margin="14,0" />

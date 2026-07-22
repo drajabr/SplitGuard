@@ -860,7 +860,14 @@ public partial class TunnelCard : UserControl
             {
                 var content = new List<Control>();
                 if (p.HasDns) content.Add(DnsValue(p));
-                foreach (var d in p.DomainValues) content.Add(Pill(d, domainBrush));
+                // A domain claimed by several peers is marked like a failover route: the
+                // current resolver's pill is accent-tinted "· active"; other claimants
+                // keep the plain pill.
+                foreach (var d in p.DomainValues)
+                {
+                    var (contested, owned) = _vm.Host.DomainStanding(p, d);
+                    content.Add(contested && owned ? Pill($"{d} · active", accent) : Pill(d, domainBrush));
+                }
                 LabeledRow("dns", content);
             }
         }

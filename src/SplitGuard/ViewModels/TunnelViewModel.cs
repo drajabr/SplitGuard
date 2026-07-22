@@ -11,7 +11,9 @@ public interface ITunnelHost
     // Persist the tunnel's on/off intent (TunnelConfig.Connected) for startup restore.
     void PersistConnectedState(TunnelViewModel tunnel);
     void TogglePin(TunnelViewModel tunnel, PeerViewModel peer);
-    bool IsDomainInUse(string domain, PeerViewModel except);
+    // Domain-group standing: whether this domain is claimed by 2+ peers, and whether THIS
+    // peer currently resolves it (drives the "· active" pill, like failover routes).
+    (bool Contested, bool Owned) DomainStanding(PeerViewModel peer, string domain);
     // Whether this peer's allowed IPs overlap another peer's (metric is moot otherwise).
     bool HasRouteGroup(PeerViewModel peer);
     // The peer's failover standing: (position by metric, group size, shared CIDR), or
@@ -354,6 +356,7 @@ public class TunnelViewModel : ObservableObject
             p.TxTotalText = "";
             p.RxTotalText = "";
             p.FailoverRole = "";
+            p.IsHealthy = true;
             p.FirstHandshake = null;
             p.UptimeText = "";
         }
@@ -813,6 +816,7 @@ public class TunnelViewModel : ObservableObject
                 _ => "",
             };
             peer.FailoverRole = s.FailoverRole ?? "";
+            peer.IsHealthy = s.Healthy;
         }
         UpRate = Format.Rate(up);
         DownRate = Format.Rate(down);

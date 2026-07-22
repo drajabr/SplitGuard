@@ -233,6 +233,12 @@ public partial class PeerViewModel : ObservableObject
     string _failoverRole = "";
     public string FailoverRole { get => _failoverRole; set => Set(ref _failoverRole, value); }
 
+    // Failover health as last reported by the engine (handshake/ping verdict). Starts true
+    // so a fresh connect isn't judged unhealthy before its first stats poll; domain-group
+    // arbitration reads this the way route arbitration reads PeerRuntime.Healthy.
+    bool _isHealthy = true;
+    public bool IsHealthy { get => _isHealthy; set => Set(ref _isHealthy, value); }
+
     public RelayCommand AddDomainCommand { get; }
     public RelayCommand RemoveDomainCommand { get; }
     public RelayCommand AddAllowedIpCommand { get; }
@@ -296,7 +302,10 @@ public partial class PeerViewModel : ObservableObject
     void AddDomain()
     {
         var domain = NewDomain.Trim().TrimEnd('.');
-        if (!IsValidDomain(domain) || _tunnel.Host.IsDomainInUse(domain, this))
+        // The same domain on ANOTHER peer is legal — the currently-active claimant resolves
+        // it (see MainViewModel's domain arbitration, mirroring route metrics). Only an
+        // exact duplicate on this peer is refused.
+        if (!IsValidDomain(domain) || DomainValues.Contains(domain, StringComparer.OrdinalIgnoreCase))
         {
             DomainAddError = true;
             return;

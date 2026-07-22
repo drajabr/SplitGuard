@@ -105,6 +105,10 @@ public class RuleStore
                             Endpoint = "backup.office.example.com:51820",
                             AllowedIps = { "10.7.0.0/24" },
                             PersistentKeepalive = 25,
+                            // Same domain as "main": a contested domain group — the active
+                            // claimant's pill gets the "· active" accent in the detail.
+                            Dns = "10.7.0.6",
+                            Domains = { "*.corp.example" },
                             PingHost = "10.7.0.5",
                             PingDownCount = 3,
                             PingUpCount = 5,
