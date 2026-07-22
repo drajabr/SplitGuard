@@ -56,6 +56,12 @@ public static class Motion
 
     public static void Tween(double from, double to, int ms, Action<double> apply, Action? done = null)
     {
+        // Compact (Android): structural code tweens — card/drawer heights, scroll offsets
+        // — apply INSTANTLY. Every step re-measures and re-arranges whole subtrees, and
+        // even one such pass per 30ms tick is the residual interaction jank on a phone
+        // CPU. The render-only XAML transitions (fades, color rides, the knob slide)
+        // still animate, so the UI keeps its motion language without paying layout.
+        if (TunnelCard.Compact) { apply(to); done?.Invoke(); return; }
         if (Math.Abs(to - from) < 0.5) { apply(to); done?.Invoke(); return; }
         _tweens.Add(new ActiveTween { Sw = Stopwatch.StartNew(), From = from, To = to, Ms = ms, Apply = apply, Done = done });
         if (_pump is null)

@@ -85,7 +85,18 @@ public class MainActivity : AvaloniaMainActivity<App>
             single.MainView = view;
             _ = vm.InitializeAsync();
         };
-        return base.CustomizeAppBuilder(builder);
+        // GPU rendering explicitly first: if EGL init quietly fails Avalonia falls back
+        // to SOFTWARE rendering, which is "laggy as hell" no matter what the app does —
+        // pinning the order makes the fallback deliberate and logcat-visible.
+        return base.CustomizeAppBuilder(builder)
+            .With(new Avalonia.AndroidPlatformOptions
+            {
+                RenderingMode = new[]
+                {
+                    Avalonia.AndroidRenderingMode.Egl,
+                    Avalonia.AndroidRenderingMode.Software,
+                },
+            });
     }
 
     protected override void OnResume()

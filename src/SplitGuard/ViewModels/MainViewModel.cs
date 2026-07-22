@@ -562,7 +562,10 @@ public class MainViewModel : ObservableObject, ITunnelHost
         var tunnelServers = Dispatcher.UIThread.Invoke(SnapshotPinnedChain);
         if (tunnelServers is null) return null;
         var servers = new List<string>(tunnelServers);
-        servers.AddRange(SystemDns.Snapshot());
+        // The system tail is SORTED: NIC enumeration order is nondeterministic, and an
+        // order-shuffled-but-identical chain must not read as drift (the verify pass was
+        // rewriting the catch-all — and toasting "self-healed" — on nothing).
+        servers.AddRange(SystemDns.Snapshot().OrderBy(s => s, StringComparer.Ordinal));
         return servers.Distinct().ToArray();
     }
 
@@ -763,12 +766,17 @@ public class MainViewModel : ObservableObject, ITunnelHost
                 _appliedDomainRules.Remove(id);
             }
 
-            // Reapply anything missing, duplicated, or pointing at the wrong namespace/server.
+            // Reapply anything missing, duplicated, or pointing at the wrong namespace/
+            // server. Comparisons are case- and trailing-dot-insensitive: the OS may
+            // normalize what it stores, and a cosmetic difference must not put a rule
+            // into a remove/re-add loop every pass.
+            static string Norm(string s) => s.TrimEnd('.').ToLowerInvariant();
             foreach (var (id, w) in desired)
             {
                 var ok = seen.TryGetValue(id, out var r) && !dupes.Contains(id)
-                         && r!.Servers.Length == 1 && r.Servers[0] == w.Dns
-                         && r.Namespaces.Length == 1 && r.Namespaces[0] == SplitDnsRules.DomainToNamespace(w.Domain);
+                         && r!.Servers.Length == 1 && Norm(r.Servers[0]) == Norm(w.Dns)
+                         && r.Namespaces.Length == 1
+                         && Norm(r.Namespaces[0]) == Norm(SplitDnsRules.DomainToNamespace(w.Domain));
                 if (ok) { _appliedDomainRules[id] = w.Dns; continue; }
                 try
                 {
@@ -782,19 +790,20 @@ public class MainViewModel : ObservableObject, ITunnelHost
 
             // Catch-all drift: rebuild it only when the live rule disagrees with the
             // expected chain (an unconditional Set would churn NRPT + flush every pass).
+            // Chain refreshes are SILENT — the system-DNS tail can legitimately change
+            // (DHCP renew, adapter flaps) and isn't worth a toast, unlike rule repairs.
             try
             {
                 var chain = ComputeCatchAllChain();
                 var ca = actual.FirstOrDefault(r => r.Id == CatchAllRuleId);
                 var expectExists = chain is { Length: > 0 };
                 var matches = expectExists
-                    ? ca is not null && ca.Servers.SequenceEqual(chain!)
+                    ? ca is not null && ca.Servers.Select(Norm).SequenceEqual(chain!.Select(Norm))
                     : ca is null;
                 if (!matches)
                 {
                     if (expectExists) _nrpt.SetCatchAll(chain!);
                     else _nrpt.RemoveCatchAll();
-                    repaired++;
                 }
             }
             catch { }

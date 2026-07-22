@@ -859,6 +859,10 @@ public partial class TunnelCard : UserControl
                 var (contested, owned) = _vm.Host.DomainStanding(p, d);
                 domains.Add((contested && owned ? $"{d} ●" : d, contested));
             }
+            // Fixed entries lead; the DUPLICATED ones (which can move between peers) sit
+            // at the END of each row, so the stable part of the list never reshuffles.
+            routes = routes.OrderBy(r => r.Item2).ToList();
+            domains = domains.OrderBy(d => d.Item2).ToList();
             spec.Add((p, name, routes, domains));
         }
 
