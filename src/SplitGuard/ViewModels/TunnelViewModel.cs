@@ -513,6 +513,8 @@ public class TunnelViewModel : ObservableObject
     {
         var sb = new System.Text.StringBuilder();
         sb.AppendLine("[Interface]");
+        // Name travels in the config (SplitGuard extension) so a QR-scanned clone keeps it.
+        if (Name.Trim().Length > 0) sb.AppendLine($"Name = {Name.Trim()}");
         sb.AppendLine($"PrivateKey = {PrivateKeyEdit.Trim()}");
         if (ListenPortText.Trim().Length > 0) sb.AppendLine($"ListenPort = {ListenPortText.Trim()}");
         if (AddressValues.Any()) sb.AppendLine($"Address = {string.Join(", ", AddressValues)}");
@@ -541,6 +543,8 @@ public class TunnelViewModel : ObservableObject
     void ApplyTextToFields()
     {
         var parsed = WireGuardConf.Parse(ConfigText);
+        // A Name line renames the tunnel; its absence keeps the current name (never clears).
+        if (!string.IsNullOrWhiteSpace(parsed.Name)) Name = parsed.Name!.Trim();
         PrivateKeyEdit = parsed.PrivateKey;
         ListenPortText = parsed.ListenPort > 0 ? parsed.ListenPort.ToString() : "";
         PeerViewModel.Fill(Addresses, parsed.Addresses);

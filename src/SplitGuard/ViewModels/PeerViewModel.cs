@@ -286,7 +286,8 @@ public partial class PeerViewModel : ObservableObject
                 PublicKey.Trim(), string.IsNullOrWhiteSpace(PresharedKey) ? null : PresharedKey.Trim(),
                 // Only emit a complete host:port endpoint — a half-filled "host:" (host typed,
                 // port blank) would produce a malformed 'Endpoint = host:' line a parser rejects.
-                IsValidEndpoint(Endpoint) ? Endpoint : "", AllowedIpValues.ToList(), ParsedKeepalive);
+                IsValidEndpoint(Endpoint) ? Endpoint : "", AllowedIpValues.ToList(), ParsedKeepalive,
+                _tunnel.Name);
         }
     }
 

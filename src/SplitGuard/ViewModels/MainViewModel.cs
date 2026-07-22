@@ -1019,7 +1019,9 @@ public class MainViewModel : ObservableObject, ITunnelHost
             StatusOk = false;
             return;
         }
-        var name = suggestedName ?? parsed.Name ?? "tunnel";
+        // An embedded Name (our own exports write one) outranks the filename guess; a QR
+        // scan or paste has no filename at all, so the clone keeps its name either way.
+        var name = parsed.Name ?? suggestedName ?? "tunnel";
         var baseName = name;
         for (int i = 2; _config.Tunnels.Any(t => t.Name == name); i++) name = $"{baseName}-{i}";
         var dnsPeer = WireGuardConf.PeerForDns(parsed);

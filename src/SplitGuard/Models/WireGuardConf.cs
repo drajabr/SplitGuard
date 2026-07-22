@@ -65,6 +65,9 @@ public static class WireGuardConf
             {
                 switch (key)
                 {
+                    // SplitGuard extension (like the per-peer Name): the tunnel's display name
+                    // travels inside the config, so a QR-scanned clone keeps its name.
+                    case "name": result.Name = value; break;
                     case "privatekey": result.PrivateKey = value; break;
                     case "listenport": if (ushort.TryParse(value, out var lp)) result.ListenPort = lp; break;
                     case "address": result.Addresses.AddRange(SplitList(value).Select(NormalizeCidr)); break;
@@ -219,10 +222,11 @@ public static class WireGuardConf
     // is the chosen remote. Another device imports it to replicate exactly this connection.
     public static string SerializePeer(string privateKey, IReadOnlyList<string> addresses, ushort listenPort,
         string? dns, string publicKey, string? presharedKey, string endpoint,
-        IReadOnlyList<string> allowedIps, ushort keepalive)
+        IReadOnlyList<string> allowedIps, ushort keepalive, string? tunnelName = null)
     {
         var sb = new StringBuilder();
         sb.Append("[Interface]\n");
+        if (!string.IsNullOrWhiteSpace(tunnelName)) sb.Append($"Name = {tunnelName!.Trim()}\n");
         sb.Append($"PrivateKey = {privateKey.Trim()}\n");
         if (addresses.Count > 0) sb.Append($"Address = {string.Join(", ", addresses)}\n");
         if (listenPort > 0) sb.Append($"ListenPort = {listenPort}\n");
