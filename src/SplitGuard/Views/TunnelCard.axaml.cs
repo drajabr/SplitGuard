@@ -637,7 +637,10 @@ public partial class TunnelCard : UserControl
         ScanStage.Height = Math.Clamp(w * 0.55, 240, 380);
         ScanFrame.Width = ScanFrame.Height = Math.Round(ScanStage.Height * 0.62);
 
-        var stacked = _overlaysStacked == true ? w < 512 : w < 500; // 12px hysteresis
+        // Stacked (full-width QR, text/buttons below) is the DEFAULT; side-by-side only
+        // once the card is wide enough that the description and buttons sit comfortably
+        // NEXT to the QR (~184px QR + ~430px of breathing room for the side column).
+        var stacked = _overlaysStacked == true ? w < 652 : w < 640; // 12px hysteresis
         if (_overlaysStacked != stacked)
         {
             _overlaysStacked = stacked;
@@ -645,7 +648,7 @@ public partial class TunnelCard : UserControl
             Apply(PairGrid, PairQrBox, PairSide);
         }
         // The QR itself: fixed 184 beside the text; edge-to-edge (capped) when stacked.
-        var qr = stacked ? Math.Min(w - 40, 420) : 184;
+        var qr = stacked ? Math.Min(w - 40, 440) : 184;
         ExportQr.Width = ExportQr.Height = qr;
         PairQr.Width = PairQr.Height = qr;
 

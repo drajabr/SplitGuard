@@ -1,4 +1,4 @@
-﻿<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:sys="clr-namespace:System;assembly=System.Runtime"
              xmlns:vm="clr-namespace:SplitGuard.ViewModels"
@@ -131,7 +131,7 @@
       <Border Name="ScanOverlay" IsVisible="False">
         <StackPanel Margin="16,10,14,14" Spacing="9">
           <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
-            <TextBlock Grid.Column="0" Classes="glyph accentfg" Text="&#xED14;" FontSize="{DynamicResource Fs14}" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="0" Classes="glyph accentfg" Text="&#xEE6F;" FontSize="{DynamicResource Fs14}" VerticalAlignment="Center" />
             <TextBlock Grid.Column="1" Name="ScanTitle" Text="Scan a peer QR" Classes="accentfg" FontWeight="Bold"
                        FontSize="{DynamicResource Fs135}" Margin="8,0,0,0" VerticalAlignment="Center" />
             <Button Grid.Column="2" Classes="hdr" Name="ScanClose" Padding="10,4">
@@ -270,7 +270,7 @@
               <Button Classes="link" Name="ScanPeerBtn" Click="OnScanPeerClick" IsVisible="{Binding ShowInterfaceSection}"
                       FontSize="{DynamicResource Fs115}" ToolTip.Tip="Scan or paste a peer's code to add it">
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                  <TextBlock Classes="glyph accentfg" Text="&#xED14;" FontSize="{DynamicResource Fs12}" />
+                  <TextBlock Classes="glyph accentfg" Text="&#xEE6F;" FontSize="{DynamicResource Fs12}" />
                   <TextBlock Text="Scan peer" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
