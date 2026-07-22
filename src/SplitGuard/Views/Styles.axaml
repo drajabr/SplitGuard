@@ -121,6 +121,18 @@
     <Setter Property="Padding" Value="4" />
     <Setter Property="MinHeight" Value="0" />
   </Style>
+  <!-- Explicit hover/press states: without these the Fluent theme's own pointer-over shade
+       (a different gray, plus a foreground repaint) lands first and the universal brush
+       transition then fades to it — which read as a two-stage flicker on every icon button. -->
+  <Style Selector="Button.icon /template/ ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.icon:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource FieldFillHoverBrush}" />
+  </Style>
+  <Style Selector="Button.icon:pressed /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource FieldFillBrush}" />
+  </Style>
   <!-- Icon toggle (e.g. reveal the private key): borderless like Button.icon; the glyph
        tints to the accent while checked. -->
   <Style Selector="ToggleButton.icon">
@@ -379,12 +391,18 @@
   </Style>
   <Style Selector="Button.quiet /template/ ContentPresenter">
     <Setter Property="Background" Value="Transparent" />
+    <!-- Same brush at rest as on hover/press (below), so the label never shifts shade. -->
+    <Setter Property="Foreground" Value="{DynamicResource TextControlForeground}" />
   </Style>
   <Style Selector="Button.quiet:pointerover /template/ ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource FieldFillHoverBrush}" />
+    <!-- Pin the label color: Fluent's pointer-over otherwise repaints the presenter
+         foreground to its own theme shade for a frame (the hover "glitch"). -->
+    <Setter Property="Foreground" Value="{DynamicResource TextControlForeground}" />
   </Style>
   <Style Selector="Button.quiet:pressed /template/ ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource FieldFillBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextControlForeground}" />
   </Style>
 
   <Style Selector="Border.card">

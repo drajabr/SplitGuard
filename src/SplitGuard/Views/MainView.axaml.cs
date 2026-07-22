@@ -129,8 +129,14 @@ public partial class MainView : UserControl
         // desktop Window responds (Android's VisualRoot isn't a Window → no-op); the update button
         // opts out so its click isn't swallowed by the drag.
         TitleStrip.AddHandler(PointerPressedEvent, OnTitleStripPressed, RoutingStrategies.Tunnel);
-        // The settings drawer's two-column/stacked shape follows the available width.
-        SizeChanged += (_, _) => UpdateSettingsLayout();
+        // The settings drawer's two-column/stacked shape follows the available width, and the
+        // QR-scan drawer's camera stage grows with it (a fixed 240 wasted a phone's width).
+        SizeChanged += (_, _) =>
+        {
+            UpdateSettingsLayout();
+            QrStage.Height = Math.Clamp((Bounds.Width - 28) * 0.55, 240, 420);
+            QrFrame.Width = QrFrame.Height = Math.Round(QrStage.Height * 0.62);
+        };
     }
 
     void OnTitleStripPressed(object? sender, PointerPressedEventArgs e)

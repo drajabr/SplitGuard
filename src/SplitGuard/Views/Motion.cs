@@ -42,7 +42,12 @@ public static class Motion
         if (Math.Abs(to - from) < 0.5) { apply(to); done?.Invoke(); return; }
         var sw = Stopwatch.StartNew();
         DispatcherTimer? timer = null;
-        timer = new DispatcherTimer(TimeSpan.FromMilliseconds(15), DispatcherPriority.Render, (_, _) =>
+        // Mobile (Compact) halves the tick rate: every tween step that touches a Height
+        // re-measures and re-arranges the whole card subtree, and ~33fps of that is the
+        // difference between smooth and janky expand/collapse on a phone CPU. Desktop
+        // keeps the 15ms tick.
+        var tick = TunnelCard.Compact ? 30 : 15;
+        timer = new DispatcherTimer(TimeSpan.FromMilliseconds(tick), DispatcherPriority.Render, (_, _) =>
         {
             var p = Math.Min(1, sw.Elapsed.TotalMilliseconds / ms);
             apply(from + (to - from) * Standard.Ease(p));

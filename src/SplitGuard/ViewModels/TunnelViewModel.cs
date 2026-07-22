@@ -429,7 +429,8 @@ public class TunnelViewModel : ObservableObject
     public void NotifyPresentation() => Raise(nameof(CollapsedSummary));
 
     public bool ShowInterfaceSection => !IsExternal && !IsCustom;
-    public string AddPeerLabel => IsCustom ? "+ Add DNS rule" : "+ Add peer";
+    // The "+" lives in the button's glyph now (same plus icon as the Add panel).
+    public string AddPeerLabel => IsCustom ? "Add DNS rule" : "Add peer";
 
     string _warningText = "";
     public string WarningText { get => _warningText; set => Set(ref _warningText, value); }

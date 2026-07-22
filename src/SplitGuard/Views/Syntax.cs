@@ -33,7 +33,8 @@ public static class Syntax
 
     public static readonly IValueConverter Not = new FuncValueConverter<bool, bool>(b => !b);
 
-    // Keeps a status slot occupied when there's no value yet, instead of collapsing away.
-    public static readonly IValueConverter OrDots = new FuncValueConverter<string?, string>(
-        s => string.IsNullOrEmpty(s) ? "·····" : s!);
+    // Half of a bound Bounds rect's width — caps the preshared-key box at its row's half
+    // so a filled key shares the line instead of squeezing the public key out.
+    public static readonly IValueConverter HalfWidth = new FuncValueConverter<Avalonia.Rect, double>(
+        r => Math.Max(60, r.Width * 0.5));
 }

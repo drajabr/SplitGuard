@@ -31,10 +31,13 @@
                    IsReadOnly="{Binding !NameEditable}" IsHitTestVisible="{Binding NameEditable}" />
           <!-- Pair (chain): show this device's descriptor QR for another device to scan. By the
                name while editing. Export lives down by the Save/edit row. -->
-          <Button Grid.Column="1" Classes="icon" Name="PairBtn" Margin="6,0,0,0" VerticalAlignment="Center"
+          <Button Grid.Column="1" Classes="hdr" Name="PairBtn" Margin="6,0,0,0" VerticalAlignment="Center"
                   Command="{Binding ShowPairCommand}" IsVisible="{Binding PairButtonVisible}"
                   ToolTip.Tip="Pair — show this device's code for another device to scan">
-            <TextBlock Classes="glyph accentfg" Text="&#xE71B;" FontSize="{DynamicResource Fs14}" />
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Classes="glyph accentfg" Text="&#xE71B;" FontSize="{DynamicResource Fs13}" />
+              <TextBlock Text="Pair" FontSize="{DynamicResource Fs12}" VerticalAlignment="Center" />
+            </StackPanel>
           </Button>
           <Border Grid.Column="2" Background="{DynamicResource ItemBrush}" CornerRadius="4" Padding="6,2" Margin="10,0,0,0"
                   IsVisible="{Binding IsExternal}" VerticalAlignment="Center">
@@ -53,11 +56,13 @@
            QR sits left; title / hint / Copy / Save file stack to its right. Swaps in like the
            edit pane; the card clips it to its rounded corners. Wired in code. -->
       <Border Name="ExportOverlay" IsVisible="False">
-        <Grid Margin="16,10,14,14" ColumnDefinitions="Auto,*">
-          <Border Grid.Column="0" Background="White" CornerRadius="7" Padding="5" VerticalAlignment="Top" Margin="0,0,14,0">
+        <!-- Width-adaptive (see UpdateOverlayLayouts): wide cards keep the QR left with the
+             text/buttons beside it; narrow cards stack the QR full-width on top. -->
+        <Grid Name="ExportGrid" Margin="16,10,14,14" ColumnDefinitions="Auto,*">
+          <Border Name="ExportQrBox" Grid.Column="0" Background="White" CornerRadius="7" Padding="5" VerticalAlignment="Top" Margin="0,0,14,0">
             <Image Name="ExportQr" Width="184" Height="184" RenderOptions.BitmapInterpolationMode="None" />
           </Border>
-          <StackPanel Grid.Column="1" Spacing="9">
+          <StackPanel Name="ExportSide" Grid.Column="1" Spacing="9">
             <DockPanel>
               <Button DockPanel.Dock="Right" Classes="icon" Name="ExportClose" VerticalAlignment="Top" ToolTip.Tip="Back">
                 <TextBlock Classes="glyph" Text="&#xE711;" FontSize="{DynamicResource Fs14}" Opacity="0.7" />
@@ -90,11 +95,11 @@
            endpoint, NO private key) for another device to scan. QR left; description, the
            "reachable at" endpoint, and Copy stack to its right. Wired in code. -->
       <Border Name="PairOverlay" IsVisible="False">
-        <Grid Margin="16,10,14,14" ColumnDefinitions="Auto,*">
-          <Border Grid.Column="0" Background="White" CornerRadius="7" Padding="5" VerticalAlignment="Top" Margin="0,0,14,0">
+        <Grid Name="PairGrid" Margin="16,10,14,14" ColumnDefinitions="Auto,*">
+          <Border Name="PairQrBox" Grid.Column="0" Background="White" CornerRadius="7" Padding="5" VerticalAlignment="Top" Margin="0,0,14,0">
             <Image Name="PairQr" Width="184" Height="184" RenderOptions.BitmapInterpolationMode="None" />
           </Border>
-          <StackPanel Grid.Column="1" Spacing="9">
+          <StackPanel Name="PairSide" Grid.Column="1" Spacing="9">
             <DockPanel>
               <Button DockPanel.Dock="Right" Classes="icon" Name="PairClose" VerticalAlignment="Top" ToolTip.Tip="Back">
                 <TextBlock Classes="glyph" Text="&#xE711;" FontSize="{DynamicResource Fs14}" Opacity="0.7" />
@@ -126,14 +131,16 @@
       <Border Name="ScanOverlay" IsVisible="False">
         <StackPanel Margin="16,10,14,14" Spacing="9">
           <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
-            <TextBlock Grid.Column="0" Classes="glyph accentfg" Text="&#xE8B8;" FontSize="{DynamicResource Fs14}" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="0" Classes="glyph accentfg" Text="&#xED14;" FontSize="{DynamicResource Fs14}" VerticalAlignment="Center" />
             <TextBlock Grid.Column="1" Name="ScanTitle" Text="Scan a peer QR" Classes="accentfg" FontWeight="Bold"
                        FontSize="{DynamicResource Fs135}" Margin="8,0,0,0" VerticalAlignment="Center" />
             <Button Grid.Column="2" Classes="hdr" Name="ScanClose" Padding="10,4">
               <TextBlock Text="Cancel" Classes="setlabel" />
             </Button>
           </Grid>
-          <Panel Height="240" ClipToBounds="True">
+          <!-- Camera stage: full card width; height follows the width (UpdateOverlayLayouts)
+               so a narrow card gets a taller, more usable preview than the old fixed 240. -->
+          <Panel Name="ScanStage" Height="240" ClipToBounds="True">
             <Border CornerRadius="10" ClipToBounds="True" Background="#0A0A0A">
               <ContentControl Name="ScanHost" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
             </Border>
@@ -167,45 +174,49 @@
         </Border>
 
         <StackPanel Name="FieldsGrid" IsVisible="{Binding !IsTextMode}">
-          <!-- Interface (self-evident top section, no border): the public key shown by
-               default (click to copy), a key button reveals the private key to edit or
-               regenerate, addresses sit next to it, and the listen port docks right. -->
-          <DockPanel Margin="14,4,14,6" IsVisible="{Binding ShowInterfaceSection}">
-            <TextBox DockPanel.Dock="Right" Classes="mono fit" MinWidth="0" HorizontalAlignment="Right" VerticalAlignment="Top"
+          <!-- Interface identity as two labelled rows — "Keys" (the derived public key
+               stretches across to the port box; the reveal toggle swaps in the private key)
+               and "Addresses" (chips wrapping the full width). No adaptive re-flow: a
+               narrow card just trims the key. -->
+          <Grid Margin="14,4,14,6" IsVisible="{Binding ShowInterfaceSection}"
+                ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
+            <TextBlock Grid.Row="0" Grid.Column="0" Classes="lbl" Text="Keys" MinWidth="46"
+                       VerticalAlignment="Center" Margin="0,0,8,4" />
+            <DockPanel Grid.Row="0" Grid.Column="1" Margin="0,0,0,4">
+              <!-- Single toggle: reveal the private key to edit/regenerate, or hide it. -->
+              <ToggleButton DockPanel.Dock="Right" Classes="icon" Margin="4,0,0,0" VerticalAlignment="Center"
+                            IsChecked="{Binding EditingPrivateKey}" ToolTip.Tip="Edit the private key">
+                <TextBlock Classes="glyph" Text="&#xE70F;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
+              </ToggleButton>
+              <Panel>
+                <!-- Default: the derived public key, click to copy; fills the row and trims. -->
+                <Button Classes="keyfield" HorizontalAlignment="Stretch" Command="{Binding CopyPublicKeyCommand}"
+                        ToolTip.Tip="{Binding PublicKeyFull}" IsVisible="{Binding !EditingPrivateKey}">
+                  <DockPanel>
+                    <TextBlock DockPanel.Dock="Right" Classes="glyph" Text="&#xE8C8;" FontSize="{DynamicResource Fs11}"
+                               Opacity="0.55" VerticalAlignment="Center" Margin="6,0,0,0" />
+                    <TextBlock Classes="mono synkey" Text="{Binding PublicKeyFull}"
+                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                  </DockPanel>
+                </Button>
+                <!-- Revealed: the masked private key with only a regenerate button. -->
+                <TextBox Classes="mono" MinWidth="0" ScrollViewer.HorizontalScrollBarVisibility="Hidden"
+                         IsVisible="{Binding EditingPrivateKey}"
+                         Text="{Binding PrivateKeyEdit}" Watermark="private key" PasswordChar="●">
+                  <TextBox.InnerRightContent>
+                    <Button Classes="icon" Command="{Binding GenerateKeyCommand}"
+                            ToolTip.Tip="Regenerate the keypair">
+                      <TextBlock Classes="glyph" Text="&#xE72C;" FontSize="{DynamicResource Fs12}" Opacity="0.7" />
+                    </Button>
+                  </TextBox.InnerRightContent>
+                </TextBox>
+              </Panel>
+            </DockPanel>
+            <TextBox Grid.Row="0" Grid.Column="2" Classes="mono fit" MinWidth="0" Margin="10,0,0,4" VerticalAlignment="Center"
                      Text="{Binding ListenPortText}" Watermark="port" ToolTip.Tip="Listen port (blank = automatic)" />
-            <Grid Name="IfaceGrid" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
-              <StackPanel Name="KeyGroup" Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="4" Margin="0,0,10,0" VerticalAlignment="Top">
-                <Panel>
-                  <!-- Default: the derived public key, click to copy. -->
-                  <Button Classes="keyfield" Command="{Binding CopyPublicKeyCommand}" ToolTip.Tip="{Binding PublicKeyFull}"
-                          IsVisible="{Binding !EditingPrivateKey}">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                      <TextBlock Classes="mono synkey" Text="{Binding PublicKeyShort}" VerticalAlignment="Center" />
-                      <TextBlock Classes="glyph" Text="&#xE8C8;" FontSize="{DynamicResource Fs11}" Opacity="0.55" VerticalAlignment="Center" />
-                    </StackPanel>
-                  </Button>
-                  <!-- Revealed: the masked private key with only a regenerate button. Fixed to
-                       the public display's width so revealing never widens the row. -->
-                  <TextBox Classes="mono" Width="150" MinWidth="0" ScrollViewer.HorizontalScrollBarVisibility="Hidden"
-                           IsVisible="{Binding EditingPrivateKey}"
-                           Text="{Binding PrivateKeyEdit}" Watermark="private key" PasswordChar="●">
-                    <TextBox.InnerRightContent>
-                      <Button Classes="icon" Command="{Binding GenerateKeyCommand}"
-                              ToolTip.Tip="Regenerate the keypair">
-                        <TextBlock Classes="glyph" Text="&#xE72C;" FontSize="{DynamicResource Fs12}" Opacity="0.7" />
-                      </Button>
-                    </TextBox.InnerRightContent>
-                  </TextBox>
-                </Panel>
-                <!-- Single toggle: reveal the private key to edit/regenerate, or hide it. -->
-                <ToggleButton Classes="icon" IsChecked="{Binding EditingPrivateKey}" ToolTip.Tip="Edit the private key">
-                  <TextBlock Classes="glyph" Text="&#xE70F;" FontSize="{DynamicResource Fs12}" Opacity="0.6" />
-                </ToggleButton>
-              </StackPanel>
-              <!-- Shown only when the addresses can't sit next to the keys (see code-behind). -->
-              <TextBlock Name="AddrLabel" Grid.Row="1" Grid.Column="0" Classes="lbl" Text="Addresses"
-                         Margin="0,5,10,0" VerticalAlignment="Top" IsVisible="False" />
-              <ItemsControl Name="AddrList" Grid.Row="0" Grid.Column="1" ItemsSource="{Binding Addresses}" VerticalAlignment="Top">
+            <TextBlock Grid.Row="1" Grid.Column="0" Classes="lbl" Text="Addresses" MinWidth="46"
+                       Margin="0,5,8,0" VerticalAlignment="Top" />
+            <ItemsControl Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" ItemsSource="{Binding Addresses}" VerticalAlignment="Top">
                   <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
                   </ItemsControl.ItemsPanel>
@@ -237,8 +248,7 @@
                     </DataTemplate>
                   </ItemsControl.DataTemplates>
                 </ItemsControl>
-            </Grid>
-          </DockPanel>
+          </Grid>
 
           <!-- Peers: full-width cards stacking vertically. -->
           <StackPanel Name="PeersHost" Margin="0,2,0,2">
@@ -250,11 +260,19 @@
               </ItemsControl.ItemTemplate>
             </ItemsControl>
             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="12,0,0,6">
-              <Button Classes="link" Content="{Binding AddPeerLabel}" Command="{Binding AddPeerCommand}" FontSize="{DynamicResource Fs115}" />
+              <Button Classes="link" Command="{Binding AddPeerCommand}" FontSize="{DynamicResource Fs115}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Classes="glyph accentfg" Text="&#xE710;" FontSize="{DynamicResource Fs12}" />
+                  <TextBlock Text="{Binding AddPeerLabel}" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
               <!-- Scan / paste a peer's descriptor QR to add it (drop a QR on the card works too). -->
-              <Button Classes="icon" Name="ScanPeerBtn" Click="OnScanPeerClick" IsVisible="{Binding ShowInterfaceSection}"
-                      ToolTip.Tip="Scan or paste a peer's code to add it">
-                <TextBlock Classes="glyph accentfg" Text="&#xE8B8;" FontSize="{DynamicResource Fs14}" />
+              <Button Classes="link" Name="ScanPeerBtn" Click="OnScanPeerClick" IsVisible="{Binding ShowInterfaceSection}"
+                      FontSize="{DynamicResource Fs115}" ToolTip.Tip="Scan or paste a peer's code to add it">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Classes="glyph accentfg" Text="&#xED14;" FontSize="{DynamicResource Fs12}" />
+                  <TextBlock Text="Scan peer" VerticalAlignment="Center" />
+                </StackPanel>
               </Button>
             </StackPanel>
           </StackPanel>
@@ -270,7 +288,10 @@
             <!-- Export the whole tunnel .conf (QR / copy / save) — next to the raw-editor pen. -->
             <Button Classes="quiet" Name="ExportBtn" Command="{Binding ShowExportCommand}" IsVisible="{Binding CanExport}"
                     ToolTip.Tip="Export tunnel configuration (QR / copy / save)">
-              <TextBlock Classes="glyph accentfg" Text="&#xE72D;" />
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <TextBlock Classes="glyph accentfg" Text="&#xE72D;" />
+                <TextBlock Text="Export" VerticalAlignment="Center" />
+              </StackPanel>
             </Button>
             <Button Classes="quiet" Command="{Binding ToggleTextModeCommand}" IsVisible="{Binding ShowInterfaceSection}"
                     ToolTip.Tip="Toggle raw config editing (Ctrl+E)">

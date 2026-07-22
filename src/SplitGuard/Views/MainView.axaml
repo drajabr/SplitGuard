@@ -105,7 +105,7 @@
               <!-- Camera QR import (Android): leads the Add menu; hidden where there's no camera flow. -->
               <Button Classes="actionrow" Name="ScanQrRow" Click="OnScanQrClick" IsVisible="False">
                 <DockPanel>
-                  <TextBlock DockPanel.Dock="Left" Classes="glyph accentfg" Text="&#xE8B8;" VerticalAlignment="Center" Margin="0,0,10,0" />
+                  <TextBlock DockPanel.Dock="Left" Classes="glyph accentfg" Text="&#xED14;" VerticalAlignment="Center" Margin="0,0,10,0" />
                   <TextBlock Text="Scan QR code" Classes="setlabel" />
                 </DockPanel>
               </Button>
@@ -158,14 +158,14 @@
           <Panel ClipToBounds="True">
             <StackPanel Name="QrCard" Spacing="10" Margin="12" VerticalAlignment="Bottom">
               <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
-                <TextBlock Grid.Column="0" Classes="glyph accentfg" Text="&#xE8B8;" FontSize="{DynamicResource Fs14}" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="0" Classes="glyph accentfg" Text="&#xED14;" FontSize="{DynamicResource Fs14}" VerticalAlignment="Center" />
                 <TextBlock Grid.Column="1" Text="Scan tunnel QR" Classes="setlabel" Margin="8,0,0,0" VerticalAlignment="Center" />
                 <Button Grid.Column="2" Classes="hdr" Click="OnQrCancelClick" Padding="10,4">
                   <TextBlock Text="Cancel" Classes="setlabel" />
                 </Button>
               </Grid>
-              <!-- 1:1 camera stage: preview fills, corner brackets frame the target. -->
-              <Panel Height="240" ClipToBounds="True">
+              <!-- Camera stage: preview fills; height follows the drawer width (code-behind). -->
+              <Panel Name="QrStage" Height="240" ClipToBounds="True">
                 <Border CornerRadius="10" ClipToBounds="True" Background="#0A0A0A">
                   <ContentControl Name="QrHost" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
                 </Border>

@@ -112,10 +112,8 @@ public partial class TunnelCard : UserControl
         DetailPanel.SizeChanged += OnBodyContentSizeChanged;
         ExpandContent.SizeChanged += OnBodyContentSizeChanged;
 
-        // Interface addresses sit next to the keys while they fit; when they'd wrap, the
-        // whole group drops to its own "Addresses" line below.
-        IfaceGrid.SizeChanged += (_, _) => UpdateAddressLayout();
-        AddrList.SizeChanged += (_, _) => UpdateAddressLayout();
+        // QR overlays and the camera stage follow the card's width (stacked vs side-by-side).
+        SizeChanged += (_, _) => UpdateOverlayLayouts();
 
         // Fade a card in the first time it appears; fade + collapse it on removal. The fade lives
         // on CardShell (the shadow-casting Border, whose Opacity transition comes from the
@@ -136,7 +134,6 @@ public partial class TunnelCard : UserControl
             for (var v = this.GetVisualParent(); v is Control c && c is not Avalonia.Controls.Presenters.ScrollContentPresenter; v = v.GetVisualParent())
                 c.ClipToBounds = false;
             if (!_appeared) { _appeared = true; CardShell.Opacity = 1; }
-            Dispatcher.UIThread.Post(UpdateAddressLayout, DispatcherPriority.Loaded);
             // First-render reconcile: a freshly attached card's auto-sized body can come
             // up collapsed to its header (the detail measured 0 before the first layout
             // completed) until something re-drives its height. Snap it to the measured
@@ -390,6 +387,7 @@ public partial class TunnelCard : UserControl
         // equal-module bitmap (a non-integer downscale drops modules and can make it unscannable).
         try { var conf = _vm.TunnelExportConf; ExportQr.Source = conf.Length > 0 ? QrGen.Generate(conf, 184) : null; }
         catch { ExportQr.Source = null; }
+        UpdateOverlayLayouts(); // measure the right (stacked / side-by-side) shape
         AnimateSwap(ExportOverlay, ExpandContent);
     }
 
@@ -401,6 +399,7 @@ public partial class TunnelCard : UserControl
         if (_vm is null) return;
         PairTitle.Text = string.IsNullOrWhiteSpace(_vm.Name) ? "Pair" : $"Pair · {_vm.Name.Trim()}";
         RenderPairQr();
+        UpdateOverlayLayouts();
         AnimateSwap(PairOverlay, ExpandContent);
     }
 
@@ -435,6 +434,7 @@ public partial class TunnelCard : UserControl
         ScanHost.Content = _scanner.Preview;
         _scanner.Decoded += OnScanDecoded;
         _scanner.Failed += OnScanFailed;
+        UpdateOverlayLayouts();
         AnimateSwap(ScanOverlay, ExpandContent);
         _scanner.Start();
     }
@@ -621,33 +621,55 @@ public partial class TunnelCard : UserControl
     // Syntax-colored collapsed detail as atomic tokens in a WrapPanel: addresses in
     // IP color, domains in domain color. Each token is a whole TextBlock, so wrapping
     // moves a full address/domain to the next line and never splits one.
-    bool _addrStacked;
-    bool _measuringAddr;
+    // ---- width-adaptive QR overlays + camera stage --------------------------------
 
-    // Keep the interface addresses beside the keys until they'd wrap, then move the whole
-    // group to a labelled "Addresses" line. Compares their single-line width against the
-    // space left next to the key group.
-    void UpdateAddressLayout()
+    bool? _overlaysStacked; // null until the first pass applies a shape
+
+    // Export/Pair: side-by-side (QR left, text/buttons right) on wide cards; stacked with a
+    // full-width QR on narrow ones — purely width-driven, so a slim desktop window behaves
+    // like a phone. The scan stage's height follows the width for a usable viewfinder.
+    void UpdateOverlayLayouts()
     {
-        if (_measuringAddr || _vm is null || !_vm.ShowInterfaceSection) return;
-        var gridW = IfaceGrid.Bounds.Width;
-        if (gridW < 1) return;
-        _measuringAddr = true;
-        try
+        var w = Bounds.Width;
+        if (w < 1) return;
+        // The camera stage: grow with width up to a sane ceiling (a fixed 240 wasted the
+        // whole width on phones); the target frame scales with the stage.
+        ScanStage.Height = Math.Clamp(w * 0.55, 240, 380);
+        ScanFrame.Width = ScanFrame.Height = Math.Round(ScanStage.Height * 0.62);
+
+        var stacked = _overlaysStacked == true ? w < 512 : w < 500; // 12px hysteresis
+        if (_overlaysStacked != stacked)
         {
-            AddrList.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-            var need = AddrList.DesiredSize.Width;
-            var avail = gridW - KeyGroup.Bounds.Width - 8;
-            // Hysteresis so a borderline width can't oscillate between the two layouts.
-            var stacked = _addrStacked ? need > avail + 12 : need > avail;
-            if (stacked == _addrStacked && AddrLabel.IsVisible == stacked) return;
-            _addrStacked = stacked;
-            Grid.SetRow(AddrList, stacked ? 1 : 0);
-            Grid.SetColumn(AddrList, 1);
-            AddrList.Margin = new Avalonia.Thickness(stacked ? 0 : 0, stacked ? 1 : 0, 0, 0);
-            AddrLabel.IsVisible = stacked;
+            _overlaysStacked = stacked;
+            Apply(ExportGrid, ExportQrBox, ExportSide);
+            Apply(PairGrid, PairQrBox, PairSide);
         }
-        finally { _measuringAddr = false; }
+        // The QR itself: fixed 184 beside the text; edge-to-edge (capped) when stacked.
+        var qr = stacked ? Math.Min(w - 40, 420) : 184;
+        ExportQr.Width = ExportQr.Height = qr;
+        PairQr.Width = PairQr.Height = qr;
+
+        void Apply(Grid grid, Border qrBox, Control side)
+        {
+            if (stacked)
+            {
+                grid.ColumnDefinitions = new ColumnDefinitions("*");
+                grid.RowDefinitions = new RowDefinitions("Auto,Auto");
+                Grid.SetRow(qrBox, 0); Grid.SetColumn(qrBox, 0);
+                qrBox.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center;
+                qrBox.Margin = new Avalonia.Thickness(0, 0, 0, 12);
+                Grid.SetRow(side, 1); Grid.SetColumn(side, 0);
+            }
+            else
+            {
+                grid.RowDefinitions = new RowDefinitions("Auto");
+                grid.ColumnDefinitions = new ColumnDefinitions("Auto,*");
+                Grid.SetRow(qrBox, 0); Grid.SetColumn(qrBox, 0);
+                qrBox.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left;
+                qrBox.Margin = new Avalonia.Thickness(0, 0, 14, 0);
+                Grid.SetRow(side, 0); Grid.SetColumn(side, 1);
+            }
+        }
     }
 
     // Set by the Android head: reflow the collapsed detail for a narrow, thumb-driven
@@ -661,11 +683,11 @@ public partial class TunnelCard : UserControl
         if (_vm is null) return;
 
         // Detail text is accent-as-TEXT — use the contrast-safe variant (theme-keyed).
+        // Values wear the accent; only DUPLICATED entries (a range or domain claimed by
+        // several peers, so it could live at either) stand out in the warning amber, with
+        // the current holder marked "●".
         IBrush accent = this.TryFindResource("AccentTextBrush", out var ao) && ao is IBrush ab ? ab : Brushes.LimeGreen;
-        // Theme-aware syntax brushes (fall back to the fixed palette if unset) so IPs/domains keep
-        // contrast on light themes instead of washing out.
-        IBrush ipBrush = this.TryFindResource("SynIpBrush", out var ipo) && ipo is IBrush ipb ? ipb : Syntax.IpBrush;
-        IBrush domainBrush = this.TryFindResource("SynDomainBrush", out var dmo) && dmo is IBrush dmb ? dmb : Syntax.DomainBrush;
+        IBrush dupBrush = this.TryFindResource("WarningBrush", out var wo) && wo is IBrush wb ? wb : Brushes.Orange;
 
         TextBlock Mono(string text, IBrush brush)
         {
@@ -712,8 +734,8 @@ public partial class TunnelCard : UserControl
         }
 
         // The peer's name (bold accent) with its live status flushed right — uptime, transfer
-        // totals and RTT while connected, or dots when it isn't. The middle grid column is
-        // reserved for the upcoming per-peer Pair/scan button.
+        // totals and RTT while connected (nothing at all when idle). One line on every head:
+        // the name keeps its width, the stats trim from the left-going end when cramped.
         void NameLine(string name, string stats, IBrush accent, PeerViewModel? peer)
         {
             var grid = new Grid
@@ -730,6 +752,8 @@ public partial class TunnelCard : UserControl
                 Text = stats, Opacity = 0.65,
                 HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
                 TextAlignment = Avalonia.Media.TextAlignment.Right,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                Margin = new Avalonia.Thickness(8, 0, 0, 0),
             };
             st.Classes.Add("mono");
             Grid.SetColumn(st, 2);
@@ -738,12 +762,11 @@ public partial class TunnelCard : UserControl
         }
 
         // The DNS server as a bubble like the domains. When it's pinned as the device-wide
-        // (system) DNS, it's highlighted with the accent and a pin glyph instead of the plain
-        // blue bubble.
+        // (system) DNS, it's highlighted with a pin glyph and a stronger fill.
         Control DnsValue(PeerViewModel peer)
         {
             var dns = peer.Dns.Trim();
-            if (!peer.IsPinned) return Pill(dns, ipBrush);
+            if (!peer.IsPinned) return Pill(dns, accent);
 
             var pin = new TextBlock { Text = "", FontSize = 11, Foreground = accent, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center };
             pin.Classes.Add("glyph");
@@ -763,30 +786,6 @@ public partial class TunnelCard : UserControl
             };
         }
 
-        // Compact (mobile): the peer's live stats on ONE line — left text (uptime, + rtt) flush
-        // left, right text (sent/recv) flush right — so it stays a single row on a narrow card.
-        void PeerStatLine(string left, string right)
-        {
-            var grid = new Grid
-            {
-                Margin = new Avalonia.Thickness(0, 1, 0, 6),
-                ColumnDefinitions = new ColumnDefinitions("Auto,*"),
-            };
-            var l = new TextBlock { Text = left, Opacity = 0.7, TextWrapping = Avalonia.Media.TextWrapping.NoWrap,
-                                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center };
-            l.Classes.Add("mono");
-            Grid.SetColumn(l, 0);
-            var r = new TextBlock { Text = right, Opacity = 0.85, TextWrapping = Avalonia.Media.TextWrapping.NoWrap,
-                                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
-                                    TextAlignment = Avalonia.Media.TextAlignment.Right,
-                                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center };
-            r.Classes.Add("mono");
-            Grid.SetColumn(r, 1);
-            grid.Children.Add(l);
-            grid.Children.Add(r);
-            DetailPanel.Children.Add(grid);
-        }
-
         // A soft, self-fading divider between peers.
         void AddSeparator()
         {
@@ -798,10 +797,11 @@ public partial class TunnelCard : UserControl
             });
         }
 
-        // One block per peer: a bold name + right-aligned live status line, then labelled
-        // "routes" and "dns" rows whose values flow left as soft pills. The metric-preferred
-        // (or live-active) failover route is tinted with the accent and marked "· active",
-        // and pulled out of the plain route list so nothing is duplicated. Peers separate
+        // One block per peer: a bold name + right-aligned live status on ONE line, then
+        // labelled "routes" and "dns" rows whose values flow left as soft accent pills.
+        // A DUPLICATED entry (a range or domain claimed by 2+ peers, so it could be served
+        // by either) wears the warning amber instead, and its current holder — engine role
+        // first, live-aware fallback otherwise — carries the "●" marker. Peers separate
         // with a hairline.
         bool first = true;
         for (int i = 0; i < _vm.Peers.Count; i++)
@@ -816,47 +816,28 @@ public partial class TunnelCard : UserControl
                 var name = string.IsNullOrWhiteSpace(p.Name)
                     ? (_vm.Peers.Count > 1 ? $"peer {i + 1}" : "peer")
                     : p.Name.Trim();
-                if (Compact)
+                string stats = "";
+                if (p.HasStats)
                 {
-                    // Name on its own line; then a single stat line — uptime (+ rtt) at the left,
-                    // sent/recv flushed right — instead of a crowding 2-column grid.
-                    NameLine(name, p.HasStats ? "" : "·····", accent, p);
-                    if (p.HasStats)
-                    {
-                        var left = p.UptimeText ?? "";
-                        if (p.HasPingHost && !string.IsNullOrEmpty(p.PingText))
-                            left = string.IsNullOrEmpty(left) ? p.PingText : $"{left}  ·  {p.PingText}";
-                        PeerStatLine(left, $"↑ {p.TxTotalText}   ↓ {p.RxTotalText}");
-                    }
+                    var parts = new List<string>();
+                    if (!string.IsNullOrEmpty(p.UptimeText)) parts.Add(p.UptimeText);
+                    parts.Add($"↑ {p.TxTotalText}  ↓ {p.RxTotalText}");
+                    if (p.HasPingHost && !string.IsNullOrEmpty(p.PingText)) parts.Add(p.PingText);
+                    stats = string.Join(Compact ? "  ·  " : "   ·   ", parts);
                 }
-                else
-                {
-                    string stats;
-                    if (p.HasStats)
-                    {
-                        var parts = new List<string>();
-                        if (!string.IsNullOrEmpty(p.UptimeText)) parts.Add(p.UptimeText);
-                        parts.Add($"↑ {p.TxTotalText}  ↓ {p.RxTotalText}");
-                        if (p.HasPingHost && !string.IsNullOrEmpty(p.PingText)) parts.Add(p.PingText);
-                        stats = string.Join("   ·   ", parts);
-                    }
-                    else stats = "·····";
-                    NameLine(name, stats, accent, p);
-                }
+                NameLine(name, stats, accent, p);
 
-                // The engine's live role wins; when it isn't ranking this peer (group
-                // dissolved to one live claimant, claimants partly disconnected), the
-                // live-aware host check decides — a tunnel the user turned off is never
-                // shown holding a route, its live partners are.
-                var isActiveMember = p.FailoverRole == "active"
+                var holdsGroup = p.FailoverRole == "active"
                     || (string.IsNullOrEmpty(p.FailoverRole) && _vm.Host.IsRouteGroupOwner(p));
-                IReadOnlyList<string> activeRoutes = isActiveMember
-                    ? _vm.Host.RouteGroupCidrs(p)
-                    : System.Array.Empty<string>();
+                var dupRoutes = _vm.Host.RouteGroupCidrs(p); // this peer's duplicated ranges (canonical)
                 var routePills = new List<Control>();
-                foreach (var a in activeRoutes) routePills.Add(Pill($"{a} · active", accent));
-                foreach (var ip in p.AllowedIpValues.Where(ip => !activeRoutes.Contains(Models.WireGuardConf.CanonicalCidr(ip))))
-                    routePills.Add(Pill(ip, ipBrush));
+                foreach (var ip in p.AllowedIpValues)
+                {
+                    var dup = dupRoutes.Contains(Models.WireGuardConf.CanonicalCidr(ip));
+                    routePills.Add(dup
+                        ? Pill(holdsGroup ? $"{ip} ●" : ip, dupBrush)
+                        : Pill(ip, accent));
+                }
                 if (routePills.Count > 0) LabeledRow("routes", routePills);
             }
 
@@ -864,20 +845,19 @@ public partial class TunnelCard : UserControl
             {
                 var content = new List<Control>();
                 if (p.HasDns) content.Add(DnsValue(p));
-                // A domain claimed by several peers is marked like a failover route: the
-                // current resolver's pill is accent-tinted "· active"; other claimants
-                // keep the plain pill.
                 foreach (var d in p.DomainValues)
                 {
                     var (contested, owned) = _vm.Host.DomainStanding(p, d);
-                    content.Add(contested && owned ? Pill($"{d} · active", accent) : Pill(d, domainBrush));
+                    content.Add(contested
+                        ? Pill(owned ? $"{d} ●" : d, dupBrush)
+                        : Pill(d, accent));
                 }
                 LabeledRow("dns", content);
             }
         }
 
         if (DetailPanel.Children.Count == 0)
-            LabeledRow("", new List<Control> { Mono("no peers configured", ipBrush) });
+            LabeledRow("", new List<Control> { Mono("no peers configured", accent) });
     }
 
     // ---- press / tap-to-expand ---------------------------------------------------
