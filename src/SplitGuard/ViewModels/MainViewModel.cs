@@ -59,13 +59,16 @@ public class MainViewModel : ObservableObject, ITunnelHost
             Notify("Failover", msg, false);
         });
         // Engine-initiated teardown (single-tunnel platform replaced it, or the OS
-        // revoked the VPN): flip the card off without re-entering the disconnect path.
+        // revoked the VPN): flip the card off without re-entering the disconnect path,
+        // and re-arbitrate immediately — its rules leave the desired set and the DNS
+        // chain drops it, same as a user-initiated off.
         _tunnels.Disconnected += name => Dispatcher.UIThread.Post(() =>
         {
             var vm = Tunnels.FirstOrDefault(t => !t.IsExternal && !t.IsCustom && t.Name == name);
             if (vm is null || !vm.IsConnected) return;
             vm.SetConnectedState(false);
             RefreshPins();
+            _ = Task.Run(() => { ReconcileDomainRules(); RefreshCatchAll(); });
         });
         if (_external is not null)
             _external.AdaptersChanged += () => Dispatcher.UIThread.Post(() => _ = RefreshExternalsAsync());
@@ -416,7 +419,8 @@ public class MainViewModel : ObservableObject, ITunnelHost
     {
         try
         {
-            _tunnels.Connect(vm.Config!);
+            vm.EngineName = vm.Config!.Name; // what a later disconnect must tear down, even after a rename
+            _tunnels.Connect(vm.Config);
             ReconcileDomainRules();
             RefreshCatchAll();
             // No "Connected" announcement yet — that fires on the first handshake.
@@ -442,7 +446,9 @@ public class MainViewModel : ObservableObject, ITunnelHost
     {
         try
         {
-            _tunnels.Disconnect(vm.Name);
+            // Tear down the adapter the engine actually has — after a rename-while-
+            // connected, vm.Name wouldn't match it and the "off" would silently no-op.
+            _tunnels.Disconnect(vm.EngineName ?? vm.Name);
             // Its rules leave the desired set; a standby claimant takes over any
             // contested domain it owned.
             ReconcileDomainRules();
@@ -670,9 +676,10 @@ public class MainViewModel : ObservableObject, ITunnelHost
     }
 
     // UI-side standing for the description panel, computed over the DISPLAYED (view-model)
-    // values with the same ordering as the rules engine. Live claimants outrank offline
-    // ones; with nothing live the best-ranked claimant is shown as the would-be resolver,
-    // mirroring the static Position-1 fallback the route pills use.
+    // values with the same ordering as the rules engine. A card the user turned off
+    // resolves nothing: only live claimants can own a domain, and they take it over the
+    // moment the previous owner is switched off — a deliberate off never waits for any
+    // host-down detection. With no live claimant at all, nothing is marked active.
     public (bool Contested, bool Owned) DomainStanding(PeerViewModel peer, string domain)
     {
         var claimants = new List<(TunnelViewModel T, PeerViewModel P)>();
@@ -681,14 +688,48 @@ public class MainViewModel : ObservableObject, ITunnelHost
                 if (p.HasDns && p.DomainValues.Contains(domain, StringComparer.OrdinalIgnoreCase))
                     claimants.Add((t, p));
         if (claimants.Count < 2) return (false, true);
-        var pool = claimants.Any(c => c.T.IsConnected)
-            ? claimants.Where(c => c.T.IsConnected).ToList()
-            : claimants;
-        var ordered = OrderClaims(pool, c =>
+        var live = claimants.Where(c => c.T.IsConnected).ToList();
+        if (live.Count == 0) return (true, false);
+        var ordered = OrderClaims(live, c =>
             (c.P.ParsedMetric, c.T.IsCustom ? 0 : c.T.IsExternal ? 1 : 2, c.T.Name, c.T.Peers.IndexOf(c.P))).ToList();
         var owner = ordered.FirstOrDefault(c => c.P.IsHealthy);
         if (owner.P is null) owner = ordered[0];
         return (true, ReferenceEquals(owner.P, peer));
+    }
+
+    // Live-aware route ownership for the detail marking, used when the engine isn't
+    // ranking this peer (its group dissolved to one live claimant, or some claimants'
+    // tunnels are off). A tunnel the user turned OFF holds nothing — its routes pass to
+    // the connected claimants instantly, exactly like the engine's own reconcile on
+    // disconnect; the metric order only ranks the live members.
+    public bool IsRouteGroupOwner(PeerViewModel peer)
+    {
+        var mine = Tunnels.FirstOrDefault(t => !t.IsExternal && !t.IsCustom && t.Peers.Contains(peer));
+        if (mine is null || !mine.IsConnected) return false;
+        var pairs = Tunnels.Where(t => !t.IsExternal && !t.IsCustom)
+            .SelectMany(t => t.Peers.Select(p => (T: t, P: p))).ToList();
+        var mineCidrs = peer.AllowedIpValues.Select(WireGuardConf.CanonicalCidr).ToList();
+        // Same group formation as RouteGroupInfo: each of my ranges, plus ranges of
+        // others that one of mine covers.
+        var candidates = mineCidrs.Concat(pairs.Where(x => !ReferenceEquals(x.P, peer))
+            .SelectMany(x => x.P.AllowedIpValues.Select(WireGuardConf.CanonicalCidr))
+            .Where(c => mineCidrs.Any(m => WireGuardConf.CidrContainsCidr(m, c))));
+        foreach (var cidr in candidates.Distinct())
+        {
+            var members = pairs.Where(x => x.P.AllowedIpValues.Select(WireGuardConf.CanonicalCidr)
+                .Any(c => c == cidr || WireGuardConf.CidrContainsCidr(c, cidr))).ToList();
+            if (members.Count < 2 || !members.Any(m => ReferenceEquals(m.P, peer))) continue;
+            // Ranked like the engine: metric, then tunnel name, then peer order; the
+            // first healthy live member holds the range (best-ranked when none are).
+            var ordered = members.Where(m => m.T.IsConnected)
+                .OrderBy(m => m.P.ParsedMetric)
+                .ThenBy(m => m.T.Name, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(m => m.T.Peers.IndexOf(m.P)).ToList();
+            var owner = ordered.FirstOrDefault(m => m.P.IsHealthy);
+            if (owner.P is null) owner = ordered.FirstOrDefault();
+            if (owner.P is not null && ReferenceEquals(owner.P, peer)) return true;
+        }
+        return false;
     }
 
     // ---- route-group metrics -------------------------------------------------
@@ -842,11 +883,16 @@ public class MainViewModel : ObservableObject, ITunnelHost
             else if (vm.IsConnected)
             {
                 // DNS/domain-only edits re-arbitrate in place; connection edits need a
-                // quick reconnect first.
-                if (connectionChanged) _tunnels.Disconnect(vm.Name);
+                // quick reconnect first — tearing down by the engine's CURRENT adapter
+                // name so a rename doesn't orphan the old adapter.
+                if (connectionChanged) _tunnels.Disconnect(vm.EngineName ?? vm.Name);
                 try
                 {
-                    if (connectionChanged) _tunnels.Connect(vm.Config!);
+                    if (connectionChanged)
+                    {
+                        vm.EngineName = vm.Config!.Name;
+                        _tunnels.Connect(vm.Config);
+                    }
                     ReconcileDomainRules();
                 }
                 catch (Exception ex)

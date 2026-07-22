@@ -844,8 +844,12 @@ public partial class TunnelCard : UserControl
                     NameLine(name, stats, accent, p);
                 }
 
+                // The engine's live role wins; when it isn't ranking this peer (group
+                // dissolved to one live claimant, claimants partly disconnected), the
+                // live-aware host check decides — a tunnel the user turned off is never
+                // shown holding a route, its live partners are.
                 var isActiveMember = p.FailoverRole == "active"
-                    || (string.IsNullOrEmpty(p.FailoverRole) && _vm.Host.RouteGroupInfo(p) is { Position: 1 });
+                    || (string.IsNullOrEmpty(p.FailoverRole) && _vm.Host.IsRouteGroupOwner(p));
                 IReadOnlyList<string> activeRoutes = isActiveMember
                     ? _vm.Host.RouteGroupCidrs(p)
                     : System.Array.Empty<string>();

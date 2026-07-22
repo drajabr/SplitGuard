@@ -14,6 +14,9 @@ public interface ITunnelHost
     // Domain-group standing: whether this domain is claimed by 2+ peers, and whether THIS
     // peer currently resolves it (drives the "· active" pill, like failover routes).
     (bool Contested, bool Owned) DomainStanding(PeerViewModel peer, string domain);
+    // Live-aware route ownership for the detail marking when the engine isn't ranking
+    // this peer; false for any peer whose tunnel the user turned off.
+    bool IsRouteGroupOwner(PeerViewModel peer);
     // Whether this peer's allowed IPs overlap another peer's (metric is moot otherwise).
     bool HasRouteGroup(PeerViewModel peer);
     // The peer's failover standing: (position by metric, group size, shared CIDR), or
@@ -190,6 +193,11 @@ public class TunnelViewModel : ObservableObject
     // Created via Ctrl+N and never saved: cancelling deletes it instead of keeping a stub.
     public bool IsDraft { get; set; }
 
+    // The adapter name the engine currently has for this tunnel (set when it connects).
+    // A rename while connected must tear down the OLD adapter — disconnecting by the new
+    // name would silently no-op and leave the tunnel up after the user turned it off.
+    public string? EngineName;
+
     void LoadFromConfig()
     {
         Name = Config!.Name;
@@ -269,8 +277,15 @@ public class TunnelViewModel : ObservableObject
             if (IsExternal) return; // external adapters are driven by the official client
 
             // The power button doubles as save-and-apply while editing: commit the edits
-            // first, then connect/activate the freshly-saved config.
-            if (IsEditing) SaveEdit();
+            // first, then connect/activate the freshly-saved config. Turning OFF flips the
+            // field before the save so TunnelSaved sees the off intent and can't bounce
+            // (disconnect + reconnect) a tunnel the user just chose to kill — that
+            // reconnect used to race the disconnect below and could leave the tunnel up.
+            if (IsEditing)
+            {
+                if (!value) _isConnected = false;
+                SaveEdit();
+            }
 
             // Turning a tunnel ON validates the saved config; a bad/empty tunnel can be
             // saved, but it can't be connected — report the problem and stay off.
