@@ -42,15 +42,19 @@ class DnsForwarder
         if (server is not null)
         {
             // Peer DNS: an UNPROTECTED socket routes through the VPN → into the tunnel.
-            return Ask(server, query, protect: false) ?? null;
+            var viaPeer = Ask(server, query, protect: false);
+            Android.Util.Log.Debug("SG-DNS", $"{qname} → rule {server}: {(viaPeer is null ? "timeout" : $"{viaPeer.Length}B")}");
+            return viaPeer;
         }
 
         // No rule: pinned→tunnel chain first (unprotected — these are tunnel/pinned
         // servers), then the underlying network's DNS (protected, bypasses the VPN).
         foreach (var s in catchAll)
             if (Ask(s, query, protect: false) is { } viaChain) return viaChain;
-        foreach (var s in AndroidDns.UnderlyingServers())
+        var underlying = AndroidDns.UnderlyingServers();
+        foreach (var s in underlying)
             if (Ask(s, query, protect: true) is { } viaSystem) return viaSystem;
+        Android.Util.Log.Debug("SG-DNS", $"{qname} → no upstream answered (chain {catchAll.Length}, system {underlying.Count})");
         return null;
     }
 

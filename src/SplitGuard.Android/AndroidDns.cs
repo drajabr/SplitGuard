@@ -7,6 +7,12 @@ namespace SplitGuard.Droid;
 // walk all networks and take the DNS servers of the non-VPN one with internet.
 static class AndroidDns
 {
+    // Last non-empty discovery. The live walk can transiently return nothing (network
+    // revalidating, app backgrounded); falling back to the servers we last saw keeps
+    // unruled queries resolving instead of blackholing all DNS. Seeded at connect time,
+    // before the VPN network exists (see SgVpnService.Establish).
+    static volatile List<string> _lastKnown = new();
+
     public static List<string> UnderlyingServers()
     {
         var result = new List<string>();
@@ -14,7 +20,7 @@ static class AndroidDns
         {
             var cm = (ConnectivityManager?)Android.App.Application.Context
                 .GetSystemService(Context.ConnectivityService);
-            if (cm is null) return result;
+            if (cm is null) return _lastKnown;
             foreach (var network in cm.GetAllNetworks())
             {
                 var caps = cm.GetNetworkCapabilities(network);
@@ -31,6 +37,7 @@ static class AndroidDns
             }
         }
         catch { }
-        return result;
+        if (result.Count > 0) _lastKnown = result;
+        return result.Count > 0 ? result : _lastKnown;
     }
 }

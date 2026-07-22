@@ -83,6 +83,9 @@ public class SgVpnService : Android.Net.VpnService
         // installs the tun routes, a DNS lookup would be routed into a tunnel that has no live
         // wireguard/forwarder yet and would hang until it times out, failing the connect.
         var uapi = Uapi.BuildSettings(cfg);
+        // Snapshot the underlying network's DNS while it's still the active network — the
+        // forwarder falls back to this if the live walk comes up empty mid-connection.
+        _ = AndroidDns.UnderlyingServers();
 
         var builder = new Builder(this);
         builder.SetSession(cfg.Name).SetMtu(1280);

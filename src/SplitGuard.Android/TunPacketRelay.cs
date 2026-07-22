@@ -64,8 +64,13 @@ class TunPacketRelay : IDisposable
         while (_running)
         {
             int n;
+            // EINTR is ROUTINE here, not a teardown: the runtimes' GC suspends threads
+            // with signals, which interrupts a blocked read/write. Treating it as "fd
+            // closed" silently killed this pump within the first GC cycles — the tunnel
+            // then looked connected while no packet (or DNS answer) moved at all.
             try { n = Os.Read(from, buf, 0, buf.Length); }
-            catch { break; } // fd closed → tunnel going down
+            catch (ErrnoException ex) when (ex.Errno == OsConstants.Eintr || ex.Errno == OsConstants.Eagain) { continue; }
+            catch (Exception ex) { PumpExit(toTun, ex); break; } // fd closed → tunnel going down
             if (n <= 0) continue;
 
             if (inspectDns && IsDnsQuery(buf, n))
@@ -77,10 +82,26 @@ class TunPacketRelay : IDisposable
             }
             try
             {
-                if (toTun) lock (_tunWriteGate) Os.Write(to, buf, 0, n);
-                else Os.Write(to, buf, 0, n);
+                if (toTun) lock (_tunWriteGate) WriteFull(to, buf, n);
+                else WriteFull(to, buf, n);
             }
-            catch { break; }
+            catch (Exception ex) { PumpExit(toTun, ex); break; }
+        }
+    }
+
+    void PumpExit(bool toTun, Exception ex)
+    {
+        if (_running) // a real mid-flight death is worth a trace; teardown isn't
+            Android.Util.Log.Info("SG-DNS", $"pump {(toTun ? "wg→tun" : "tun→wg")} stopped: {ex.Message}");
+    }
+
+    // Os.Write interrupted by a GC-suspension signal must retry, not drop the pump.
+    static void WriteFull(Java.IO.FileDescriptor fd, byte[] buf, int n)
+    {
+        while (true)
+        {
+            try { Os.Write(fd, buf, 0, n); return; }
+            catch (ErrnoException ex) when (ex.Errno == OsConstants.Eintr) { }
         }
     }
 
@@ -131,9 +152,9 @@ class TunPacketRelay : IDisposable
             if (udpSum == 0) udpSum = 0xFFFF;
             resp[ihl + 6] = (byte)(udpSum >> 8); resp[ihl + 7] = (byte)udpSum;
 
-            lock (_tunWriteGate) Os.Write(_tunFd, resp, 0, resp.Length);
+            lock (_tunWriteGate) WriteFull(_tunFd, resp, resp.Length);
         }
-        catch { }
+        catch (Exception ex) { Android.Util.Log.Debug("SG-DNS", $"answer write failed: {ex.Message}"); }
     }
 
     static int Checksum(byte[] data, int offset, int length, long seed)

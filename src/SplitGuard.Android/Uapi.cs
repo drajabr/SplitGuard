@@ -12,13 +12,35 @@ static class Uapi
 {
     public static string BuildSettings(TunnelConfig config)
     {
+        // Within one tunnel WireGuard forbids the same allowed IP on two peers — feeding
+        // duplicates to wireguard-go silently hands the range to whichever peer sets it
+        // LAST, so traffic (and the split-DNS queries to a server inside that range) went
+        // to the wrong peer. Give each duplicated range to its best-ranked claimant
+        // instead: lowest metric, then config order — the static equivalent of the
+        // desktop engine's intra-tunnel ownership (no live failover on Android).
+        // Networks are masked so equivalent spellings ("10.7.0.1/24") group and route.
+        var owner = new Dictionary<string, int>(); // masked cidr → owning peer index
+        for (int i = 0; i < config.Peers.Count; i++)
+        {
+            var p = config.Peers[i];
+            if (string.IsNullOrWhiteSpace(p.PublicKey)) continue;
+            foreach (var cidr in p.AllowedIps)
+            {
+                if (!WireGuardConf.TryParseCidr(cidr, out var net, out var prefix)) continue;
+                var key = $"{WireGuardConf.MaskNetwork(net, prefix)}/{prefix}";
+                if (!owner.TryGetValue(key, out var cur) || config.Peers[cur].Metric > p.Metric)
+                    owner[key] = i;
+            }
+        }
+
         var sb = new StringBuilder();
         sb.Append("private_key=").Append(Hex(RuleStore.Unprotect(config.PrivateKeyProtected))).Append('\n');
         if (config.ListenPort != 0)
             sb.Append("listen_port=").Append(config.ListenPort).Append('\n');
         sb.Append("replace_peers=true\n");
-        foreach (var p in config.Peers)
+        for (int i = 0; i < config.Peers.Count; i++)
         {
+            var p = config.Peers[i];
             if (string.IsNullOrWhiteSpace(p.PublicKey)) continue;
             sb.Append("public_key=").Append(Hex(p.PublicKey)).Append('\n');
             if (!string.IsNullOrEmpty(p.PresharedKeyProtected))
@@ -34,9 +56,14 @@ static class Uapi
             if (p.PersistentKeepalive != 0)
                 sb.Append("persistent_keepalive_interval=").Append(p.PersistentKeepalive).Append('\n');
             sb.Append("replace_allowed_ips=true\n");
+            var emitted = new HashSet<string>();
             foreach (var cidr in p.AllowedIps)
-                if (WireGuardConf.TryParseCidr(cidr, out var net, out var prefix))
-                    sb.Append("allowed_ip=").Append(net).Append('/').Append(prefix).Append('\n');
+            {
+                if (!WireGuardConf.TryParseCidr(cidr, out var net, out var prefix)) continue;
+                var key = $"{WireGuardConf.MaskNetwork(net, prefix)}/{prefix}";
+                if (owner[key] == i && emitted.Add(key))
+                    sb.Append("allowed_ip=").Append(key).Append('\n');
+            }
         }
         return sb.ToString();
     }
