@@ -80,7 +80,6 @@ public class MainActivity : AvaloniaMainActivity<App>
             var view = new MainView();
             _view = view;
             var vm = new MainViewModel(new AndroidDialogs(view), App.Platform!);
-            SgVpnService.SplitDnsEnabled = vm.Prefs.AndroidSplitDns;
             view.DataContext = vm;
             view.ApplyUiPrefs(vm.Prefs);
             single.MainView = view;

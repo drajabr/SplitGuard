@@ -33,8 +33,9 @@ public class SgVpnService : Android.Net.VpnService
     public static string? ActiveTunnel;
     public static int Handle = -1;
 
-    // Per-domain DNS routing (the relay + forwarder). Off = stock behavior: tun fd
-    // handed straight to wireguard-go, DNS from the conf. Mirrors UiPrefs.AndroidSplitDns.
+    // Per-domain DNS routing (the relay + forwarder) is always on now — the stock path
+    // below (tun fd handed straight to wireguard-go, DNS from the conf) is kept only as
+    // an emergency escape hatch for debugging.
     public static volatile bool SplitDnsEnabled = true;
 
     ParcelFileDescriptor? _tun;
@@ -191,7 +192,7 @@ public class SgVpnService : Android.Net.VpnService
         base.OnDestroy();
     }
 
-    Notification BuildNotification(string tunnel)
+    Notification BuildNotification(string tunnel, string? content = null, string? details = null)
     {
         var mgr = (NotificationManager)GetSystemService(NotificationService)!;
         if (Build.VERSION.SdkInt >= BuildVersionCodes.O)
@@ -199,12 +200,41 @@ public class SgVpnService : Android.Net.VpnService
         var open = PendingIntent.GetActivity(this, 0,
             PackageManager!.GetLaunchIntentForPackage(PackageName!),
             PendingIntentFlags.Immutable);
-        return new Notification.Builder(this, Channel)
-            .SetContentTitle("SplitGuard")!
-            .SetContentText($"{tunnel} connected")!
+        // Expandable: the collapsed line is the live one-liner (rates/handshake), the
+        // expanded BigText shows per-peer details, and a Disconnect action tears the
+        // tunnel down without opening the app.
+        var disconnect = PendingIntent.GetService(this, 1,
+            new Intent(this, typeof(SgVpnService)).SetAction(ActionDisconnect),
+            PendingIntentFlags.Immutable);
+        var b = new Notification.Builder(this, Channel)
+            .SetContentTitle($"SplitGuard · {tunnel}")!
+            .SetContentText(content ?? "connected")!
             .SetSmallIcon(Resource.Drawable.icon)!
             .SetOngoing(true)!
-            .SetContentIntent(open)!
-            .Build()!;
+            .SetOnlyAlertOnce(true)!   // silent in-place updates
+            .SetContentIntent(open)!;
+        if (!string.IsNullOrEmpty(details))
+            b.SetStyle(new Notification.BigTextStyle().BigText(details));
+        b.AddAction(new Notification.Action.Builder((Android.Graphics.Drawables.Icon?)null,
+            "Disconnect", disconnect).Build());
+        return b.Build()!;
+    }
+
+    // Live refresh from the stats poll (every ~2s, but only pushed when the text actually
+    // changed — see AndroidTunnelEngine). Safe to call from any thread.
+    string? _lastNotifText;
+    public void UpdateNotification(string content, string details)
+    {
+        var name = ActiveTunnel;
+        if (name is null) return;
+        var key = content + "\n" + details;
+        if (key == _lastNotifText) return;
+        _lastNotifText = key;
+        try
+        {
+            var mgr = (NotificationManager)GetSystemService(NotificationService)!;
+            mgr.Notify(NotificationId, BuildNotification(name, content, details));
+        }
+        catch { } // notification refresh is best-effort
     }
 }

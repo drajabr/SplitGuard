@@ -129,10 +129,13 @@ public static class Netio
             throw new InvalidOperationException($"Route {destination}/{prefixLength} failed (win32 {err}).");
     }
 
+    public enum RouteMetric { Applied, Missing, Failed }
+
     // Retarget an existing route's metric in place (failover arbitration between tunnels
-    // sharing the same destination prefix). Returns false when the route doesn't exist —
-    // the adapter may be tearing down, or the caller may want to create a shadow route.
-    public static bool SetRouteMetric(ulong luid, IPAddress destination, byte prefixLength, uint metric)
+    // sharing the same destination prefix). Missing = no such row (adapter tearing down,
+    // or deleted externally — the caller can recreate it); Failed = the row exists but
+    // the set was rejected — the caller must NOT record the metric as applied.
+    public static RouteMetric TrySetRouteMetric(ulong luid, IPAddress destination, byte prefixLength, uint metric)
     {
         destination = MaskToNetwork(destination, prefixLength);
         InitializeIpForwardEntry(out var row);
@@ -141,11 +144,10 @@ public static class Netio
         row.DestinationPrefixLength = prefixLength;
         row.NextHop = SockaddrInet.From(destination.AddressFamily == AddressFamily.InterNetwork
             ? IPAddress.Any : IPAddress.IPv6Any);
-        if (GetIpForwardEntry2(ref row) != 0) return false;
-        if (row.Metric == metric) return true;
+        if (GetIpForwardEntry2(ref row) != 0) return RouteMetric.Missing;
+        if (row.Metric == metric) return RouteMetric.Applied;
         row.Metric = metric;
-        SetIpForwardEntry2(ref row);
-        return true;
+        return SetIpForwardEntry2(ref row) == 0 ? RouteMetric.Applied : RouteMetric.Failed;
     }
 
     // Remove a route we created (subset-failover shadow routes). Missing routes are ignored.

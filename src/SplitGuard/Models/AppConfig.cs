@@ -46,9 +46,6 @@ public class UiPrefs
     // Keep the trigger-less "SplitGuardLaunch" scheduled task registered so opening the
     // app doesn't show a UAC prompt.
     public bool SkipUacLaunch { get; set; } = true;
-    // Android only: per-domain DNS routing via the in-tunnel forwarder (NRPT-equivalent).
-    // Off = stock WireGuard behavior (conf DNS, no interception) as a safety fallback.
-    public bool AndroidSplitDns { get; set; } = true;
     // Last window size/position (client-window bounds), restored at startup when they still
     // land on a visible screen. 0x0 = never saved (use the defaults).
     public int WindowW { get; set; }

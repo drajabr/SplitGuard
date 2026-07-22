@@ -25,7 +25,6 @@ public class BootReceiver : BroadcastReceiver
             // Consent must already be granted — a receiver can't show the consent dialog.
             if (Android.Net.VpnService.Prepare(context) is not null) return;
 
-            SgVpnService.SplitDnsEnabled = cfg.Ui.AndroidSplitDns;
             SgVpnService.PendingConfig = tunnel;
             var svc = new Intent(context, typeof(SgVpnService)).SetAction(SgVpnService.ActionConnect);
             context.StartForegroundService(svc);

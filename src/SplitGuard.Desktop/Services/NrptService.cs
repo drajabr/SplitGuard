@@ -12,8 +12,14 @@ public class NrptService : ISplitDnsService
 {
     public const string Tag = "WG-SPLIT-DNS";
     const string CatchAllId = "WGSDNS|catchall";
-    const string CimNamespace = @"root\StandardCimv2";
-    const string CimClass = "MSFT_DNSClientNrptRule";
+    // The NRPT CIM model lives in the DNS-client namespace: PS_DnsClientNrptRule carries
+    // the static cmdlet methods (Add), DnsClientNrptRule is the instance class the rules
+    // enumerate/delete through. (The old root\StandardCimv2 / MSFT_DNSClientNrptRule pair
+    // doesn't exist, so the probe always failed and EVERY operation silently ran through
+    // a spawned powershell.exe — seconds per rule change.)
+    const string CimNamespace = @"root\Microsoft\Windows\DNS";
+    const string CimCmdletClass = "PS_DnsClientNrptRule";
+    const string CimRuleClass = "DnsClientNrptRule";
 
     [DllImport("dnsapi")] static extern bool DnsFlushResolverCache();
 
@@ -176,7 +182,11 @@ public class NrptService : ISplitDnsService
                 CimMethodParameter.Create("Comment", NrptService.Tag, CimType.String, CimFlags.None),
                 CimMethodParameter.Create("DisplayName", id, CimType.String, CimFlags.None),
             };
-            _session.InvokeMethod(CimNamespace, CimClass, "Add", parameters);
+            var result = _session.InvokeMethod(CimNamespace, CimCmdletClass, "Add", parameters);
+            // A non-zero ReturnValue is a SILENT failure (no exception): surface it so the
+            // caller un-tracks the rule and the self-heal pass retries it.
+            if (result?.ReturnValue?.Value is uint rv && rv != 0)
+                throw new InvalidOperationException($"NRPT Add returned {rv} for {id}");
         }
 
         public void Remove(string id)
@@ -195,7 +205,7 @@ public class NrptService : ISplitDnsService
                 .ToList();
 
         List<CimInstance> Query() =>
-            _session.QueryInstances(CimNamespace, "WQL", $"SELECT * FROM {CimClass}").ToList();
+            _session.QueryInstances(CimNamespace, "WQL", $"SELECT * FROM {CimRuleClass}").ToList();
 
         static T? Prop<T>(CimInstance instance, string name)
         {
@@ -268,7 +278,13 @@ public class NrptService : ISplitDnsService
             // when the child fills the un-read one first.
             var errorTask = process.StandardError.ReadToEndAsync();
             var output = process.StandardOutput.ReadToEnd();
-            process.WaitForExit(30000);
+            if (!process.WaitForExit(30000))
+            {
+                // A hung powershell.exe would otherwise leak holding the pipeline and the
+                // ExitCode read below would throw a misleading InvalidOperationException.
+                try { process.Kill(); } catch { }
+                throw new TimeoutException("NRPT command timed out after 30s");
+            }
             if (process.ExitCode != 0)
                 throw new InvalidOperationException($"NRPT command failed: {errorTask.Result}");
             return output;

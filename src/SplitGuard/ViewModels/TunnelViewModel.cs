@@ -810,8 +810,12 @@ public class TunnelViewModel : ObservableObject
 
     static readonly TimeSpan HandshakeFresh = TimeSpan.FromSeconds(180);
 
-    public void ApplyStats(TunnelStats stats)
+    // Returns true when any peer's HEALTH changed — the caller only re-arbitrates
+    // domain/catch-all ownership on those ticks (winners can't move otherwise, and the
+    // recompute allocated on the UI thread every 2s for nothing).
+    public bool ApplyStats(TunnelStats stats)
     {
+        bool healthChanged = false;
         double up = 0, down = 0;
         DateTime? newest = null;
         foreach (var peer in Peers)
@@ -836,7 +840,7 @@ public class TunnelViewModel : ObservableObject
                 _ => "",
             };
             peer.FailoverRole = s.FailoverRole ?? "";
-            peer.IsHealthy = s.Healthy;
+            if (peer.IsHealthy != s.Healthy) { peer.IsHealthy = s.Healthy; healthChanged = true; }
         }
         UpRate = Format.Rate(up);
         DownRate = Format.Rate(down);
@@ -844,6 +848,7 @@ public class TunnelViewModel : ObservableObject
             IsEstablished = newest is not null && DateTime.UtcNow - newest < HandshakeFresh;
         // Refresh the collapsed-card detail so its per-peer handshake/RTT stay live.
         StatsTick++;
+        return healthChanged;
     }
 
     // Bumped every stats poll; the card watches it to rebuild the collapsed detail.

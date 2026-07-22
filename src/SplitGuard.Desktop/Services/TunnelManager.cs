@@ -49,6 +49,15 @@ public class TunnelManager : ITunnelEngine
         public int PingUpCount;
         public string? PingHost;
         public DateTime ConnectedAt;
+        // When this peer last BECAME its group's active member: a freshly promoted peer
+        // gets a handshake grace window (its pre-promotion handshake age says nothing).
+        public DateTime PromotedAt;
+        // Original "host:port" when the host is a NAME (null for literal IPs): a stale
+        // peer gets its hostname re-resolved periodically — DDNS servers move, and the
+        // one-shot resolve at Connect froze the old IP forever.
+        public string? EndpointSpec;
+        public DateTime NextResolveDue;
+        public bool ResolveInFlight;
 
         public (ulong Tx, ulong Rx, DateTime At)? Previous;
         public DateTime? LastHandshake;
@@ -71,6 +80,12 @@ public class TunnelManager : ITunnelEngine
         // True when a /32 probe route pins this peer's ping host to its own adapter, so
         // pings test this path even while the peer is standby.
         public bool HasProbeRoute;
+        // Whether probe outcomes currently test THIS peer's path (set each reconcile from
+        // the same predicate EvaluateHealth uses). While false, completed pings must not
+        // touch the health streaks — a standby probing through the ACTIVE tunnel was
+        // banking fail/ok streaks about the wrong path, and consuming them on promotion
+        // produced a ~1Hz failover flap through the dead tunnel.
+        public bool PingMeaningful = true;
     }
 
     class ActiveTunnel
@@ -137,10 +152,16 @@ public class TunnelManager : ITunnelEngine
                 PingUpCount = p.PingUpCount is >= 1 and <= 100 ? p.PingUpCount : DefaultPingCount,
                 PingHost = string.IsNullOrWhiteSpace(p.PingHost) ? null : p.PingHost.Trim(),
                 ConnectedAt = now,
+                PromotedAt = now,
+                EndpointSpec = EndpointHostIsName(p.Endpoint) ? p.Endpoint.Trim() : null,
+                NextResolveDue = now.AddSeconds(90),
                 NextPingDue = now,
             });
         }
 
+        // Sweep stale NetworkList profiles from the pre-stable-GUID era ("office 2", …):
+        // NLA would otherwise resurrect the highest suffix for the fresh adapter's profile.
+        NetworkProfiles.SweepStale(config.Name);
         var adapter = WireGuardAdapter.Create(config.Name);
         var tunnel = new ActiveTunnel
         {
@@ -218,10 +239,29 @@ public class TunnelManager : ITunnelEngine
             adapter.Dispose();
             throw;
         }
-        lock (_gate) _active[config.Name] = tunnel;
+        lock (_gate)
+        {
+            // Never leak an adapter by overwriting a same-name entry: lifecycle ops are
+            // serialized by the caller, but an orphan here would keep routing forever.
+            if (_active.Remove(config.Name, out var previous))
+            {
+                try { previous.Adapter.Dispose(); } catch { }
+                foreach (var r in previous.EndpointRoutes) { try { r.Delete(); } catch { } }
+            }
+            _active[config.Name] = tunnel;
+        }
         // Arbitrate immediately so a standby joining an existing overlap group never
         // competes with the active route at equal metrics.
         try { ReconcileFailover(); } catch { }
+    }
+
+    // Whether the endpoint's host part is a DNS name (vs a literal IP).
+    static bool EndpointHostIsName(string endpoint)
+    {
+        if (string.IsNullOrWhiteSpace(endpoint)) return false;
+        var idx = endpoint.LastIndexOf(':');
+        if (idx <= 0) return false;
+        return !IPAddress.TryParse(endpoint[..idx].Trim('[', ']'), out _);
     }
 
     public void Disconnect(string name)
@@ -277,6 +317,7 @@ public class TunnelManager : ITunnelEngine
                     rt.LastHandshake = s.LastHandshakeUtc;
                 }
                 SchedulePings(tunnel, now);
+                ScheduleEndpointReresolve(tunnel, now);
             }
 
             ReconcileFailover();
@@ -324,27 +365,56 @@ public class TunnelManager : ITunnelEngine
                 }
                 catch { ok = false; }
 
-                if (ok)
+                // The live readout always updates; the HEALTH streaks and rolling window
+                // only count probes that actually traversed this peer's path (see
+                // PingMeaningful) — foreign-path outcomes poisoned failover decisions.
+                rt.LastPingMs = ok ? ms : null;
+                rt.LastPingOk = ok;
+                if (rt.PingMeaningful)
                 {
-                    rt.LastPingMs = ms;
-                    rt.LastPingOk = true;
-                    rt.PingFailStreak = 0;
-                    rt.PingOkStreak++;
+                    if (ok) { rt.PingFailStreak = 0; rt.PingOkStreak++; }
+                    else { rt.PingFailStreak++; rt.PingOkStreak = 0; }
+                    // Rolling stats over the last ~20 probes (only this task touches the queue).
+                    rt.PingWindow.Enqueue((ok, ms));
+                    while (rt.PingWindow.Count > 20) rt.PingWindow.Dequeue();
+                    var oks = rt.PingWindow.Where(w => w.Ok).Select(w => w.Ms).ToList();
+                    rt.AvgPingMs = oks.Count > 0 ? oks.Average() : null;
+                    rt.PingLoss = (double)rt.PingWindow.Count(w => !w.Ok) / rt.PingWindow.Count;
                 }
-                else
-                {
-                    rt.LastPingMs = null;
-                    rt.LastPingOk = false;
-                    rt.PingFailStreak++;
-                    rt.PingOkStreak = 0;
-                }
-                // Rolling stats over the last ~20 probes (only this task touches the queue).
-                rt.PingWindow.Enqueue((ok, ms));
-                while (rt.PingWindow.Count > 20) rt.PingWindow.Dequeue();
-                var oks = rt.PingWindow.Where(w => w.Ok).Select(w => w.Ms).ToList();
-                rt.AvgPingMs = oks.Count > 0 ? oks.Average() : null;
-                rt.PingLoss = (double)rt.PingWindow.Count(w => !w.Ok) / rt.PingWindow.Count;
                 rt.PingInFlight = false;
+            });
+        }
+    }
+
+    // A peer whose handshake has gone stale and whose endpoint came from a hostname gets
+    // the name re-resolved (once a minute, one in flight): if the IP moved (DDNS), the
+    // driver's endpoint is updated IN PLACE via a single-peer update — never a full peer
+    // replace, which would reset every peer's roamed endpoint and handshake state.
+    void ScheduleEndpointReresolve(ActiveTunnel tunnel, DateTime now)
+    {
+        foreach (var rt in tunnel.Peers)
+        {
+            if (rt.EndpointSpec is null || rt.ResolveInFlight || now < rt.NextResolveDue) continue;
+            var stale = rt.LastHandshake is { } h
+                ? now - h >= HandshakeStale
+                : now - rt.ConnectedAt >= HandshakeGrace;
+            if (!stale) continue;
+            rt.NextResolveDue = now.AddSeconds(60);
+            rt.ResolveInFlight = true;
+            var t = tunnel;
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    var ep = ResolveEndpoint(rt.EndpointSpec);
+                    if (ep is not null && !ep.Equals(rt.Endpoint))
+                    {
+                        rt.Endpoint = ep;
+                        t.Adapter.UpdatePeerEndpoint(rt.PublicKey, ep);
+                    }
+                }
+                catch { } // unresolvable right now: retried next due time
+                finally { rt.ResolveInFlight = false; }
             });
         }
     }
@@ -384,7 +454,12 @@ public class TunnelManager : ITunnelEngine
             // it here — so an untestable probe falls back to the handshake rule.
             bool pingBased = rt.PingHost is not null
                 && IPAddress.TryParse(rt.PingHost, out var pingIp)
-                && !PingRoutesElsewhere(tunnel, rt, pingIp, groups);
+                && !PingRoutesElsewhere(tunnel, rt, pingIp, groups)
+                // Another adapter's /32 probe pin to the SAME host wins by longest prefix
+                // and captures our probes — outcomes would describe that adapter's path.
+                && !members.Any(m => !ReferenceEquals(m.Peer, rt)
+                    && m.Peer.HasProbeRoute && m.Peer.PingHost == rt.PingHost);
+            rt.PingMeaningful = pingBased;
 
             if (pingBased)
             {
@@ -394,19 +469,60 @@ public class TunnelManager : ITunnelEngine
                 if (rt.PingFailStreak >= rt.PingDownCount) rt.Healthy = false;
                 else if (rt.PingOkStreak >= rt.PingUpCount) rt.Healthy = true;
             }
+            else if (rt.Keepalive == 0 && IsStandbyEverywhere(tunnel, rt, groups))
+            {
+                // A keepalive-less STANDBY routes no traffic, so it can never handshake —
+                // judging its handshake stale marked it permanently unhealthy, which
+                // poisoned the whole group: when the active died, no member was "healthy"
+                // and failover simply never happened. With no signal either way, assume
+                // it's available; promotion (PromotedAt) gives it a real grace window to
+                // prove itself, after which staleness applies again — so a dead standby
+                // gets skipped on the NEXT hop instead of blocking the first one.
+                rt.Healthy = true;
+            }
             else
             {
-                rt.Healthy = rt.LastHandshake is { } h
-                    ? now - h < HandshakeStale
-                    : now - rt.ConnectedAt < HandshakeGrace;
+                // Handshake freshness, with grace measured from the LATER of connect and
+                // promotion — a just-promoted peer's pre-promotion handshake age means
+                // nothing (it couldn't handshake while standby).
+                var basis = rt.PromotedAt > rt.ConnectedAt ? rt.PromotedAt : rt.ConnectedAt;
+                rt.Healthy = (rt.LastHandshake is { } h && now - h < HandshakeStale)
+                    || now - basis < HandshakeGrace;
             }
         }
+    }
+
+    // Member of at least one overlap group, active in none of them, with no ungrouped
+    // range of its own — i.e. a peer that cannot be carrying any traffic right now.
+    bool IsStandbyEverywhere(ActiveTunnel tunnel, PeerRuntime rt,
+        Dictionary<string, List<(ActiveTunnel Tunnel, PeerRuntime Peer)>> groups)
+    {
+        bool inAnyGroup = false;
+        var key = MemberKey(tunnel, rt);
+        foreach (var (cidr, members) in groups)
+        {
+            if (!members.Any(m => ReferenceEquals(m.Peer, rt))) continue;
+            inAnyGroup = true;
+            // Active here (or the group hasn't been arbitrated yet): judge it normally.
+            if (!_groupActive.TryGetValue(cidr, out var active) || active == key) return false;
+        }
+        if (!inAnyGroup) return false;
+        // Any range of its own that ISN'T contested still carries this peer's traffic.
+        return rt.AllowedIps.All(a => groups.ContainsKey(CidrKey(a.Ip, a.Cidr)));
     }
 
     bool PingRoutesElsewhere(ActiveTunnel tunnel, PeerRuntime rt, IPAddress pingIp,
         Dictionary<string, List<(ActiveTunnel Tunnel, PeerRuntime Peer)>> groups)
     {
-        if (rt.HasProbeRoute) return false; // pinned to this adapter: always meaningful
+        if (rt.HasProbeRoute)
+        {
+            // The pin is only trustworthy while its /32 isn't itself an arbitrated range
+            // owned by someone else — a covering tunnel's shadow route (or a third tunnel
+            // claiming the exact /32) retunes the SAME row, silently repurposing the pin.
+            var probeKey = CidrKey(pingIp, 32);
+            return _groupActive.TryGetValue(probeKey, out var owner)
+                && owner != MemberKey(tunnel, rt);
+        }
         foreach (var (key, members) in groups)
         {
             if (!WireGuardConf.CidrContains(key, pingIp)) continue;
@@ -491,6 +607,12 @@ public class TunnelManager : ITunnelEngine
             {
                 var from = prevActive?.Split('\n')[0];
                 _groupActive[key] = activeKey;
+                // Fresh promotion: restart the handshake grace clock and drop any streaks
+                // banked before promotion — the first post-promotion verdict must come
+                // from probes that traverse the newly-active path.
+                active.Peer.PromotedAt = now;
+                active.Peer.PingFailStreak = 0;
+                active.Peer.PingOkStreak = 0;
                 if (prevActive is not null && groups.Count > 0)
                     FailoverChanged?.Invoke($"{key}: {(from == active.Tunnel.Name ? "peer switch" : $"failover {from} → {active.Tunnel.Name}")}");
             }
@@ -566,7 +688,9 @@ public class TunnelManager : ITunnelEngine
         if (!WireGuardConf.TryParseCidr(groupCidr, out var ip, out var prefix)) return;
         try
         {
-            if (!Netio.SetRouteMetric(tunnel.Adapter.Luid, ip, (byte)prefix, metric))
+            var r = Netio.TrySetRouteMetric(tunnel.Adapter.Luid, ip, (byte)prefix, metric);
+            if (r == Netio.RouteMetric.Failed) return; // don't record: retry next tick
+            if (r == Netio.RouteMetric.Missing)
                 Netio.AddRoute(tunnel.Adapter.Luid, ip, (byte)prefix, metric: metric);
             _shadowRoutes.Add(stateKey);
             _appliedMetric[stateKey] = metric;
@@ -578,25 +702,36 @@ public class TunnelManager : ITunnelEngine
     {
         var stateKey = (tunnel.Adapter.Luid, groupCidr);
         if (_appliedMetric.TryGetValue(stateKey, out var cur) && cur == metric) return;
-        _appliedMetric[stateKey] = metric;
         if (!WireGuardConf.TryParseCidr(groupCidr, out var ip, out var prefix)) return;
+        // Cache ONLY after every syscall succeeded: recording intent before the set (and
+        // discarding failures) froze routes at stale metrics forever — the reconcile diff
+        // believed the state converged while traffic still followed the dead tunnel. A
+        // failed pass simply retries next tick; a route deleted externally is recreated.
+        bool ok;
         if (prefix == 0)
         {
-            // A /0 group is installed as the two /1 halves.
-            if (ip.AddressFamily == AddressFamily.InterNetwork)
-            {
-                Netio.SetRouteMetric(tunnel.Adapter.Luid, IPAddress.Parse("0.0.0.0"), 1, metric);
-                Netio.SetRouteMetric(tunnel.Adapter.Luid, IPAddress.Parse("128.0.0.0"), 1, metric);
-            }
-            else
-            {
-                Netio.SetRouteMetric(tunnel.Adapter.Luid, IPAddress.Parse("::"), 1, metric);
-                Netio.SetRouteMetric(tunnel.Adapter.Luid, IPAddress.Parse("8000::"), 1, metric);
-            }
+            // A /0 group is installed as the two /1 halves; both must land.
+            ok = ip.AddressFamily == AddressFamily.InterNetwork
+                ? SetOrRecreate(IPAddress.Parse("0.0.0.0"), 1) & SetOrRecreate(IPAddress.Parse("128.0.0.0"), 1)
+                : SetOrRecreate(IPAddress.Parse("::"), 1) & SetOrRecreate(IPAddress.Parse("8000::"), 1);
         }
-        else
+        else ok = SetOrRecreate(ip, (byte)prefix);
+        if (ok) _appliedMetric[stateKey] = metric;
+
+        bool SetOrRecreate(IPAddress dst, byte pfx)
         {
-            Netio.SetRouteMetric(tunnel.Adapter.Luid, ip, (byte)prefix, metric);
+            try
+            {
+                switch (Netio.TrySetRouteMetric(tunnel.Adapter.Luid, dst, pfx, metric))
+                {
+                    case Netio.RouteMetric.Applied: return true;
+                    case Netio.RouteMetric.Missing:
+                        Netio.AddRoute(tunnel.Adapter.Luid, dst, pfx, metric: metric);
+                        return true;
+                    default: return false;
+                }
+            }
+            catch { return false; }
         }
     }
 

@@ -20,14 +20,20 @@ public class AndroidPlatform : IPlatform
     public IExternalTunnels? CreateExternalTunnels() => null; // no external-client concept
 
     public bool SupportsStartup => false;          // no logon task / UAC on Android
-    public bool SupportsInstallerUpdate => false;  // updates come from GitHub releases page
-    public bool SupportsSplitDnsToggle => true;
+    public bool SupportsInstallerUpdate => false;  // updates surface the GitHub release page
     public bool SupportsQrScan => true;
     public bool SupportsBootStart => true;   // BootReceiver reconnects the last-on tunnel
 
     public void SetStartOnBoot(bool on) { }
     public void SetSkipUacLaunch(bool on) { }
-    public void SetSplitDnsEnabled(bool on) => SgVpnService.SplitDnsEnabled = on;
+
+    public void OpenUrl(string url)
+    {
+        var intent = new Android.Content.Intent(Android.Content.Intent.ActionView,
+            Android.Net.Uri.Parse(url));
+        intent.AddFlags(Android.Content.ActivityFlags.NewTask);
+        Android.App.Application.Context.StartActivity(intent);
+    }
 
     public void SetSystemBarColor(uint argb, bool lightBackground) =>
         MainActivity.Current?.SetSystemBars(unchecked((int)argb), lightBackground);

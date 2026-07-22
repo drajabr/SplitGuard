@@ -86,6 +86,7 @@ public partial class TunnelCard : UserControl
                 HookEditCollections(_vm, true);
                 _vm.RemovalAnimator = PlayRemove;
             }
+            _detailFingerprint = null; // never reuse a detail tree across a rebind
             BuildDetail();
             // Initial state (no animation): show the right content at its natural height.
             var editing = _vm?.IsEditing ?? false;
@@ -332,13 +333,17 @@ public partial class TunnelCard : UserControl
     }
 
     // Scroll the card near the top of the list, animated in step with the expand.
+    // Compact: jump once instead — a third concurrent motion driving ScrollViewer.Offset
+    // costs a viewport re-arrange per tick the phone can't spare during the expand.
     void ScrollSelfIntoView()
     {
         var sv = this.FindAncestorOfType<ScrollViewer>();
         if (sv?.Content is not Visual content) return;
         var p = this.TranslatePoint(new Point(0, 0), content);
         if (p is not { } pt) return;
-        Tween(sv.Offset.Y, Math.Max(0, pt.Y - 12), AnimMs, v => sv.Offset = new Vector(sv.Offset.X, Math.Max(0, v)));
+        var target = Math.Max(0, pt.Y - 12);
+        if (Compact) { sv.Offset = new Vector(sv.Offset.X, target); return; }
+        Tween(sv.Offset.Y, target, AnimMs, v => sv.Offset = new Vector(sv.Offset.X, Math.Max(0, v)));
     }
 
     // ---- expand/collapse: explicit height animation of a single region ----------
@@ -680,10 +685,27 @@ public partial class TunnelCard : UserControl
     // grid. Desktop leaves this false and keeps the single-line strip.
     public static bool Compact;
 
+    // Steady-state stats ticks must NOT rebuild the collapsed detail's control tree —
+    // rebuilding every card every poll was the mobile jank. The STRUCTURE (names, pill
+    // texts, duplicate/owner markers, palette) is fingerprinted; while it's unchanged,
+    // only the live stat texts are written in place (no allocation, minimal layout).
+    string? _detailFingerprint;
+    readonly List<(PeerViewModel Peer, TextBlock Stats)> _detailStatSlots = new();
+
+    // The live half of a peer's name line (uptime · totals · rtt); empty when idle.
+    static string PeerStatsText(PeerViewModel p)
+    {
+        if (!p.HasStats) return "";
+        var parts = new List<string>();
+        if (!string.IsNullOrEmpty(p.UptimeText)) parts.Add(p.UptimeText);
+        parts.Add($"↑ {p.TxTotalText}  ↓ {p.RxTotalText}");
+        if (p.HasPingHost && !string.IsNullOrEmpty(p.PingText)) parts.Add(p.PingText);
+        return string.Join(Compact ? "  ·  " : "   ·   ", parts);
+    }
+
     void BuildDetail()
     {
-        DetailPanel.Children.Clear();
-        if (_vm is null) return;
+        if (_vm is null) { DetailPanel.Children.Clear(); return; }
 
         // Detail text is accent-as-TEXT — use the contrast-safe variant (theme-keyed).
         // Values wear the accent; only DUPLICATED entries (a range or domain claimed by
@@ -762,6 +784,8 @@ public partial class TunnelCard : UserControl
             Grid.SetColumn(st, 2);
             grid.Children.Add(st);
             DetailPanel.Children.Add(grid);
+            // Registered so a stats tick can refresh this text without rebuilding the tree.
+            if (peer is not null) _detailStatSlots.Add((peer, st));
         }
 
         // The DNS server as a bubble like the domains. When it's pinned as the device-wide
@@ -806,55 +830,80 @@ public partial class TunnelCard : UserControl
         // by either) wears the warning amber instead, and its current holder — engine role
         // first, live-aware fallback otherwise — carries the "●" marker. Peers separate
         // with a hairline.
-        bool first = true;
+        //
+        // Pass 1 — compute the STRUCTURE (pill texts + markers) without touching controls.
+        var wg = !_vm.IsExternal && !_vm.IsCustom;
+        var spec = new List<(PeerViewModel P, string Name, List<(string Text, bool Dup)> Routes,
+                             List<(string Text, bool Dup)> Domains)>();
         for (int i = 0; i < _vm.Peers.Count; i++)
         {
             var p = _vm.Peers[i];
-            var wg = !_vm.IsExternal && !_vm.IsCustom;
+            var name = string.IsNullOrWhiteSpace(p.Name)
+                ? (_vm.Peers.Count > 1 ? $"peer {i + 1}" : "peer")
+                : p.Name.Trim();
+            var routes = new List<(string, bool)>();
+            if (wg)
+            {
+                var holdsGroup = p.FailoverRole == "active"
+                    || (string.IsNullOrEmpty(p.FailoverRole) && _vm.Host.IsRouteGroupOwner(p));
+                var dupRoutes = _vm.Host.RouteGroupCidrs(p); // this peer's duplicated ranges (canonical)
+                foreach (var ip in p.AllowedIpValues)
+                {
+                    var dup = dupRoutes.Contains(Models.WireGuardConf.CanonicalCidr(ip));
+                    routes.Add((dup && holdsGroup ? $"{ip} ●" : ip, dup));
+                }
+            }
+            var domains = new List<(string, bool)>();
+            foreach (var d in p.DomainValues)
+            {
+                var (contested, owned) = _vm.Host.DomainStanding(p, d);
+                domains.Add((contested && owned ? $"{d} ●" : d, contested));
+            }
+            spec.Add((p, name, routes, domains));
+        }
+
+        // Fingerprint structure + palette; unchanged → refresh stat texts in place, done.
+        var fpb = new System.Text.StringBuilder();
+        fpb.Append(accent is ISolidColorBrush ac ? ac.Color.ToUInt32() : 0).Append('|')
+           .Append(dupBrush is ISolidColorBrush dc ? dc.Color.ToUInt32() : 0).Append('|').Append(wg);
+        foreach (var s in spec)
+        {
+            fpb.Append('\n').Append(s.Name).Append('|').Append(s.P.IsPinned).Append('|')
+               .Append(s.P.HasDns ? s.P.Dns.Trim() : "");
+            foreach (var r in s.Routes) fpb.Append(';').Append(r.Text).Append(r.Dup ? '!' : '.');
+            fpb.Append('#');
+            foreach (var d in s.Domains) fpb.Append(';').Append(d.Text).Append(d.Dup ? '!' : '.');
+        }
+        var fp = fpb.ToString();
+        if (fp == _detailFingerprint && DetailPanel.Children.Count > 0)
+        {
+            foreach (var (peer, tb) in _detailStatSlots) tb.Text = PeerStatsText(peer);
+            return;
+        }
+        _detailFingerprint = fp;
+        _detailStatSlots.Clear();
+        DetailPanel.Children.Clear();
+
+        // Pass 2 — the structure changed (or first build): rebuild the control tree.
+        bool first = true;
+        foreach (var s in spec)
+        {
             if (!first) AddSeparator();
             first = false;
 
             if (wg)
             {
-                var name = string.IsNullOrWhiteSpace(p.Name)
-                    ? (_vm.Peers.Count > 1 ? $"peer {i + 1}" : "peer")
-                    : p.Name.Trim();
-                string stats = "";
-                if (p.HasStats)
-                {
-                    var parts = new List<string>();
-                    if (!string.IsNullOrEmpty(p.UptimeText)) parts.Add(p.UptimeText);
-                    parts.Add($"↑ {p.TxTotalText}  ↓ {p.RxTotalText}");
-                    if (p.HasPingHost && !string.IsNullOrEmpty(p.PingText)) parts.Add(p.PingText);
-                    stats = string.Join(Compact ? "  ·  " : "   ·   ", parts);
-                }
-                NameLine(name, stats, accent, p);
-
-                var holdsGroup = p.FailoverRole == "active"
-                    || (string.IsNullOrEmpty(p.FailoverRole) && _vm.Host.IsRouteGroupOwner(p));
-                var dupRoutes = _vm.Host.RouteGroupCidrs(p); // this peer's duplicated ranges (canonical)
+                NameLine(s.Name, PeerStatsText(s.P), accent, s.P);
                 var routePills = new List<Control>();
-                foreach (var ip in p.AllowedIpValues)
-                {
-                    var dup = dupRoutes.Contains(Models.WireGuardConf.CanonicalCidr(ip));
-                    routePills.Add(dup
-                        ? Pill(holdsGroup ? $"{ip} ●" : ip, dupBrush)
-                        : Pill(ip, accent));
-                }
+                foreach (var (text, dup) in s.Routes) routePills.Add(Pill(text, dup ? dupBrush : accent));
                 if (routePills.Count > 0) LabeledRow("routes", routePills);
             }
 
-            if (p.HasDns || p.DomainValues.Any())
+            if (s.P.HasDns || s.Domains.Count > 0)
             {
                 var content = new List<Control>();
-                if (p.HasDns) content.Add(DnsValue(p));
-                foreach (var d in p.DomainValues)
-                {
-                    var (contested, owned) = _vm.Host.DomainStanding(p, d);
-                    content.Add(contested
-                        ? Pill(owned ? $"{d} ●" : d, dupBrush)
-                        : Pill(d, accent));
-                }
+                if (s.P.HasDns) content.Add(DnsValue(s.P));
+                foreach (var (text, dup) in s.Domains) content.Add(Pill(text, dup ? dupBrush : accent));
                 LabeledRow("dns", content);
             }
         }

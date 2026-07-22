@@ -18,10 +18,10 @@ public class DesktopPlatform : IPlatform
 
     public bool SupportsStartup => true;
     public bool SupportsInstallerUpdate => true;
-    public bool SupportsSplitDnsToggle => false; // NRPT is always the mechanism here
     public bool SupportsQrScan => true; // webcam capture; falls back to drop/paste when there's no camera
 
-    public void SetSplitDnsEnabled(bool on) { }
+    public void OpenUrl(string url) =>
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
 
     public void SetStartOnBoot(bool on) => Services.StartupService.Set(on);
 

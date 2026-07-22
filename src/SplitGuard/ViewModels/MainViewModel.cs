@@ -42,15 +42,16 @@ public class MainViewModel : ObservableObject, ITunnelHost
             var vm = Tunnels.FirstOrDefault(t => !t.IsExternal && t.Name == name);
             if (vm is null) return;
             var wasEstablished = vm.IsEstablished;
-            vm.ApplyStats(stats);
+            var healthChanged = vm.ApplyStats(stats);
             // "Connected" means a handshake completed — only announce it then.
             if (!wasEstablished && vm.IsEstablished)
             {
                 Notify(vm.Name, "Connected", false);
                 NotifyStatus();
             }
-            // Health changes can hand a contested domain to another claimant.
-            MaybeRearbitrateDomains();
+            // Health changes can hand a contested domain (and the catch-all) to another
+            // claimant; ticks that changed nothing skip the recompute entirely.
+            if (healthChanged) MaybeRearbitrateDomains();
         });
         _tunnels.FailoverChanged += msg => Dispatcher.UIThread.Post(() =>
         {
@@ -168,7 +169,9 @@ public class MainViewModel : ObservableObject, ITunnelHost
     {
         UpdateStatus.Checking => "Checking for updates…",
         UpdateStatus.Downloading => $"Downloading {_pendingUpdate?.Tag}… {_downloadPct:P0}",
-        UpdateStatus.Ready => $"Update {_pendingUpdate?.Tag} ready — click to install",
+        UpdateStatus.Ready => Platform.SupportsInstallerUpdate
+            ? $"Update {_pendingUpdate?.Tag} ready — click to install"
+            : $"Update {_pendingUpdate?.Tag} available — click to open the release page",
         UpdateStatus.UpToDate => $"Up to date (v{UpdateService.CurrentVersion})",
         UpdateStatus.Error => "Update check failed — click to retry",
         _ => $"Check for updates (v{UpdateService.CurrentVersion})",
@@ -194,14 +197,14 @@ public class MainViewModel : ObservableObject, ITunnelHost
         }
     }
 
-    // Check GitHub and, if newer, download the installer. `manual` distinguishes a user
-    // click (surface errors, no toast) from the silent once-a-day startup check (toast on
-    // success so a hidden-to-tray app still tells the user).
+    // Check GitHub and, if newer, download the installer (Windows) or arm the header
+    // arrow toward the release page (Android). `manual` distinguishes a user click
+    // (surface errors, no toast) from the silent startup check (toast on success so a
+    // hidden-to-tray app still tells the user).
     public async Task CheckForUpdatesAsync(bool manual)
     {
-        // The UI-review harness must never hit GitHub or fetch a real installer; platforms
-        // without an installer flow (Android — updates come from the releases page) skip too.
-        if (RuleStore.DemoMode || !Platform.SupportsInstallerUpdate) return;
+        // The UI-review harness must never hit GitHub or fetch a real installer.
+        if (RuleStore.DemoMode) return;
         if (_update is UpdateStatus.Checking or UpdateStatus.Downloading) return;
         // A downloaded update is already waiting — don't let a re-check (e.g. flipping the
         // check-updates toggle) reset Ready and, on a network hiccup, silently discard it.
@@ -209,7 +212,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
         SetUpdate(UpdateStatus.Checking);
         try
         {
-            var info = await UpdateService.CheckAsync();
+            var info = await UpdateService.CheckAsync(requireInstaller: Platform.SupportsInstallerUpdate);
             if (info is null)
             {
                 StampUpdateCheck();
@@ -218,6 +221,14 @@ public class MainViewModel : ObservableObject, ITunnelHost
                 return;
             }
             _pendingUpdate = info;
+            if (!Platform.SupportsInstallerUpdate)
+            {
+                // No installer flow: Ready means "the release page is one click away".
+                StampUpdateCheck();
+                SetUpdate(UpdateStatus.Ready);
+                if (!manual) Notify("Update available", $"SplitGuard {info.Tag} is out — tap the arrow to get it.", false);
+                return;
+            }
             _downloadPct = 0;
             SetUpdate(UpdateStatus.Downloading);
             var progress = new Progress<double>(p => Dispatcher.UIThread.Post(() =>
@@ -248,6 +259,12 @@ public class MainViewModel : ObservableObject, ITunnelHost
 
     void InstallUpdate()
     {
+        // No installer flow (Android): the Ready click opens the release page instead.
+        if (!Platform.SupportsInstallerUpdate)
+        {
+            Platform.OpenUrl(_pendingUpdate?.PageUrl ?? "https://github.com/drajabr/SplitGuard/releases/latest");
+            return;
+        }
         if (string.IsNullOrEmpty(_installerPath) || !File.Exists(_installerPath))
         {
             _ = CheckForUpdatesAsync(manual: true); // installer went missing — re-fetch
@@ -274,11 +291,14 @@ public class MainViewModel : ObservableObject, ITunnelHost
         if (_update == from && token == _updateRevertToken) SetUpdate(UpdateStatus.Idle);
     }
 
-    // Startup: check at most once a day (and on the very first run) when the pref is on.
+    // Startup: Windows checks at most once a day (a found update downloads an installer —
+    // that shouldn't churn on every launch); Android checks on EVERY run — it's one cheap
+    // API call and the result is just an arrow to the release page.
     void MaybeCheckUpdatesOnStartup()
     {
         if (!_config.Ui.CheckUpdates) return;
-        if (DateTime.TryParse(_config.Ui.LastUpdateCheck, null,
+        if (Platform.SupportsInstallerUpdate
+            && DateTime.TryParse(_config.Ui.LastUpdateCheck, null,
                 System.Globalization.DateTimeStyles.RoundtripKind, out var last)
             && DateTime.UtcNow - last.ToUniversalTime() < TimeSpan.FromDays(1))
             return;
@@ -351,6 +371,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
             await Task.Run(RefreshCatchAll);
             RestoreConnections();
             MaybeCheckUpdatesOnStartup();
+            StartNrptVerify(); // periodic drift repair against the ACTUAL OS rule state
         }
         else
         {
@@ -409,13 +430,29 @@ public class MainViewModel : ObservableObject, ITunnelHost
 
     // ---- tunnel lifecycle -------------------------------------------------
 
+    // Engine lifecycle ops for one tunnel run strictly in the order the user issued them.
+    // Unserialized Task.Run let a disconnect overtake its own connect: the disconnect
+    // no-opped (nothing published yet), the connect then finished — a live adapter kept
+    // routing behind a card that showed OFF.
+    readonly Dictionary<TunnelViewModel, Task> _engineOps = new();
+
+    void QueueEngineOp(TunnelViewModel vm, Action op)
+    {
+        lock (_engineOps)
+        {
+            _engineOps.TryGetValue(vm, out var tail);
+            _engineOps[vm] = (tail ?? Task.CompletedTask)
+                .ContinueWith(_ => op(), TaskScheduler.Default);
+        }
+    }
+
     public void RequestConnect(TunnelViewModel vm)
     {
         // UI-review harness: never create a real adapter/routes from the fake demo tunnels —
         // pretend the connect succeeded so the toggle stays interactive. Pins/details still
         // refresh so contested-domain marking re-arbitrates like the real path would.
         if (RuleStore.DemoMode) { vm.MarkEstablished(); RefreshPins(); return; }
-        _ = Task.Run(() =>
+        QueueEngineOp(vm, () =>
     {
         try
         {
@@ -442,7 +479,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
     public void RequestDisconnect(TunnelViewModel vm)
     {
         if (RuleStore.DemoMode) { RefreshPins(); return; } // demo: the optimistic UI already flipped the toggle
-        _ = Task.Run(() =>
+        QueueEngineOp(vm, () =>
     {
         try
         {
@@ -508,18 +545,25 @@ public class MainViewModel : ObservableObject, ITunnelHost
     {
         try
         {
-            var tunnelServers = Dispatcher.UIThread.Invoke(SnapshotPinnedChain);
-            if (tunnelServers is null) { _nrpt.RemoveCatchAll(); return; }
-            var servers = new List<string>(tunnelServers);
-            servers.AddRange(SystemDns.Snapshot());
-            var chain = servers.Distinct().ToArray();
-            if (chain.Length == 0) _nrpt.RemoveCatchAll();
+            var chain = ComputeCatchAllChain();
+            if (chain is null or { Length: 0 }) _nrpt.RemoveCatchAll();
             else _nrpt.SetCatchAll(chain);
         }
         catch (Exception ex)
         {
             Dispatcher.UIThread.Post(() => { StatusText = $"Device DNS update failed: {ex.Message}"; StatusOk = false; });
         }
+    }
+
+    // The ordered catch-all server chain, or null when nothing is pinned (no rule wanted).
+    // Shared by RefreshCatchAll and the periodic NRPT verify so both agree on "desired".
+    string[]? ComputeCatchAllChain()
+    {
+        var tunnelServers = Dispatcher.UIThread.Invoke(SnapshotPinnedChain);
+        if (tunnelServers is null) return null;
+        var servers = new List<string>(tunnelServers);
+        servers.AddRange(SystemDns.Snapshot());
+        return servers.Distinct().ToArray();
     }
 
     // UI-thread only: ordered connected-peer DNS, or null when nothing is pinned.
@@ -530,16 +574,21 @@ public class MainViewModel : ObservableObject, ITunnelHost
         if (_config.PinnedDns is null) return null;
         var servers = new List<string>();
 
-        // The pinned peer wins outright.
+        // The pinned peer wins outright — but only while it's HEALTHY. A dead pinned
+        // server would otherwise lead the chain and every non-split lookup would pay its
+        // timeout first; it re-enters the front the moment health returns (the chain is
+        // rebuilt on health flips via the arbitration fingerprint).
         foreach (var t in Tunnels.Where(t => t.IsConnected))
-            foreach (var p in t.Peers.Where(p => p.HasDns))
+            foreach (var p in t.Peers.Where(p => p.HasDns && p.IsHealthy))
                 if (_config.PinnedDns.TunnelName == TunnelKey(t) && _config.PinnedDns.PeerPublicKey == PeerKey(t, p))
                     servers.Add(p.Dns.Trim());
 
         void AddFrom(Func<TunnelViewModel, bool> category)
         {
+            // Healthy servers first within each tier; unhealthy ones stay in the chain
+            // as a last resort rather than being dropped outright.
             foreach (var t in Tunnels.Where(t => t.IsConnected && category(t)))
-                foreach (var p in t.Peers.Where(p => p.HasDns))
+                foreach (var p in t.Peers.Where(p => p.HasDns).OrderByDescending(p => p.IsHealthy))
                     servers.Add(p.Dns.Trim());
         }
         AddFrom(t => t.IsCustom);
@@ -638,25 +687,125 @@ public class MainViewModel : ObservableObject, ITunnelHost
     // disconnect / save / delete / external flip and any stats-driven winner change ends
     // here. A (re)applied id is removed first so a pre-session copy of the same rule
     // (previous run, crash) can't linger as a duplicate.
+    volatile bool _shuttingDown; // OnExit: queued passes must not resurrect rules
+
     void ReconcileDomainRules()
     {
-        var desired = DesiredDomainRules(Dispatcher.UIThread.Invoke(LiveDomainClaims));
+        if (_shuttingDown) return;
         lock (_domainRulesGate)
         {
+            // Snapshot INSIDE the gate: a pass that snapshotted before losing the CPU
+            // could otherwise apply a stale desired set over a newer pass's work (e.g.
+            // re-adding rules for a tunnel that was just disconnected). The UI thread
+            // never takes this gate, so the Invoke cannot deadlock.
+            var desired = DesiredDomainRules(Dispatcher.UIThread.Invoke(LiveDomainClaims));
+            // Per-rule failure isolation: one CIM hiccup must not abort the whole pass,
+            // and a failed op leaves its id UNTRACKED so the next reconcile (or the
+            // periodic verify below) retries it instead of assuming it landed.
             var stale = _appliedDomainRules.Keys.Where(id => !desired.ContainsKey(id)).ToList();
-            if (stale.Count > 0)
+            foreach (var id in stale)
             {
-                _nrpt.RemoveTagged(stale);
-                foreach (var id in stale) _appliedDomainRules.Remove(id);
+                try { _nrpt.RemoveTagged(new[] { id }); _appliedDomainRules.Remove(id); }
+                catch { _appliedDomainRules.Remove(id); } // verify pass sweeps the leftover
             }
             foreach (var (id, w) in desired)
             {
                 if (_appliedDomainRules.TryGetValue(id, out var dns) && dns == w.Dns) continue;
-                _nrpt.RemoveTagged(new[] { id });
-                _nrpt.ApplyDomain(w.TunnelKey, w.PeerKey, w.Domain, w.Dns);
-                _appliedDomainRules[id] = w.Dns;
+                try
+                {
+                    _nrpt.RemoveTagged(new[] { id });
+                    _nrpt.ApplyDomain(w.TunnelKey, w.PeerKey, w.Domain, w.Dns);
+                    _appliedDomainRules[id] = w.Dns;
+                }
+                catch { _appliedDomainRules.Remove(id); }
             }
         }
+    }
+
+    // ---- NRPT self-heal ----------------------------------------------------------
+    // NRPT is shared OS state: a GPO refresh, another tool, a crashed half-apply or a
+    // silently failed CIM call can knock rules out from under us. Every 45s the ACTUAL
+    // tagged rules are read back and diffed against the desired set — unknown/duplicate
+    // rules are swept, missing/mismatched ones reapplied, and the catch-all re-pinned.
+    const string CatchAllRuleId = "WGSDNS|catchall"; // must match NrptService.CatchAllId
+
+    System.Threading.Timer? _nrptVerifyTimer;
+
+    void StartNrptVerify()
+    {
+        if (RuleStore.DemoMode || _nrptVerifyTimer is not null) return;
+        _nrptVerifyTimer = new System.Threading.Timer(
+            _ => { try { VerifyDomainRules(); } catch { } },
+            null, TimeSpan.FromSeconds(45), TimeSpan.FromSeconds(45));
+    }
+
+    void VerifyDomainRules()
+    {
+        if (_shuttingDown) return;
+        int repaired = 0;
+        lock (_domainRulesGate)
+        {
+            var desired = DesiredDomainRules(Dispatcher.UIThread.Invoke(LiveDomainClaims));
+            List<NrptRule> actual;
+            try { actual = _nrpt.GetTaggedRules(); } catch { return; }
+
+            var seen = new Dictionary<string, NrptRule>();
+            var dupes = new HashSet<string>();
+            foreach (var r in actual.Where(r => r.Id != CatchAllRuleId))
+                if (!seen.TryAdd(r.Id, r)) dupes.Add(r.Id);
+
+            // Sweep rules that shouldn't exist (stale ids, crash leftovers) and every
+            // duplicated id outright (Remove targets all instances; re-added below).
+            foreach (var id in seen.Keys.Where(id => !desired.ContainsKey(id)).Concat(dupes).Distinct().ToList())
+            {
+                try { _nrpt.RemoveTagged(new[] { id }); repaired++; } catch { }
+                seen.Remove(id);
+                _appliedDomainRules.Remove(id);
+            }
+
+            // Reapply anything missing, duplicated, or pointing at the wrong namespace/server.
+            foreach (var (id, w) in desired)
+            {
+                var ok = seen.TryGetValue(id, out var r) && !dupes.Contains(id)
+                         && r!.Servers.Length == 1 && r.Servers[0] == w.Dns
+                         && r.Namespaces.Length == 1 && r.Namespaces[0] == SplitDnsRules.DomainToNamespace(w.Domain);
+                if (ok) { _appliedDomainRules[id] = w.Dns; continue; }
+                try
+                {
+                    _nrpt.RemoveTagged(new[] { id });
+                    _nrpt.ApplyDomain(w.TunnelKey, w.PeerKey, w.Domain, w.Dns);
+                    _appliedDomainRules[id] = w.Dns;
+                    repaired++;
+                }
+                catch { _appliedDomainRules.Remove(id); }
+            }
+
+            // Catch-all drift: rebuild it only when the live rule disagrees with the
+            // expected chain (an unconditional Set would churn NRPT + flush every pass).
+            try
+            {
+                var chain = ComputeCatchAllChain();
+                var ca = actual.FirstOrDefault(r => r.Id == CatchAllRuleId);
+                var expectExists = chain is { Length: > 0 };
+                var matches = expectExists
+                    ? ca is not null && ca.Servers.SequenceEqual(chain!)
+                    : ca is null;
+                if (!matches)
+                {
+                    if (expectExists) _nrpt.SetCatchAll(chain!);
+                    else _nrpt.RemoveCatchAll();
+                    repaired++;
+                }
+            }
+            catch { }
+        }
+        if (repaired > 0)
+            Dispatcher.UIThread.Post(() => { StatusText = $"DNS rules self-healed ({repaired} repaired)"; StatusOk = true; });
+
+        // GPO can arrive mid-session (gpupdate): the whole local NRPT store then goes
+        // inert with zero errors — flip the banner live instead of only probing at startup.
+        var gpo = _nrpt.IsPolicyManaged;
+        Dispatcher.UIThread.Post(() => { if (GpoWarning != gpo) GpoWarning = gpo; });
     }
 
     // Called on every stats tick (UI thread): a health change can move a contested domain
@@ -666,13 +815,26 @@ public class MainViewModel : ObservableObject, ITunnelHost
 
     void MaybeRearbitrateDomains()
     {
+        // The pinned-chain part rides in the fingerprint so a HEALTH flip of the pinned
+        // peer re-pins the catch-all too (it used to stay dead-server-first forever).
         var fp = string.Join("\n", DesiredDomainRules(LiveDomainClaims())
-            .OrderBy(kv => kv.Key, StringComparer.Ordinal)
-            .Select(kv => $"{kv.Key}={kv.Value.Dns}"));
+                .OrderBy(kv => kv.Key, StringComparer.Ordinal)
+                .Select(kv => $"{kv.Key}={kv.Value.Dns}"))
+            + "\nCA:" + string.Join(",", SnapshotPinnedChain() ?? new List<string>());
         if (fp == _domainWinnersFingerprint) return;
         _domainWinnersFingerprint = fp;
-        if (!RuleStore.DemoMode) _ = Task.Run(ReconcileDomainRules);
-        RefreshDetails(); // contested-domain "· active" pills follow the new owner
+        if (!RuleStore.DemoMode)
+            _ = Task.Run(() =>
+            {
+                try { ReconcileDomainRules(); RefreshCatchAll(); }
+                catch
+                {
+                    // A failed apply must not eat the winner change forever: clearing the
+                    // fingerprint makes the next stats tick retrigger this pass.
+                    Dispatcher.UIThread.Post(() => _domainWinnersFingerprint = "");
+                }
+            });
+        RefreshDetails(); // contested-domain "●" pills follow the new owner
     }
 
     // UI-side standing for the description panel, computed over the DISPLAYED (view-model)
@@ -872,7 +1034,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
         }
         if (!vm.IsCustom && !vm.IsExternal && vm.IsConnected && connectionChanged)
             vm.MarkReconnecting();
-        _ = Task.Run(() =>
+        QueueEngineOp(vm, () =>
         {
             if (vm.IsCustom || vm.IsExternal)
             {
@@ -1110,8 +1272,12 @@ public class MainViewModel : ObservableObject, ITunnelHost
 
     public void OnExit()
     {
+        // Stop queued arbitration passes from resurrecting rules mid-teardown, then drain
+        // any in-flight pass before removing (the gate serializes us behind it).
+        _shuttingDown = true;
         try
         {
+            lock (_domainRulesGate) { }
             foreach (var vm in Tunnels.Where(t => !t.IsExternal && !t.IsCustom && t.IsConnected))
             {
                 foreach (var p in vm.Config!.Peers)

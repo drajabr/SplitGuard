@@ -37,22 +37,49 @@ public static class Motion
     //  - it writes plain values (never an Animation with FillMode.Forward, which keeps clamping
     //    the property after completion and froze/clipped the expand).
     // Callers keep their own generation guard to cancel a stale finalize on rapid re-toggle.
+    // ALL live tweens step from ONE shared timer: co-running motions from a single
+    // trigger (height + reveal + scroll) apply inside one dispatcher tick and resolve in
+    // one layout pass, instead of three independently-phased timers beating against the
+    // frame clock. Mobile (Compact) uses a 30ms tick — every Height step re-arranges the
+    // whole card subtree and ~33fps of that is the smooth/janky line on a phone CPU.
+    sealed class ActiveTween
+    {
+        public required Stopwatch Sw;
+        public required double From, To;
+        public required int Ms;
+        public required Action<double> Apply;
+        public Action? Done;
+    }
+
+    static readonly List<ActiveTween> _tweens = new();
+    static DispatcherTimer? _pump;
+
     public static void Tween(double from, double to, int ms, Action<double> apply, Action? done = null)
     {
         if (Math.Abs(to - from) < 0.5) { apply(to); done?.Invoke(); return; }
-        var sw = Stopwatch.StartNew();
-        DispatcherTimer? timer = null;
-        // Mobile (Compact) halves the tick rate: every tween step that touches a Height
-        // re-measures and re-arranges the whole card subtree, and ~33fps of that is the
-        // difference between smooth and janky expand/collapse on a phone CPU. Desktop
-        // keeps the 15ms tick.
-        var tick = TunnelCard.Compact ? 30 : 15;
-        timer = new DispatcherTimer(TimeSpan.FromMilliseconds(tick), DispatcherPriority.Render, (_, _) =>
+        _tweens.Add(new ActiveTween { Sw = Stopwatch.StartNew(), From = from, To = to, Ms = ms, Apply = apply, Done = done });
+        if (_pump is null)
         {
-            var p = Math.Min(1, sw.Elapsed.TotalMilliseconds / ms);
-            apply(from + (to - from) * Standard.Ease(p));
-            if (p >= 1) { timer!.Stop(); done?.Invoke(); }
-        });
-        timer.Start();
+            var tick = TunnelCard.Compact ? 30 : 15;
+            _pump = new DispatcherTimer(TimeSpan.FromMilliseconds(tick), DispatcherPriority.Render, (_, _) => Pump());
+        }
+        if (!_pump.IsEnabled) _pump.Start();
+    }
+
+    static void Pump()
+    {
+        // Snapshot: apply/done callbacks may start new tweens re-entrantly.
+        var batch = _tweens.ToArray();
+        foreach (var t in batch)
+        {
+            var p = Math.Min(1, t.Sw.Elapsed.TotalMilliseconds / t.Ms);
+            t.Apply(t.From + (t.To - t.From) * Standard.Ease(p));
+            if (p >= 1)
+            {
+                _tweens.Remove(t);
+                t.Done?.Invoke();
+            }
+        }
+        if (_tweens.Count == 0) _pump!.Stop();
     }
 }

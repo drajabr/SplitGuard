@@ -46,8 +46,19 @@ public class AndroidTunnelEngine : ITunnelEngine
 
     public bool IsConnected(string name) => _active == name;
 
+    // Peer display names by public key, for the live notification lines.
+    volatile Dictionary<string, string> _peerNames = new();
+
     public void Connect(TunnelConfig config)
     {
+        var names = new Dictionary<string, string>();
+        for (int i = 0; i < config.Peers.Count; i++)
+        {
+            var p = config.Peers[i];
+            if (!string.IsNullOrWhiteSpace(p.PublicKey))
+                names[p.PublicKey] = string.IsNullOrWhiteSpace(p.Name) ? $"peer {i + 1}" : p.Name!.Trim();
+        }
+        _peerNames = names;
         var ctx = Android.App.Application.Context;
         // Consent must already be granted (MainActivity runs the prepare flow before
         // flipping the toggle); a null prepare intent means we're clear.
@@ -144,6 +155,25 @@ public class AndroidTunnelEngine : ITunnelEngine
             }
         }
         if (per.Count > 0) StatsUpdated?.Invoke(name, new TunnelStats(per));
+
+        // Keep the foreground notification's live line + expanded per-peer detail fresh
+        // (UpdateNotification de-duplicates, so unchanged text costs nothing).
+        if (per.Count > 0 && SgVpnService.Instance is { } svc)
+        {
+            double up = 0, down = 0;
+            var lines = new List<string>();
+            var names = _peerNames;
+            foreach (var (key, s) in per)
+            {
+                up += s.UpBps; down += s.DownBps;
+                var label = names.TryGetValue(key, out var n) ? n : key[..Math.Min(8, key.Length)];
+                var hs = s.Handshake is null ? "no handshake" : ViewModels.Format.Ago(s.Handshake);
+                lines.Add($"{label} — {hs} · ↑ {ViewModels.Format.Bytes(s.TotalTx)} ↓ {ViewModels.Format.Bytes(s.TotalRx)}");
+            }
+            svc.UpdateNotification(
+                $"↑ {ViewModels.Format.Rate(up)}   ↓ {ViewModels.Format.Rate(down)}",
+                string.Join("\n", lines));
+        }
     }
 
     public void Dispose()

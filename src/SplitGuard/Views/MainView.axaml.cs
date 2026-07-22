@@ -663,22 +663,14 @@ public partial class MainView : UserControl
                 sv.Prefs.StartOnBoot = on; sv.PersistPrefs();
                 sv.Platform.SetStartOnBoot(on);
             }));
-        // Android's split-DNS fallback: off = stock WireGuard DNS (no per-domain routing),
-        // for devices where the in-tunnel forwarder misbehaves. Applies on the next connect.
-        if (sv.Platform.SupportsSplitDnsToggle)
-            GeneralList.Children.Add(ToggleRow("Per-domain DNS routing", () => sv.Prefs.AndroidSplitDns, on =>
-            {
-                sv.Prefs.AndroidSplitDns = on; sv.PersistPrefs();
-                sv.Platform.SetSplitDnsEnabled(on);
-            }));
         GeneralList.Children.Add(ToggleRow("Notifications", () => sv.Prefs.Notifications, on => { sv.Prefs.Notifications = on; sv.PersistPrefs(); }));
-        // Turning on the update check runs one now, so a found update surfaces the header arrow.
-        if (sv.Platform.SupportsInstallerUpdate)
-            GeneralList.Children.Add(ToggleRow("Check for updates on startup", () => sv.Prefs.CheckUpdates, on =>
-            {
-                sv.Prefs.CheckUpdates = on; sv.PersistPrefs();
-                if (on) _ = sv.CheckForUpdatesAsync(manual: true);
-            }));
+        // Turning on the update check runs one now, so a found update surfaces the header
+        // arrow. Windows downloads the installer; Android opens the release page.
+        GeneralList.Children.Add(ToggleRow("Check for updates on startup", () => sv.Prefs.CheckUpdates, on =>
+        {
+            sv.Prefs.CheckUpdates = on; sv.PersistPrefs();
+            if (on) _ = sv.CheckForUpdatesAsync(manual: true);
+        }));
 
         AppearanceList.Children.Clear();
         AppearanceList.Children.Add(ThemeGroup());

@@ -5,8 +5,9 @@ using System.Text.Json;
 
 namespace SplitGuard.Services;
 
-// A newer release than the running build, plus where to fetch its Windows installer.
-public record UpdateInfo(Version Version, string Tag, string DownloadUrl, string AssetName);
+// A newer release than the running build: where to fetch its Windows installer (empty on
+// platforms that go through the release page instead) and the release's web page.
+public record UpdateInfo(Version Version, string Tag, string DownloadUrl, string AssetName, string PageUrl);
 
 // Self-update against the public GitHub releases of drajabr/SplitGuard: query the latest
 // release, download its installer, then hand off to it. No auth — the API is public and the
@@ -35,9 +36,11 @@ public static class UpdateService
         return c;
     }
 
-    // The latest release, but only when it's newer than what's running and ships an .exe
-    // installer. Returns null when up to date (or the latest is a draft/prerelease).
-    public static async Task<UpdateInfo?> CheckAsync(CancellationToken ct = default)
+    // The latest release, but only when it's newer than what's running. With
+    // requireInstaller (Windows) it must also ship an .exe asset; without it (Android)
+    // the release page is the destination. Returns null when up to date (or the latest
+    // is a draft/prerelease).
+    public static async Task<UpdateInfo?> CheckAsync(bool requireInstaller = true, CancellationToken ct = default)
     {
         using var http = NewClient();
         var json = await http.GetStringAsync(LatestApi, ct);
@@ -48,6 +51,10 @@ public static class UpdateService
 
         var tag = root.TryGetProperty("tag_name", out var t) ? t.GetString() ?? "" : "";
         if (!TryParseTag(tag, out var latest) || latest <= CurrentVersion) return null;
+        var page = root.TryGetProperty("html_url", out var h) ? h.GetString() ?? "" : "";
+        if (page.Length == 0) page = $"https://github.com/drajabr/SplitGuard/releases/tag/{tag}";
+
+        if (!requireInstaller) return new UpdateInfo(latest, tag, "", "", page);
 
         if (!root.TryGetProperty("assets", out var assets)) return null;
         foreach (var asset in assets.EnumerateArray())
@@ -55,7 +62,7 @@ public static class UpdateService
             var name = asset.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
             if (!name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) continue;
             var url = asset.TryGetProperty("browser_download_url", out var u) ? u.GetString() ?? "" : "";
-            if (url.Length > 0) return new UpdateInfo(latest, tag, url, name);
+            if (url.Length > 0) return new UpdateInfo(latest, tag, url, name, page);
         }
         return null;
     }

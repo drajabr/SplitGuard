@@ -112,14 +112,17 @@ public interface IPlatform
 
     // Feature gates for platform-only UI (rows/flows are hidden, not disabled).
     bool SupportsStartup { get; }          // run-at-boot + UAC-skip launcher (Windows)
-    bool SupportsInstallerUpdate { get; }  // download-and-run installer self-update
-    bool SupportsSplitDnsToggle { get; }   // Android: in-tunnel forwarder on/off fallback
+    bool SupportsInstallerUpdate { get; }  // download-and-run installer self-update (Windows);
+                                           // platforms without it surface the release page instead
     bool SupportsQrScan { get; }           // camera "Scan QR code" add flow
     bool SupportsBootStart => false;       // Android: reconnect the last tunnel after a reboot
 
     void SetStartOnBoot(bool on);
     void SetSkipUacLaunch(bool on);
-    void SetSplitDnsEnabled(bool on);      // applies on the NEXT connect
+
+    // Open a web page in the system browser (the "get the update" path on platforms
+    // without an installer flow).
+    void OpenUrl(string url) { }
 
     // Tint the OS system bars (Android status/navigation bars) to match the app theme's page
     // background, with dark glyphs on a light background. No-op where the OS chrome isn't ours.

@@ -23,6 +23,12 @@
        Anyone can re-sign a sideloaded APK regardless. Override the Signing* props to use
        a private key. -->
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <!-- FULL AOT for Release: profiled AOT only covers the SDK's built-in BCL/startup
+         profile — every Avalonia layout/text/render method and all app code still JIT'd
+         at first touch on device, which is exactly the ~20fps first-minutes jank. Full
+         AOT trades APK size (~2x) and CI minutes for real frame pacing. -->
+    <RunAOTCompilation>true</RunAOTCompilation>
+    <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
     <AndroidKeyStore>true</AndroidKeyStore>
     <AndroidSigningKeyStore Condition="'$(AndroidSigningKeyStore)' == ''">$(MSBuildProjectDirectory)/../../build/android/splitguard-release.jks</AndroidSigningKeyStore>
     <AndroidSigningKeyAlias Condition="'$(AndroidSigningKeyAlias)' == ''">splitguard</AndroidSigningKeyAlias>
