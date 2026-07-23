@@ -25,17 +25,20 @@ Android guaranteed by construction: one component set, one breakpoint.
 Tracked here, in the repo — tick items as they land; each phase ends with a commit that
 updates this file.
 
-### Phase 1 — toolchain groundwork: Avalonia 12.1 *(blocked on SDK)*
+### Phase 1 — toolchain groundwork: Avalonia 12.1
 12.1's source generators need Roslyn ≥ 4.14 (the .NET 8 SDK ships 4.11 and silently
 skips them — verified 2026-07-23). Do this FIRST so the new UI is built once, on the
 final framework.
-- [ ] .NET 10 SDK installed locally (`~/.dotnet`) and in CI (`setup-dotnet`)
-- [ ] Android workload reinstalled under the new SDK band
-- [ ] Retarget `net8.0-android34.0` → `net10.0-android`; desktop TFMs re-verified
-- [ ] Avalonia 12.1 + AvaloniaEdit 12.0 bumped; obsolete-API removals fixed
-      (`DragEventArgs.Data` → DataTransfer, `IClipboard.GetTextAsync`, `Bitmap.Save`)
+- [x] .NET 10 SDK installed locally (`~/.dotnet`, 10.0.302) and in CI (`setup-dotnet` 10.0.x)
+- [x] Android workload reinstalled under the new SDK band (android 36.1.69)
+- [x] Retarget `net8.0-android34.0` → `net10.0-android36.0`; desktop TFMs re-verified
+- [x] Avalonia 12.1 + AvaloniaEdit 12.0 bumped; obsolete-API removals fixed
+      (`DragEventArgs.Data` → DataTransfer, `IClipboard.GetTextAsync`,
+      `ExtendClientAreaChromeHints` → drawn chrome tamed via `WindowDrawnDecorations`
+      template styles: title text + fullscreen button hidden, min/max/close kept)
 - [ ] Release APK: full AOT, signing, patched libwg-go packaging re-verified on emulator
-- [ ] Both heads screenshot-verified; release as 0.5.16 (same UI, new framework)
+- [ ] Both heads screenshot-verified (desktop ✓ 2026-07-23; Android pending); release as
+      0.5.16 (same UI, new framework)
 
 ### Phase 2 — components (`Views/Controls/`)
 - [ ] StatusHero: dot + tunnel + rates + domains/routes/shared counters

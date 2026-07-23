@@ -6,6 +6,26 @@
 param([switch]$SkipAndroid)
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
+
+# Keep a full log so a failure is readable even if the window closes on exit, and pause at the
+# end when run interactively (e.g. double-clicked from Explorer) so the console never vanishes
+# before you can read the error. CI sets $env:CI/$env:GITHUB_ACTIONS, so it stays non-blocking.
+$logFile = Join-Path $root "build.log"
+try { Start-Transcript -Path $logFile -Force -ErrorAction SilentlyContinue | Out-Null } catch {}
+$script:Interactive = [Environment]::UserInteractive -and -not $env:CI -and -not $env:GITHUB_ACTIONS
+function Complete-Build([int]$code) {
+    try { Stop-Transcript -ErrorAction SilentlyContinue | Out-Null } catch {}
+    if ($script:Interactive) { Write-Host ""; Read-Host "Press Enter to close" | Out-Null }
+    exit $code
+}
+trap {
+    Write-Host ""
+    Write-Host "=== BUILD FAILED ===" -ForegroundColor Red
+    Write-Host $_.Exception.Message -ForegroundColor Red
+    Write-Host "Full log: $logFile" -ForegroundColor Yellow
+    Complete-Build 1
+}
+
 $WgNtVersion = "0.10.1"
 $version = (Get-Content (Join-Path $root "VERSION")).Trim()
 
@@ -144,22 +164,34 @@ if (-not $SkipAndroid) {
                 Where-Object { $_ -and (Test-Path (Join-Path $_.FullName "bin\java.exe")) } | Select-Object -First 1
             if ($jdk) { $androidProps += "-p:JavaSdkDirectory=$($jdk.FullName)"; Write-Host "  JDK: $($jdk.FullName)" }
 
-            # OneDrive can hold a lock on obj\...\generated, failing the bindings clean; drop the
-            # stale APK and generated sources so the signed Release publish starts clean.
+            # OneDrive can momentarily lock files under obj\ or bin\ mid-build (error XARDF7024),
+            # failing the signed Release publish. Clean the Android intermediates with a
+            # lock-tolerant delete, drop stale build-server file handles, and retry a few times.
             $abin = Join-Path $root "src\SplitGuard.Android\bin\Release"
-            $agen = Join-Path $root "src\SplitGuard.Android\obj\Release\net8.0-android34.0\generated"
-            Remove-Item -Recurse -Force $abin -ErrorAction SilentlyContinue
-            Remove-Item -Recurse -Force $agen -ErrorAction SilentlyContinue
+            $aobj = Join-Path $root "src\SplitGuard.Android\obj\Release"
+            function Remove-Locked([string]$p) {
+                for ($i = 0; $i -lt 6 -and (Test-Path $p); $i++) {
+                    try { Remove-Item -Recurse -Force $p -ErrorAction Stop }
+                    catch { Start-Sleep -Milliseconds 700 }   # wait for OneDrive to release the handle
+                }
+            }
+            try { & $dotnetExe build-server shutdown | Out-Null } catch {}  # release lingering handles
 
             $code = 1
-            foreach ($attempt in 1..2) {   # one retry clears the OneDrive-locked generated dir
-                & $dotnetExe publish $androidProj -c Release @androidProps -v q
+            foreach ($attempt in 1..3) {
+                Remove-Locked $abin
+                # Per-TFM intermediates dir (netX.Y-androidZZ.0) — resolved by glob so a TFM bump
+                # can't silently leave this pointing at a stale path.
+                Get-ChildItem $aobj -Directory -Filter "net*-android*" -ErrorAction SilentlyContinue | ForEach-Object {
+                    if ($attempt -eq 1) { Remove-Locked (Join-Path $_.FullName "generated") }
+                    else { Remove-Locked $_.FullName }   # fuller clean once a retry is needed
+                }
+                & $dotnetExe publish $androidProj -c Release @androidProps -v m
                 $code = $LASTEXITCODE
                 if ($code -eq 0) { break }
-                if ($attempt -eq 1) {
-                    Write-Warning "Android publish failed - clearing intermediates and retrying once..."
-                    Remove-Item -Recurse -Force $agen -ErrorAction SilentlyContinue
-                    Start-Sleep -Seconds 2
+                if ($attempt -lt 3) {
+                    Write-Warning "Android publish failed (attempt $attempt of 3) - likely a OneDrive file lock; cleaning and retrying..."
+                    Start-Sleep -Seconds 3
                 }
             }
 
@@ -185,4 +217,4 @@ if (-not $SkipAndroid) {
 # The installer (and, if attempted, the APK) are done. The Android step is best-effort, so a
 # failed/non-zero sub-build there must not make the whole script report failure — the critical
 # steps above throw on error under $ErrorActionPreference. Return success explicitly.
-exit 0
+Complete-Build 0

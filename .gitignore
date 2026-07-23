@@ -1,6 +1,7 @@
 bin/
 obj/
 dist/
+build.log
 *.user
 .vs/
 *.dll
