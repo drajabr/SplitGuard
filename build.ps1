@@ -29,9 +29,10 @@ trap {
 $WgNtVersion = "0.10.1"
 $version = (Get-Content (Join-Path $root "VERSION")).Trim()
 
-# A dotnet on PATH may be a runtime-only host; require one that actually has an SDK >= 8.
+# A dotnet on PATH may be a runtime-only host; require one that actually has an SDK the
+# repo can use (global.json pins the 10.0.100 band).
 function Test-Sdk([string]$exe) {
-    try { return [bool]((& $exe --list-sdks 2>$null) | Where-Object { [int]($_ -split "\.")[0] -ge 8 }) }
+    try { return [bool]((& $exe --list-sdks 2>$null) | Where-Object { [int]($_ -split "\.")[0] -ge 10 }) }
     catch { return $false }
 }
 $candidates = @()
@@ -39,7 +40,7 @@ $onPath = Get-Command dotnet -ErrorAction SilentlyContinue
 if ($onPath) { $candidates += $onPath.Source }
 $candidates += (Join-Path $env:USERPROFILE ".dotnet\dotnet.exe")
 $dotnetExe = $candidates | Where-Object { (Test-Path $_) -and (Test-Sdk $_) } | Select-Object -First 1
-if (-not $dotnetExe) { throw ".NET 8 SDK not found. Install it from https://dot.net" }
+if (-not $dotnetExe) { throw ".NET 10 SDK not found. Install it from https://dot.net" }
 
 # Inno Setup compiler. Optional: without it the app still builds into dist\win-x64;
 # only the installer packaging step is skipped.

@@ -36,9 +36,11 @@ final framework.
       (`DragEventArgs.Data` → DataTransfer, `IClipboard.GetTextAsync`,
       `ExtendClientAreaChromeHints` → drawn chrome tamed via `WindowDrawnDecorations`
       template styles: title text + fullscreen button hidden, min/max/close kept)
-- [ ] Release APK: full AOT, signing, patched libwg-go packaging re-verified on emulator
-- [ ] Both heads screenshot-verified (desktop ✓ 2026-07-23; Android pending); release as
-      0.5.16 (same UI, new framework)
+- [x] Release APK: full AOT, signing, patched libwg-go packaging re-verified on emulator
+      (170 AOT images, libwg-go for arm64-v8a + x86_64, VpnService comes up)
+- [x] Both heads screenshot-verified 2026-07-23 (desktop: title bar/edit/settings;
+      Android: Debug + Release AOT, edit mode, settings); release as 0.5.16
+      (same UI, new framework)
 
 ### Phase 2 — components (`Views/Controls/`)
 - [ ] StatusHero: dot + tunnel + rates + domains/routes/shared counters
