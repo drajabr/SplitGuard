@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using Avalonia.Animation.Easings;
+using Avalonia.Controls;
 using Avalonia.Threading;
 
 namespace SplitGuard.Views;
@@ -28,20 +29,21 @@ public static class Motion
     // Shared reveal slide-in distance (px) for fade+slide entrances.
     public const double RevealShift = 8;
 
-    // The single code tween: a DispatcherTimer that steps `apply` along Standard from -> to over
-    // `ms`. Three details are load-bearing and must not change:
-    //  - 15ms interval at DispatcherPriority.Render, so ticks don't starve behind the heavy
-    //    relayout a collapse triggers (default priority made the motion snap).
-    //  - the <0.5 short-circuit applies the target and fires done() synchronously for a zero-delta
-    //    move (generation-guarded callers rely on done() firing).
-    //  - it writes plain values (never an Animation with FillMode.Forward, which keeps clamping
-    //    the property after completion and froze/clipped the expand).
+    // The single code tween: steps `apply` along Standard from -> to over `ms`, paced by the
+    // COMPOSITOR (TopLevel.RequestAnimationFrame): exactly one step per presented frame,
+    // vsync-aligned, on every head. A wall-clock DispatcherTimer can never do this — its ticks
+    // beat against the ~16.7ms frame clock (some frames get two values, some none), which is
+    // what made phone animations feel low-fps even when every tick landed. The old Compact
+    // 30ms tick (~33fps cap) is gone for the same reason: when a step's relayout runs long,
+    // RAF self-throttles to the achievable rate without losing vsync alignment, so no manual
+    // cap is needed. Two details remain load-bearing:
+    //  - the <0.5 short-circuit applies the target and fires done() synchronously for a
+    //    zero-delta move (generation-guarded callers rely on done() firing).
+    //  - it writes plain values (never an Animation with FillMode.Forward, which keeps
+    //    clamping the property after completion and froze/clipped the expand).
     // Callers keep their own generation guard to cancel a stale finalize on rapid re-toggle.
-    // ALL live tweens step from ONE shared timer: co-running motions from a single
-    // trigger (height + reveal + scroll) apply inside one dispatcher tick and resolve in
-    // one layout pass, instead of three independently-phased timers beating against the
-    // frame clock. Mobile (Compact) uses a 30ms tick — every Height step re-arranges the
-    // whole card subtree and ~33fps of that is the smooth/janky line on a phone CPU.
+    // ALL live tweens step from ONE pump, so co-running motions from a single trigger
+    // (height + reveal + scroll) apply inside one frame and resolve in one layout pass.
     sealed class ActiveTween
     {
         public required Stopwatch Sw;
@@ -52,25 +54,58 @@ public static class Motion
     }
 
     static readonly List<ActiveTween> _tweens = new();
-    static DispatcherTimer? _pump;
+    static TopLevel? _frameHost;
+    static bool _framePending;
+    static DispatcherTimer? _fallbackPump; // pre-attach only (a tween before the view lands)
+
+    // MainView hands us its TopLevel when it enters a visual tree (the one shared code
+    // path both heads pass through), and clears it on detach.
+    public static void AttachFrameHost(TopLevel? top)
+    {
+        _frameHost = top;
+        // A frame request pending on the OLD host may never fire once it's gone; without
+        // this reset its guard would block the new host's first Kick forever.
+        _framePending = false;
+        if (top is not null) _fallbackPump?.Stop();
+        if (_tweens.Count > 0) Kick(); // don't strand live tweens across a host swap
+    }
 
     public static void Tween(double from, double to, int ms, Action<double> apply, Action? done = null)
     {
-        // Structural tweens animate on BOTH heads again: Avalonia 12's Android compositor
-        // paces frames properly, so the 11.2-era instant-apply escape hatch (which made
-        // 0.5.14 feel dead on mobile) is gone. Compact keeps the coarser tick below.
         if (Math.Abs(to - from) < 0.5) { apply(to); done?.Invoke(); return; }
         _tweens.Add(new ActiveTween { Sw = Stopwatch.StartNew(), From = from, To = to, Ms = ms, Apply = apply, Done = done });
-        if (_pump is null)
+        Kick();
+    }
+
+    static void Kick()
+    {
+        if (_frameHost is { } top)
         {
-            var tick = TunnelCard.Compact ? 30 : 15;
-            _pump = new DispatcherTimer(TimeSpan.FromMilliseconds(tick), DispatcherPriority.Render, (_, _) => Pump());
+            if (_framePending) return; // one outstanding frame request at a time
+            _framePending = true;
+            top.RequestAnimationFrame(_ =>
+            {
+                // Clear BEFORE pumping: apply/done may start tweens re-entrantly, and their
+                // Kick must be able to schedule the next frame.
+                _framePending = false;
+                Pump();
+                if (_tweens.Count > 0) Kick();
+            });
         }
-        if (!_pump.IsEnabled) _pump.Start();
+        else
+        {
+            _fallbackPump ??= new DispatcherTimer(TimeSpan.FromMilliseconds(15), DispatcherPriority.Render, (_, _) => Pump());
+            if (!_fallbackPump.IsEnabled) _fallbackPump.Start();
+        }
     }
 
     static void Pump()
     {
+#if DEBUG
+        // Frame-pacing probe: `adb logcat -s mono-stdout` (or console on desktop) shows the
+        // real step intervals — how the 33fps-timer jank was verified fixed. Debug-only.
+        Console.WriteLine($"[motion] {Stopwatch.GetTimestamp() * 1000.0 / Stopwatch.Frequency:0.0}ms tweens={_tweens.Count}");
+#endif
         // Snapshot: apply/done callbacks may start new tweens re-entrantly.
         var batch = _tweens.ToArray();
         foreach (var t in batch)
@@ -83,6 +118,6 @@ public static class Motion
                 t.Done?.Invoke();
             }
         }
-        if (_tweens.Count == 0) _pump!.Stop();
+        if (_tweens.Count == 0) _fallbackPump?.Stop();
     }
 }

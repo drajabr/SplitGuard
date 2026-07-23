@@ -117,11 +117,15 @@ public partial class MainView : UserControl
         {
             TopLevel.GetTopLevel(this)?.AddHandler(PointerPressedEvent, OnHostPointerPressed,
                 RoutingStrategies.Tunnel, handledEventsToo: true);
+            // Hand the compositor's frame clock to the shared tween pump (both heads pass
+            // through here): animation steps become one-per-presented-frame, vsync-aligned.
+            Motion.AttachFrameHost(TopLevel.GetTopLevel(this));
             Dispatcher.UIThread.Post(UpdateClusterFade); // first fade after the initial layout settles
         };
         DetachedFromVisualTree += (_, _) =>
         {
             TopLevel.GetTopLevel(this)?.RemoveHandler(PointerPressedEvent, OnHostPointerPressed);
+            Motion.AttachFrameHost(null);
             DisposeScanner(); // release the camera if the QR drawer is open when the view leaves
         };
         // Window move-drag from the title strip. The strip is opaque now (PageRoot paints it), so
