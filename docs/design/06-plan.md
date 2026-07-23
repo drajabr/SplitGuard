@@ -1,5 +1,11 @@
 # SplitGuard 0.6 — UI program
 
+> **Status: PARKED (2026-07-23).** Phase 1 (the .NET 10 + Avalonia 12.1 toolchain move)
+> shipped as 0.5.16. The redesign phases (2–5) were cancelled by decision: the classic
+> card UI stays, on the new framework. This document is kept for the locked principles
+> (content-measured adaptivity, no pixel breakpoints) which continue to apply to ALL
+> future UI work — not as a roadmap.
+
 Goal: the approved "one design, two screens" master–detail system (see the design
 proposal artifact), fully polished as **0.6.1**, with UI/UX parity between Windows and
 Android guaranteed by construction: one component set, one breakpoint.
