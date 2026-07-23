@@ -193,6 +193,11 @@ public class NrptService : ISplitDnsService
         {
             foreach (var instance in Query().Where(i => Prop<string>(i, "DisplayName") == id))
                 _session.DeleteInstance(instance);
+            // A removal that silently leaves instances behind turns every retry loop above
+            // us into an ADD loop — rules then accumulate without bound (the 2520-rules
+            // incident). Verify the store actually shed the id and fail loudly if not.
+            if (Query().Any(i => Prop<string>(i, "DisplayName") == id))
+                throw new InvalidOperationException($"NRPT rule {id} survived removal");
         }
 
         public List<NrptRule> GetTagged() =>
@@ -225,7 +230,10 @@ public class NrptService : ISplitDnsService
 
         public void Remove(string id)
         {
-            Run($"Get-DnsClientNrptRule | Where-Object {{ $_.Comment -eq {Quote(NrptService.Tag)} -and $_.DisplayName -eq {Quote(id)} }} | Remove-DnsClientNrptRule -Force");
+            // The trailing check makes a silent no-op removal (pipeline mismatch, access)
+            // exit non-zero, which Run turns into an exception — see CimBackend.Remove.
+            Run($"Get-DnsClientNrptRule | Where-Object {{ $_.Comment -eq {Quote(NrptService.Tag)} -and $_.DisplayName -eq {Quote(id)} }} | Remove-DnsClientNrptRule -Force; " +
+                $"if (Get-DnsClientNrptRule | Where-Object {{ $_.Comment -eq {Quote(NrptService.Tag)} -and $_.DisplayName -eq {Quote(id)} }}) {{ exit 1 }}");
         }
 
         public List<NrptRule> GetTagged()

@@ -366,6 +366,12 @@ public class MainViewModel : ObservableObject, ITunnelHost
         SortTunnels();
         if (!RuleStore.DemoMode)
         {
+            // Deterministic zero: a crash or an updater's hard kill skips OnExit, and a
+            // previous session's failed removals can leave tagged rules ACTIVELY misrouting
+            // DNS with no app running (seen in the wild as thousands of stale rules and a
+            // leftover catch-all pinning "." to an unreachable server). Wipe everything we
+            // own first; the steps below re-derive the live set from config.
+            await Task.Run(() => { try { _nrpt.RemoveAllTagged(); } catch { } });
             await Task.Run(Reconcile);
             RefreshPins();
             await Task.Run(RefreshCatchAll);
@@ -752,6 +758,34 @@ public class MainViewModel : ObservableObject, ITunnelHost
             List<NrptRule> actual;
             try { actual = _nrpt.GetTaggedRules(); } catch { return; }
 
+            // Bounded recovery: if the tagged store is far larger than anything we'd ever
+            // apply (every desired domain + one catch-all), per-id repair is the wrong tool —
+            // sustained ownership churn with occasionally-failing removals accumulates strays
+            // faster than the diff drains them (this reached 2520 rules in the wild, taking
+            // system DNS down with it). Wipe our tag entirely and rebuild from the desired set.
+            if (actual.Count > desired.Count + 8)
+            {
+                try
+                {
+                    _nrpt.RemoveAllTagged();
+                    _appliedDomainRules.Clear();
+                    foreach (var (id, w) in desired)
+                    {
+                        try { _nrpt.ApplyDomain(w.TunnelKey, w.PeerKey, w.Domain, w.Dns); _appliedDomainRules[id] = w.Dns; }
+                        catch { }
+                    }
+                    var rebuilt = ComputeCatchAllChain();
+                    if (rebuilt is { Length: > 0 }) _nrpt.SetCatchAll(rebuilt);
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        StatusText = $"DNS rules rebuilt — cleared {actual.Count} stale entries";
+                        StatusOk = true;
+                    });
+                }
+                catch { }
+                return;
+            }
+
             var seen = new Dictionary<string, NrptRule>();
             var dupes = new HashSet<string>();
             foreach (var r in actual.Where(r => r.Id != CatchAllRuleId))
@@ -796,10 +830,14 @@ public class MainViewModel : ObservableObject, ITunnelHost
             {
                 var chain = ComputeCatchAllChain();
                 var ca = actual.FirstOrDefault(r => r.Id == CatchAllRuleId);
+                // Duplicated catch-alls force a rebuild too: SetCatchAll's remove targets
+                // every instance, but the FirstOrDefault comparison alone would happily
+                // accept "the first copy looks right" forever.
+                var caCount = actual.Count(r => r.Id == CatchAllRuleId);
                 var expectExists = chain is { Length: > 0 };
                 var matches = expectExists
-                    ? ca is not null && ca.Servers.Select(Norm).SequenceEqual(chain!.Select(Norm))
-                    : ca is null;
+                    ? caCount == 1 && ca is not null && ca.Servers.Select(Norm).SequenceEqual(chain!.Select(Norm))
+                    : caCount == 0;
                 if (!matches)
                 {
                     if (expectExists) _nrpt.SetCatchAll(chain!);
@@ -1287,17 +1325,16 @@ public class MainViewModel : ObservableObject, ITunnelHost
         try
         {
             lock (_domainRulesGate) { }
-            foreach (var vm in Tunnels.Where(t => !t.IsExternal && !t.IsCustom && t.IsConnected))
-            {
-                foreach (var p in vm.Config!.Peers)
-                    _nrpt.RemovePeerRules(vm.Name, p.PublicKey);
-            }
-            if (_config.Custom is not null) _nrpt.RemoveByTunnel(CustomName);
             _tunnels.DisconnectAll();
-            // Catch-all survives only if the pinned DNS belongs to an external tunnel that stays up.
+            // One authoritative sweep of the ACTUAL tagged store — not the rules we THINK we
+            // applied: any removal that failed during the session must not outlive it. The
+            // catch-all survives only if the pinned DNS belongs to an external tunnel that
+            // stays up without us.
             var pinnedExternalUp = _config.PinnedDns is not null
                 && Tunnels.Any(t => t.IsExternal && t.IsConnected && ExtName(t.Name) == _config.PinnedDns.TunnelName);
-            if (!pinnedExternalUp) _nrpt.RemoveCatchAll();
+            var ids = _nrpt.GetTaggedRules().Select(r => r.Id)
+                .Where(id => !(pinnedExternalUp && id == CatchAllRuleId)).Distinct().ToList();
+            if (ids.Count > 0) _nrpt.RemoveTagged(ids);
         }
         catch { }
     }
