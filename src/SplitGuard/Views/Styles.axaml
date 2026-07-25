@@ -55,6 +55,18 @@
     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
     <Setter Property="Cursor" Value="Hand" />
   </Style>
+  <!-- Explicit hover/press fills (see the Button.icon note below): without them the Fluent
+       theme's own pointer-over shade lands and the universal brush transition fades to it,
+       which reads as an irregular two-stage flicker — worst on pointer-LEAVE. -->
+  <Style Selector="Button.keyfield /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource FieldFillBrush}" />
+  </Style>
+  <Style Selector="Button.keyfield:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource FieldFillHoverBrush}" />
+  </Style>
+  <Style Selector="Button.keyfield:pressed /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource FieldFillBrush}" />
+  </Style>
   <!-- "mono" is now just the compact value size; the family follows the chosen UI font. -->
   <Style Selector="TextBox.mono">
     <Setter Property="FontSize" Value="{DynamicResource Fs12}" />
@@ -86,12 +98,21 @@
   </Style>
   <!-- On focus the "+" clears and the box grows with what's typed — no fixed jump. -->
   <Style Selector="TextBox.addbox:focus">
-    <Setter Property="Watermark" Value="" />
+    <Setter Property="PlaceholderText" Value="" />
     <Setter Property="HorizontalContentAlignment" Value="Left" />
   </Style>
 
+  <!-- One plain, theme-matched label — the look the public-key tip already had. Tip TEXT is kept
+       short everywhere (a name/value or a few words), never a paragraph: a tooltip that wraps into
+       prose reads as clutter. Surface/hairline/radius match the menu + card chrome. -->
   <Style Selector="ToolTip">
     <Setter Property="FontSize" Value="{DynamicResource Fs12}" />
+    <Setter Property="Background" Value="{DynamicResource MenuSurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource HairlineBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="8,4" />
+    <Setter Property="MaxWidth" Value="360" />
   </Style>
 
   <Style Selector="Button">
@@ -166,6 +187,17 @@
     <Setter Property="MinWidth" Value="18" />
     <Setter Property="CornerRadius" Value="4" />
     <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <!-- Same explicit states as the other icon buttons, so the × doesn't get Fluent's default
+       shade fighting our transition on leave. -->
+  <Style Selector="Button.chipx /template/ ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.chipx:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource FieldFillHoverBrush}" />
+  </Style>
+  <Style Selector="Button.chipx:pressed /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource FieldFillBrush}" />
   </Style>
   <Style Selector="Button.link">
     <Setter Property="Background" Value="Transparent" />
@@ -538,6 +570,13 @@
     <Setter Property="FontSize" Value="{DynamicResource Fs12}" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
+  <!-- Peer title in the collapsed detail. It already wears the SAME AccentTextBrush as the tunnel
+       name, but at the mono Fs12 the identical green rendered washed-out beside the Fs17 tunnel
+       title (less ink → duller antialiasing), which read as a different color. One size step up
+       fixes the perceived mismatch. Declared after .mono so it wins the FontSize. -->
+  <Style Selector="TextBlock.peername">
+    <Setter Property="FontSize" Value="{DynamicResource Fs14}" />
+  </Style>
   <Style Selector="TextBlock.muted">
     <Setter Property="FontSize" Value="{DynamicResource Fs12}" />
     <Setter Property="Opacity" Value="{DynamicResource DimOpacity}" />
@@ -624,7 +663,7 @@
   </Style>
   <!-- An unnamed peer's "Peer" placeholder IS the title being shown — render it exactly like
        the tunnel name (full accent), not as the dimmed input hint the template defaults to. -->
-  <Style Selector="TextBox.plainname /template/ TextBlock#PART_Watermark">
+  <Style Selector="TextBox.plainname /template/ TextBlock#PART_Placeholder">
     <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
     <Setter Property="Opacity" Value="1" />
   </Style>
@@ -638,6 +677,15 @@
   <Style Selector="WindowDrawnDecorations /template/ Button#PART_FullScreenButton">
     <Setter Property="IsVisible" Value="False" />
     <Setter Property="Width" Value="0" />
+  </Style>
+  <!-- The global "Button /template/ ContentPresenter" transition (above) also cascades onto the
+       drawn-chrome caption buttons (min/max/close), stacking on Fluent's own caption hover and
+       fighting it on pointer-leave (the jitter). Clear our transition on them so a single
+       mechanism — Fluent's built-in caption hover — drives the color, consistently in and out. -->
+  <Style Selector="WindowDrawnDecorations Button /template/ ContentPresenter">
+    <Setter Property="Transitions">
+      <Transitions />
+    </Setter>
   </Style>
 
   <Style Selector="Separator">

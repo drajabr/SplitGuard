@@ -132,7 +132,7 @@ public static class AppIcons
             Marshal.Copy(dstBytes, 0, dst.Address, dstBytes.Length);
         }
         using var ms = new MemoryStream();
-        output.Save(ms);
+        output.Save(ms, new PngBitmapEncoderOptions());
         output.Dispose();
         return ms.ToArray();
     }

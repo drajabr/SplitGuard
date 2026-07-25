@@ -117,6 +117,11 @@ public partial class MainView : UserControl
         {
             TopLevel.GetTopLevel(this)?.AddHandler(PointerPressedEvent, OnHostPointerPressed,
                 RoutingStrategies.Tunnel, handledEventsToo: true);
+            // Window move-drag: a tunnelling top-level handler sees the press before Avalonia 12's
+            // managed chrome (WindowDrawnDecorations) can swallow it, so the title strip drags again
+            // — and any empty background area drags too. OnHostPointerPressedForDrag guards the rest.
+            TopLevel.GetTopLevel(this)?.AddHandler(PointerPressedEvent, OnHostPointerPressedForDrag,
+                RoutingStrategies.Tunnel, handledEventsToo: true);
             // Hand the compositor's frame clock to the shared tween pump (both heads pass
             // through here): animation steps become one-per-presented-frame, vsync-aligned.
             Motion.AttachFrameHost(TopLevel.GetTopLevel(this));
@@ -125,14 +130,10 @@ public partial class MainView : UserControl
         DetachedFromVisualTree += (_, _) =>
         {
             TopLevel.GetTopLevel(this)?.RemoveHandler(PointerPressedEvent, OnHostPointerPressed);
+            TopLevel.GetTopLevel(this)?.RemoveHandler(PointerPressedEvent, OnHostPointerPressedForDrag);
             Motion.AttachFrameHost(null);
             DisposeScanner(); // release the camera if the QR drawer is open when the view leaves
         };
-        // Window move-drag from the title strip. The strip is opaque now (PageRoot paints it), so
-        // empty areas can't fall through to the native caption — start the drag ourselves. Only a
-        // desktop Window responds (Android's VisualRoot isn't a Window → no-op); the update button
-        // opts out so its click isn't swallowed by the drag.
-        TitleStrip.AddHandler(PointerPressedEvent, OnTitleStripPressed, RoutingStrategies.Tunnel);
         // The settings drawer's two-column/stacked shape follows the available width, and the
         // QR-scan drawer's camera stage grows with it (a fixed 240 wasted a phone's width).
         SizeChanged += (_, _) =>
@@ -143,12 +144,22 @@ public partial class MainView : UserControl
         };
     }
 
-    void OnTitleStripPressed(object? sender, PointerPressedEventArgs e)
+    // Window move-drag. Registered on the top level with tunnel routing so it sees the press
+    // before Avalonia 12's managed chrome (WindowDrawnDecorations) consumes it — the app's own
+    // title strip sits below that chrome in hit-test order, which is why title-bar drag broke.
+    // Only genuinely empty chrome/background drags: bail on any interactive control (Button and
+    // its toggles/switches, TextBox, Slider, Thumb, ScrollBar) and on a TunnelCard, so caption
+    // buttons, toggles, editing, and card drag-reorder all keep working. Desktop Window only.
+    void OnHostPointerPressedForDrag(object? sender, PointerPressedEventArgs e)
     {
-        if (VisualRoot is not Window w) return;                       // desktop only
-        if (!e.GetCurrentPoint(TitleStrip).Properties.IsLeftButtonPressed) return;
-        for (var el = e.Source as Visual; el is not null && el != TitleStrip; el = el.GetVisualParent())
-            if (el is Button) return;                                 // let the update button click through
+        if (VisualRoot is not Window w) return;                       // desktop only (Android no-op)
+        if (_openDrawer != Drawer.None) return;                       // a press with a drawer open just closes it
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        for (var el = e.Source as Visual; el is not null; el = el.GetVisualParent())
+        {
+            if (el is Button or TextBox or Slider or Thumb or ScrollBar or TunnelCard) return;
+            if (ReferenceEquals(el, BottomCluster)) return;           // the floating control strip isn't a drag surface
+        }
         if (e.ClickCount >= 2)                                        // double-click toggles maximize, like a native caption
         {
             w.WindowState = w.WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
@@ -604,8 +615,11 @@ public partial class MainView : UserControl
         if (avail <= 0) return;
         GeneralList.Measure(Size.Infinity);
         AppearanceList.Measure(Size.Infinity);
-        // 12px of hysteresis so a borderline width can't oscillate between the layouts.
-        var slack = _settingsSideBySide == true ? 0 : 12;
+        // 12px of hysteresis so a borderline width can't oscillate once a shape is set. On the
+        // FIRST pass (null) use no slack, so the opening layout reflects the true fit: a width that
+        // genuinely fits side-by-side (e.g. the minimum window width) must not open stacked only to
+        // land side-by-side after a resize out-and-back at that same width (the reported mismatch).
+        var slack = _settingsSideBySide == false ? 12 : 0;
         var cols = avail - 29; // separator + its 14px side margins
         var fits = GeneralList.DesiredSize.Width + slack <= cols * 1.3 / 2.3
                    && AppearanceList.DesiredSize.Width + slack <= cols / 2.3;

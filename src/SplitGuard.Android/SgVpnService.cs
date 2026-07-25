@@ -209,7 +209,10 @@ public class SgVpnService : Android.Net.VpnService
         var b = new Notification.Builder(this, Channel)
             .SetContentTitle($"SplitGuard · {tunnel}")!
             .SetContentText(content ?? "connected")!
-            .SetSmallIcon(Resource.Drawable.icon)!
+            // The status-bar icon must be a transparent silhouette — Android keeps only the alpha
+            // and repaints it. Handing it the launcher icon (dragon on a dark rounded square) drew
+            // a plain white SQUARE up there. drawable-*/notify.png is the dragon alone.
+            .SetSmallIcon(Resource.Drawable.notify)!
             .SetOngoing(true)!
             .SetOnlyAlertOnce(true)!   // silent in-place updates
             .SetContentIntent(open)!;

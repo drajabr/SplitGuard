@@ -770,6 +770,7 @@ public partial class TunnelCard : UserControl
             };
             var nm = Mono(name, accent);
             nm.FontWeight = Avalonia.Media.FontWeight.Bold;
+            nm.Classes.Add("peername"); // same accent as the tunnel title, one size step down
             Grid.SetColumn(nm, 0);
             grid.Children.Add(nm);
             var st = new TextBlock

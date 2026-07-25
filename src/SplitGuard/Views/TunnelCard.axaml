@@ -20,7 +20,7 @@
           </StackPanel>
           <StackPanel Name="ConnectBox" Orientation="Horizontal" VerticalAlignment="Center" IsVisible="{Binding ShowConnect}">
             <ToggleButton Classes="conn" Classes.connecting="{Binding ShowConnecting}" IsChecked="{Binding IsConnected}"
-                          ToolTip.Tip="Connect / disconnect (saves &amp; applies while editing)" />
+                          ToolTip.Tip="Connect / disconnect" />
           </StackPanel>
         </StackPanel>
         <Grid VerticalAlignment="Center" ColumnDefinitions="Auto,Auto,Auto,*">
@@ -33,7 +33,7 @@
                name while editing. Export lives down by the Save/edit row. -->
           <Button Grid.Column="1" Classes="hdr" Name="PairBtn" Margin="6,0,0,0" VerticalAlignment="Center"
                   Command="{Binding ShowPairCommand}" IsVisible="{Binding PairButtonVisible}"
-                  ToolTip.Tip="Pair — show this device's code for another device to scan">
+                  ToolTip.Tip="Show this device's code to pair">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <TextBlock Classes="glyph accentfg" Text="&#xE71B;" FontSize="{DynamicResource Fs13}" />
               <TextBlock Text="Pair" FontSize="{DynamicResource Fs12}" VerticalAlignment="Center" />
@@ -113,7 +113,7 @@
                        Text="Add a peer on the other device and scan this. It gets this device's key and routes — no private key is shared." />
             <StackPanel Spacing="4">
               <TextBlock Classes="muted" Text="Reachable at (optional)" FontSize="{DynamicResource Fs11}" />
-              <TextBox Classes="mono" Text="{Binding PairEndpoint}" Watermark="{Binding PairEndpointHint}" />
+              <TextBox Classes="mono" Text="{Binding PairEndpoint}" PlaceholderText="{Binding PairEndpointHint}" />
             </StackPanel>
             <Button Classes="hdr" Name="PairCopy" Padding="11,7" HorizontalAlignment="Left">
               <StackPanel Orientation="Horizontal" Spacing="7">
@@ -202,7 +202,7 @@
                 <!-- Revealed: the masked private key with only a regenerate button. -->
                 <TextBox Classes="mono" MinWidth="0" ScrollViewer.HorizontalScrollBarVisibility="Hidden"
                          IsVisible="{Binding EditingPrivateKey}"
-                         Text="{Binding PrivateKeyEdit}" Watermark="private key" PasswordChar="●">
+                         Text="{Binding PrivateKeyEdit}" PlaceholderText="private key" PasswordChar="●">
                   <TextBox.InnerRightContent>
                     <Button Classes="icon" Command="{Binding GenerateKeyCommand}"
                             ToolTip.Tip="Regenerate the keypair">
@@ -213,7 +213,7 @@
               </Panel>
             </DockPanel>
             <TextBox Grid.Row="0" Grid.Column="2" Classes="mono fit" MinWidth="0" Margin="10,0,0,4" VerticalAlignment="Center"
-                     Text="{Binding ListenPortText}" Watermark="port" ToolTip.Tip="Listen port (blank = automatic)" />
+                     Text="{Binding ListenPortText}" PlaceholderText="port" ToolTip.Tip="Listen port (blank = auto)" />
             <TextBlock Grid.Row="1" Grid.Column="0" Classes="lbl" Text="Addresses" MinWidth="46"
                        Margin="0,5,8,0" VerticalAlignment="Top" />
             <ItemsControl Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" ItemsSource="{Binding Addresses}" VerticalAlignment="Top">
@@ -238,7 +238,7 @@
                       </Border>
                     </DataTemplate>
                     <DataTemplate DataType="vm:AddSlot">
-                      <TextBox Classes="mono addbox" Margin="0,0,6,4" Watermark="+"
+                      <TextBox Classes="mono addbox" Margin="0,0,6,4" PlaceholderText="+"
                                Classes.error="{Binding $parent[ItemsControl].DataContext.AddressAddError}"
                                Text="{Binding $parent[ItemsControl].DataContext.NewAddress}">
                         <TextBox.KeyBindings>
@@ -268,7 +268,7 @@
               </Button>
               <!-- Scan / paste a peer's descriptor QR to add it (drop a QR on the card works too). -->
               <Button Classes="link" Name="ScanPeerBtn" Click="OnScanPeerClick" IsVisible="{Binding ShowInterfaceSection}"
-                      FontSize="{DynamicResource Fs115}" ToolTip.Tip="Scan or paste a peer's code to add it">
+                      FontSize="{DynamicResource Fs115}" ToolTip.Tip="Scan or paste a peer's code">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <TextBlock Classes="glyph accentfg" Text="&#xEE6F;" FontSize="{DynamicResource Fs12}" />
                   <TextBlock Text="Scan peer" VerticalAlignment="Center" />
@@ -287,14 +287,14 @@
           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
             <!-- Export the whole tunnel .conf (QR / copy / save) — next to the raw-editor pen. -->
             <Button Classes="quiet" Name="ExportBtn" Command="{Binding ShowExportCommand}" IsVisible="{Binding CanExport}"
-                    ToolTip.Tip="Export tunnel configuration (QR / copy / save)">
+                    ToolTip.Tip="Export configuration">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <TextBlock Classes="glyph accentfg" Text="&#xE72D;" />
                 <TextBlock Text="Export" VerticalAlignment="Center" />
               </StackPanel>
             </Button>
             <Button Classes="quiet" Command="{Binding ToggleTextModeCommand}" IsVisible="{Binding ShowInterfaceSection}"
-                    ToolTip.Tip="Toggle raw config editing (Ctrl+E)">
+                    ToolTip.Tip="Raw config editing (Ctrl+E)">
               <Panel>
                 <TextBlock Classes="glyph" Text="&#xE70F;" IsVisible="{Binding !IsTextMode}" />
                 <TextBlock Classes="glyph" Text="&#xE80A;" IsVisible="{Binding IsTextMode}" />

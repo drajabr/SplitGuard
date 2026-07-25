@@ -12,14 +12,15 @@ public class NrptService : ISplitDnsService
 {
     public const string Tag = "WG-SPLIT-DNS";
     const string CatchAllId = "WGSDNS|catchall";
-    // The NRPT CIM model lives in the DNS-client namespace: PS_DnsClientNrptRule carries
-    // the static cmdlet methods (Add), DnsClientNrptRule is the instance class the rules
-    // enumerate/delete through. (The old root\StandardCimv2 / MSFT_DNSClientNrptRule pair
-    // doesn't exist, so the probe always failed and EVERY operation silently ran through
-    // a spawned powershell.exe — seconds per rule change.)
+    // The NRPT CIM model lives in the DNS-client namespace. PS_DnsClientNrptRule is the
+    // cmdlet-method class (Add/Get/Remove/Set) that mirrors the *-DnsClientNrptRule cmdlets.
+    // NRPT rules are NOT queryable as plain instances of DnsClientNrptRule — "SELECT * FROM
+    // DnsClientNrptRule" returns nothing on Windows, which silently turned Get/Remove into
+    // no-ops while Add kept working (rules then piled up unbounded — the 7550-rule incident).
+    // So ALL operations go through PS_DnsClientNrptRule's methods: Get enumerates and returns
+    // each rule's real Name GUID; Remove deletes by that GUID.
     const string CimNamespace = @"root\Microsoft\Windows\DNS";
     const string CimCmdletClass = "PS_DnsClientNrptRule";
-    const string CimRuleClass = "DnsClientNrptRule";
 
     [DllImport("dnsapi")] static extern bool DnsFlushResolverCache();
 
@@ -127,11 +128,15 @@ public class NrptService : ISplitDnsService
         }
     }
 
+    // Bulk purge of every WG-SPLIT-DNS rule — the upgrade/crash-recovery path that must clear a
+    // runaway backlog (thousands of strays) quickly and completely. Delegated to the backend so it
+    // is one enumeration + remove-each (O(n)), per-rule isolated and best-effort: unlike the
+    // targeted Remove(id), a single stubborn rule must NOT abort the sweep or the backlog persists.
     public void RemoveAllTagged()
     {
         lock (_gate)
         {
-            foreach (var rule in Backend.GetTagged()) Backend.Remove(rule.Id);
+            Backend.RemoveAllTagged();
             Flush();
         }
     }
@@ -159,6 +164,7 @@ public class NrptService : ISplitDnsService
     {
         void Add(string id, string[] namespaces, string[] servers);
         void Remove(string id);
+        void RemoveAllTagged();
         List<NrptRule> GetTagged();
     }
 
@@ -166,6 +172,7 @@ public class NrptService : ISplitDnsService
     {
         public void Add(string id, string[] namespaces, string[] servers) { }
         public void Remove(string id) { }
+        public void RemoveAllTagged() { }
         public List<NrptRule> GetTagged() => new();
     }
 
@@ -191,17 +198,53 @@ public class NrptService : ISplitDnsService
 
         public void Remove(string id)
         {
-            foreach (var instance in Query().Where(i => Prop<string>(i, "DisplayName") == id))
-                _session.DeleteInstance(instance);
-            // A removal that silently leaves instances behind turns every retry loop above
-            // us into an ADD loop — rules then accumulate without bound (the 2520-rules
-            // incident). Verify the store actually shed the id and fail loudly if not.
-            if (Query().Any(i => Prop<string>(i, "DisplayName") == id))
+            // Rules that share a DisplayName pile up as separate instances, each with its own
+            // Name GUID — the store's real primary key. Delete every match by GUID.
+            foreach (var inst in Enumerate().Where(i => Prop<string>(i, "DisplayName") == id))
+            {
+                var name = Prop<string>(inst, "Name");
+                if (string.IsNullOrEmpty(name)) continue;
+                var p = new CimMethodParametersCollection
+                {
+                    CimMethodParameter.Create("Name", name, CimType.String, CimFlags.None),
+                    CimMethodParameter.Create("Force", true, CimType.Boolean, CimFlags.None),
+                };
+                var r = _session.InvokeMethod(CimNamespace, CimCmdletClass, "Remove", p);
+                if (r?.ReturnValue?.Value is uint rv && rv != 0)
+                    throw new InvalidOperationException($"NRPT Remove returned {rv} for {id} ({name})");
+            }
+            // A removal that silently leaves instances behind turns every retry loop above us
+            // into an ADD loop — rules then accumulate without bound (the 7550-rule incident).
+            // Verify the id is actually gone and fail loudly if not.
+            if (Enumerate().Any(i => Prop<string>(i, "DisplayName") == id))
                 throw new InvalidOperationException($"NRPT rule {id} survived removal");
         }
 
+        // One enumeration, then delete every tagged rule by its GUID — O(n), not the O(n²) of
+        // looping Remove(id) (which re-enumerates twice per call). Per-rule isolated and does NOT
+        // verify/throw: this is the runaway-backlog purge, so it must drain as much as it can even
+        // if a stray refuses to go, rather than abort on the first one.
+        public void RemoveAllTagged()
+        {
+            foreach (var inst in Enumerate().Where(i => Prop<string>(i, "Comment") == NrptService.Tag))
+            {
+                var name = Prop<string>(inst, "Name");
+                if (string.IsNullOrEmpty(name)) continue;
+                try
+                {
+                    var p = new CimMethodParametersCollection
+                    {
+                        CimMethodParameter.Create("Name", name, CimType.String, CimFlags.None),
+                        CimMethodParameter.Create("Force", true, CimType.Boolean, CimFlags.None),
+                    };
+                    _session.InvokeMethod(CimNamespace, CimCmdletClass, "Remove", p);
+                }
+                catch { }
+            }
+        }
+
         public List<NrptRule> GetTagged() =>
-            Query()
+            Enumerate()
                 .Where(i => Prop<string>(i, "Comment") == NrptService.Tag)
                 .Select(i => new NrptRule(
                     Prop<string>(i, "DisplayName") ?? "",
@@ -209,8 +252,22 @@ public class NrptService : ISplitDnsService
                     Prop<string[]>(i, "NameServers") ?? Array.Empty<string>()))
                 .ToList();
 
-        List<CimInstance> Query() =>
-            _session.QueryInstances(CimNamespace, "WQL", $"SELECT * FROM {CimRuleClass}").ToList();
+        // Enumerate via the cmdlet-method Get (mirrors Get-DnsClientNrptRule): a plain WQL
+        // "SELECT * FROM DnsClientNrptRule" returns nothing on Windows. Each returned instance
+        // carries Name (GUID), DisplayName, Comment, Namespace, NameServers.
+        List<CimInstance> Enumerate()
+        {
+            var result = _session.InvokeMethod(CimNamespace, CimCmdletClass, "Get", new CimMethodParametersCollection());
+            if (result is null) return new();
+            object? output = null;
+            try { output = result.OutParameters["cmdletOutput"]?.Value; } catch { }
+            return output switch
+            {
+                IEnumerable<CimInstance> many => many.ToList(),
+                CimInstance one => new List<CimInstance> { one },
+                _ => new List<CimInstance>(),
+            };
+        }
 
         static T? Prop<T>(CimInstance instance, string name)
         {
@@ -235,6 +292,11 @@ public class NrptService : ISplitDnsService
             Run($"Get-DnsClientNrptRule | Where-Object {{ $_.Comment -eq {Quote(NrptService.Tag)} -and $_.DisplayName -eq {Quote(id)} }} | Remove-DnsClientNrptRule -Force; " +
                 $"if (Get-DnsClientNrptRule | Where-Object {{ $_.Comment -eq {Quote(NrptService.Tag)} -and $_.DisplayName -eq {Quote(id)} }}) {{ exit 1 }}");
         }
+
+        // Bulk purge in a single pipeline — one powershell.exe drains the whole backlog at once,
+        // best-effort (no survivor check): the upgrade/recovery sweep must not abort on a stray.
+        public void RemoveAllTagged() =>
+            Run($"Get-DnsClientNrptRule | Where-Object Comment -eq {Quote(NrptService.Tag)} | Remove-DnsClientNrptRule -Force");
 
         public List<NrptRule> GetTagged()
         {

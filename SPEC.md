@@ -4,8 +4,8 @@ Complete technical spec. Every decision is final — implement, don't research a
 
 ## Project
 
-`src/SplitGuard/SplitGuard.csproj`: `net8.0-windows`, `WinExe`, nullable, unsafe allowed, `ApplicationManifest=app.manifest`. Publish: `-r win-x64 --self-contained -p:PublishSingleFile=true`.
-Packages: `Avalonia` + `Avalonia.Desktop` + `Avalonia.Themes.Fluent` 11.2.*, `Microsoft.Management.Infrastructure` 3.0.*, `System.Security.Cryptography.ProtectedData` 8.0.*, `System.Threading.AccessControl` 8.0.*.
+Three projects: `src/SplitGuard/SplitGuard.csproj` is the shared UI/logic library (`net10.0`, assembly `SplitGuard.Core`, root namespace `SplitGuard`); `src/SplitGuard.Desktop/SplitGuard.Desktop.csproj` is the Windows head (`net10.0-windows10.0.19041.0` — windows10.0.19041 for the WinRT webcam QR scanner — `WinExe`, nullable, unsafe allowed, `ApplicationManifest=app.manifest`, publish `-r win-x64 --self-contained -p:PublishSingleFile=true`); `src/SplitGuard.Android` is the Android head (`net10.0-android36.0`). The repo pins the SDK in `global.json` (10.0.100+), and `build.ps1` requires an SDK >= 10.
+Packages: `Avalonia` + `Avalonia.Desktop` + `Avalonia.Themes.Fluent` 12.1.*, `Avalonia.AvaloniaEdit` 12.0.*, `ZXing.Net` 0.16.* (shared), `Microsoft.Management.Infrastructure` 3.0.*, `System.Security.Cryptography.ProtectedData` 8.0.*, `System.Threading.AccessControl` 8.0.*.
 `app.manifest`: `asInvoker` + Win10/11 supportedOS GUIDs. The app still always runs elevated: `Program.Main` redirects a non-elevated start through the trigger-less `SplitGuardLaunch` scheduled task (`/RL HIGHEST`, registered on every elevated start while `UiPrefs.SkipUacLaunch` — so no UAC prompt after the first run), falling back to a `runas` relaunch. The show event carries an explicit ACL (Authenticated Users modify) so the non-elevated stub can surface an already-running instance. `--cleanup` (uninstaller hook) removes all tagged NRPT rules, the catch-all, and both scheduled tasks. The rejected alternative — a named-pipe privileged helper (old `skip-UAC` branch) — still prompted to start the helper and exposed an unauthenticated pipe.
 
 ## Data model (`Models/`)

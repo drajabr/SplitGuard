@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
+using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using SplitGuard.Services;
 using SplitGuard.ViewModels;
@@ -30,7 +31,7 @@ public partial class MainWindow : Window, IDialogs
                 var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SplitGuard");
                 Directory.CreateDirectory(dir);
                 var iconPath = Path.Combine(dir, "notify.png");
-                icons.Logo.Save(iconPath);
+                icons.Logo.Save(iconPath, new PngBitmapEncoderOptions());
                 NotificationService.Register(iconPath);
             }
             catch { }

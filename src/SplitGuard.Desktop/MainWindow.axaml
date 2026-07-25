@@ -9,7 +9,7 @@
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaTitleBarHeightHint="38"
         FontFamily="Segoe UI Variable Text, Segoe UI"
-        RenderOptions.TextRenderingMode="SubpixelAntialias"
+        TextOptions.TextRenderingMode="SubpixelAntialias"
         DragDrop.AllowDrop="True">
   <!-- The entire UI is the shared MainView; this window is only the desktop shell:
        native chrome, drag-drop, keyboard shortcuts, bounds persistence, clipboard/toasts. -->

@@ -1,0 +1,31 @@
+<Project>
+  <!-- This repo lives inside a OneDrive-synced folder. OneDrive grabs handles on build folders
+       as they are created, so MSBuild's own cleanup of its intermediates fails mid-build with
+       "error XARDF7024: Access to the path '...\obj\Release\net10.0-android36.0\stamp\' is
+       denied" (also seen on obj\...\generated and obj\...\android\assets). Retrying the delete
+       cannot fix it: the handle is taken during the very build that then tries to clean up.
+
+       Build output is pure derived data that nothing outside the build reads, so move BOTH obj\
+       and bin\ out of the synced tree. bin\ has to move too: OneDrive starts uploading the fresh
+       50 MB APK the moment it lands in bin\Release and the build's own cleanup then fails with
+       "The process cannot access the file 'energy.saba.splitguard.apk' because it is being used
+       by another process".
+
+       Consumers stay happy: build.ps1 publishes with an explicit -o, and the UI driver matches the
+       dev instance on "bin\Debug" which the redirected path still contains. Set the properties
+       explicitly (e.g. on CI) to override. -->
+  <PropertyGroup Condition="'$(BaseIntermediateOutputPath)' == '' AND '$(LOCALAPPDATA)' != ''">
+    <BaseIntermediateOutputPath>$(LOCALAPPDATA)\SplitGuardBuild\$(MSBuildProjectName)\obj\</BaseIntermediateOutputPath>
+    <MSBuildProjectExtensionsPath>$(BaseIntermediateOutputPath)</MSBuildProjectExtensionsPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(BaseOutputPath)' == '' AND '$(LOCALAPPDATA)' != ''">
+    <BaseOutputPath>$(LOCALAPPDATA)\SplitGuardBuild\$(MSBuildProjectName)\bin\</BaseOutputPath>
+  </PropertyGroup>
+  <!-- The SDK's default source glob only excludes the CURRENT intermediate path. With obj\
+       redirected above, any leftover in-repo obj\ (from a build before this file existed, or a
+       checkout that sets BaseIntermediateOutputPath) would get its generated AssemblyInfo.cs
+       compiled — "error CS0579: Duplicate ... attribute". Exclude both trees explicitly. -->
+  <PropertyGroup>
+    <DefaultItemExcludes>$(DefaultItemExcludes);obj\**;bin\**</DefaultItemExcludes>
+  </PropertyGroup>
+</Project>

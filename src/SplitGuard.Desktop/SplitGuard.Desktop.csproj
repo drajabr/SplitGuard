@@ -2,7 +2,7 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <!-- windows10.0.19041 for WinRT (Windows.Media.Capture) — the desktop webcam QR scanner. -->
-    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -25,7 +25,9 @@
     <PackageReference Include="Avalonia.Desktop" Version="12.1.0" />
     <PackageReference Include="Microsoft.Management.Infrastructure" Version="3.0.0" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
-    <PackageReference Include="System.Threading.AccessControl" Version="8.0.0" />
+    <!-- System.Threading.AccessControl (EventWaitHandleAcl, used for the ACL'd show event in
+         Program.cs) ships in the net10.0-windows framework, so an explicit PackageReference is
+         redundant — NuGet on .NET 10 flags it as NU1510. -->
   </ItemGroup>
 
   <Target Name="CopyWireGuardDll" AfterTargets="Build;Publish">

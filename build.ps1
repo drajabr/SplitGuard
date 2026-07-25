@@ -26,6 +26,12 @@ trap {
     Complete-Build 1
 }
 
+# An MSBuild -p: value must never end in a path separator. PowerShell hands the argument to the
+# native host as -p:Key=C:\dir\ and the trailing "\" escapes the closing quote, so the NEXT
+# argument is swallowed into the value — a trailing-slash JAVA_HOME literally produced
+# JavaSdkDirectory="C:\...\jdk-17 -v m" and failed the build. Strip trailing separators.
+function ConvertTo-MsBuildPath([string] $p) { if ($p) { $p.TrimEnd('\', '/') } else { $p } }
+
 $WgNtVersion = "0.10.1"
 $version = (Get-Content (Join-Path $root "VERSION")).Trim()
 
@@ -124,6 +130,19 @@ if (-not $SkipAndroid) {
         Write-Warning "Android workload not installed - skipping APK. Install with: dotnet workload install android"
     }
     else {
+        # JDK 17 (skip a stray JDK 21) is resolved FIRST: both the APK publish and the SDK
+        # auto-install below need it. Passed explicitly when found, else MSBuild auto-detects.
+        $jdk = @(
+            $env:JAVA_HOME,
+            "$env:ProgramFiles\Microsoft\jdk-17*",
+            "$env:ProgramFiles\Eclipse Adoptium\jdk-17*",
+            "$env:ProgramFiles\Java\jdk-17*",
+            "$env:ProgramFiles\Android\Android Studio\jbr"
+        ) | Where-Object { $_ } | ForEach-Object { Get-Item $_ -ErrorAction SilentlyContinue } |
+            Where-Object { $_ -and (Test-Path (Join-Path $_.FullName "bin\java.exe")) } | Select-Object -First 1
+        $jdkPath = if ($jdk) { ConvertTo-MsBuildPath $jdk.FullName } else { $null }
+        if ($jdkPath) { Write-Host "  JDK: $jdkPath" }
+
         # Locate the Android SDK. MSBuild's own auto-detect is unreliable across shells
         # (env vars, elevation), so resolve it explicitly and validate the candidate is a
         # real SDK (has platform-tools / cmdline-tools / platforms). Checks env vars, the
@@ -139,37 +158,69 @@ if (-not $SkipAndroid) {
             $c = Get-Command $t -ErrorAction SilentlyContinue
             if ($c) { $sdkCandidates += (Split-Path (Split-Path $c.Source -Parent) -Parent) }
         }
-        $sdk = $sdkCandidates | Where-Object {
-            $_ -and (Test-Path $_) -and (
-                (Test-Path (Join-Path $_ 'platform-tools')) -or
-                (Test-Path (Join-Path $_ 'cmdline-tools')) -or
-                (Test-Path (Join-Path $_ 'platforms'))) } | Select-Object -First 1
+        function Resolve-AndroidSdk([string[]] $candidates) {
+            $candidates | Where-Object {
+                $_ -and (Test-Path $_) -and (
+                    (Test-Path (Join-Path $_ 'platform-tools')) -or
+                    (Test-Path (Join-Path $_ 'cmdline-tools')) -or
+                    (Test-Path (Join-Path $_ 'platforms'))) } | Select-Object -First 1
+        }
+        $sdk = Resolve-AndroidSdk $sdkCandidates
+
+        # Nothing usable: provision it instead of giving up. InstallAndroidDependencies is the
+        # official .NET-for-Android target — it downloads the platform, build-tools and
+        # platform-tools into the target dir and accepts the SDK licenses. One-time; afterwards
+        # discovery finds it like any Android Studio install. Print what was checked either way,
+        # so a discovery miss on a working machine is diagnosable instead of silent.
+        if (-not $sdk) {
+            # Report WHICH check failed per candidate — "not found" alone can't distinguish a
+            # missing directory from a present-but-incomplete SDK (or a profile/elevation mismatch
+            # that changes %LOCALAPPDATA% out from under us).
+            Write-Warning "Android SDK not found. Checked:"
+            foreach ($c in ($sdkCandidates | Where-Object { $_ } | Select-Object -Unique)) {
+                $e = Test-Path $c
+                $flags = if ($e) {
+                    "platform-tools=$(Test-Path (Join-Path $c 'platform-tools')) platforms=$(Test-Path (Join-Path $c 'platforms')) cmdline-tools=$(Test-Path (Join-Path $c 'cmdline-tools'))"
+                } else { "directory missing" }
+                Write-Warning "    $c  ->  $flags"
+            }
+            $sdkTarget = ConvertTo-MsBuildPath (Join-Path $env:LOCALAPPDATA "Android\Sdk")
+            Write-Host "Installing the Android SDK into $sdkTarget (one-time, several hundred MB - this takes a while)..."
+            $depProps = @("-p:AndroidSdkDirectory=$sdkTarget", "-p:AcceptAndroidSDKLicenses=true")
+            if ($jdkPath) { $depProps += "-p:JavaSdkDirectory=$jdkPath" }
+            & $dotnetExe build $androidProj -t:InstallAndroidDependencies @depProps -v m
+            if ($LASTEXITCODE -ne 0) { Write-Warning "  Android SDK install failed (exit $LASTEXITCODE)." }
+            $sdk = Resolve-AndroidSdk (@($sdkTarget) + $sdkCandidates)
+            # Last resort: a candidate directory that EXISTS but failed the subdirectory probe is
+            # still worth handing to MSBuild — its own resolver is the real authority, and its
+            # error message is far more specific than skipping the APK silently.
+            if (-not $sdk) {
+                $sdk = @($sdkTarget) + $sdkCandidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+                if ($sdk) { Write-Warning "  Using $sdk anyway and letting MSBuild resolve it." }
+            }
+        }
 
         if (-not $sdk) {
-            Write-Warning "Android SDK not found - skipping APK (the Windows installer is still in $dist)."
+            Write-Warning "Android SDK still unavailable - skipping APK (the Windows installer is still in $dist)."
             Write-Warning "  Set ANDROID_HOME to your SDK path (e.g. %LOCALAPPDATA%\Android\Sdk), or install it:"
             Write-Warning "  https://aka.ms/dotnet-android-install-sdk"
         }
         else {
+            $sdk = ConvertTo-MsBuildPath $sdk
             Write-Host "Building Android APK (SDK: $sdk)..."
             $androidProps = @("-p:AndroidSdkDirectory=$sdk")
-
-            # JDK 17 (skip a stray JDK 21); pass it when found, else let MSBuild auto-detect.
-            $jdk = @(
-                $env:JAVA_HOME,
-                "$env:ProgramFiles\Microsoft\jdk-17*",
-                "$env:ProgramFiles\Eclipse Adoptium\jdk-17*",
-                "$env:ProgramFiles\Java\jdk-17*",
-                "$env:ProgramFiles\Android\Android Studio\jbr"
-            ) | Where-Object { $_ } | ForEach-Object { Get-Item $_ -ErrorAction SilentlyContinue } |
-                Where-Object { $_ -and (Test-Path (Join-Path $_.FullName "bin\java.exe")) } | Select-Object -First 1
-            if ($jdk) { $androidProps += "-p:JavaSdkDirectory=$($jdk.FullName)"; Write-Host "  JDK: $($jdk.FullName)" }
+            if ($jdkPath) { $androidProps += "-p:JavaSdkDirectory=$jdkPath" }
 
             # OneDrive can momentarily lock files under obj\ or bin\ mid-build (error XARDF7024),
             # failing the signed Release publish. Clean the Android intermediates with a
             # lock-tolerant delete, drop stale build-server file handles, and retry a few times.
-            $abin = Join-Path $root "src\SplitGuard.Android\bin\Release"
-            $aobj = Join-Path $root "src\SplitGuard.Android\obj\Release"
+            # Publish to an explicit output dir OUTSIDE the OneDrive-synced repo (Directory.Build.props
+            # redirects bin\ and obj\ for the same reason: OneDrive starts uploading fresh build output
+            # and the build's own cleanup then dies with XARDF7024). Globbing the APK from here also
+            # decouples this from the project's bin\ layout and its TFM.
+            $abin = Join-Path $env:LOCALAPPDATA "SplitGuardBuild\apk-publish"
+            $aobj = Join-Path $env:LOCALAPPDATA "SplitGuardBuild\SplitGuard.Android\obj\Release"
+            $androidProps += "-o", $abin
             function Remove-Locked([string]$p) {
                 for ($i = 0; $i -lt 6 -and (Test-Path $p); $i++) {
                     try { Remove-Item -Recurse -Force $p -ErrorAction Stop }
@@ -180,13 +231,13 @@ if (-not $SkipAndroid) {
 
             $code = 1
             foreach ($attempt in 1..3) {
+                # Full clean of the Android output+intermediates every attempt. These now live
+                # outside OneDrive so deleting them is cheap and lock-free, and a Release publish
+                # re-AOTs anyway — while a STALE intermediate after any path/TFM change crashes the
+                # AOT compiler outright ("Assertion ... condition `corlib' not met"). Determinism
+                # beats incremental here: this is the release build.
                 Remove-Locked $abin
-                # Per-TFM intermediates dir (netX.Y-androidZZ.0) — resolved by glob so a TFM bump
-                # can't silently leave this pointing at a stale path.
-                Get-ChildItem $aobj -Directory -Filter "net*-android*" -ErrorAction SilentlyContinue | ForEach-Object {
-                    if ($attempt -eq 1) { Remove-Locked (Join-Path $_.FullName "generated") }
-                    else { Remove-Locked $_.FullName }   # fuller clean once a retry is needed
-                }
+                Remove-Locked $aobj
                 & $dotnetExe publish $androidProj -c Release @androidProps -v m
                 $code = $LASTEXITCODE
                 if ($code -eq 0) { break }
