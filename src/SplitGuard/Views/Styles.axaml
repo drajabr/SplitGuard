@@ -624,13 +624,34 @@
     <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
   </Style>
 
-  <!-- Header update button: dim by default, accented + full opacity once an update is ready. -->
+  <!-- Header update button: dim by default, accented + full opacity once an update is ready.
+       The glyph and its label own the fade themselves (one transition, one driver) so hovering
+       in and out is symmetric in EVERY update state — dim idle, checking, downloading, ready. -->
   <Style Selector="TextBlock.updicon">
     <Setter Property="Opacity" Value="0.55" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <DoubleTransition Property="Opacity" Duration="{x:Static v:Motion.Fast}" Easing="{x:Static v:Motion.Standard}" />
+        <BrushTransition Property="Foreground" Duration="{x:Static v:Motion.Fast}" Easing="{x:Static v:Motion.Standard}" />
+      </Transitions>
+    </Setter>
+  </Style>
+  <!-- Hover lifts the dim in any state; .hot (update ready) is already full-strength accent. -->
+  <Style Selector="Button.upd:pointerover TextBlock.updicon">
+    <Setter Property="Opacity" Value="1" />
   </Style>
   <Style Selector="TextBlock.updicon.hot">
     <Setter Property="Opacity" Value="1" />
     <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+  </Style>
+  <!-- Fluent's own Button theme repaints the presenter's Foreground on pointerover, which fought
+       the fade above and made LEAVE stutter (the same two-driver bug as the caption buttons).
+       Pin it to the button's inherited color in both states so only our transition animates. -->
+  <Style Selector="Button.upd:pointerover /template/ ContentPresenter">
+    <Setter Property="Foreground" Value="{Binding $parent[Button].Foreground}" />
+  </Style>
+  <Style Selector="Button.upd:pressed /template/ ContentPresenter">
+    <Setter Property="Foreground" Value="{Binding $parent[Button].Foreground}" />
   </Style>
 
   <Style Selector="TextBlock.synip">

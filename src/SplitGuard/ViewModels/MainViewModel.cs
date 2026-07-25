@@ -147,6 +147,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
     {
         _update = s;
         Raise(nameof(UpdateGlyph));
+        Raise(nameof(UpdateLabel));
         Raise(nameof(UpdateTooltip));
         Raise(nameof(UpdateHighlight));
         Raise(nameof(UpdateVisible));
@@ -163,6 +164,18 @@ public class MainViewModel : ObservableObject, ITunnelHost
         UpdateStatus.UpToDate => "",     // CheckMark
         UpdateStatus.Error => "",        // Error
         _ => "",                          // Idle: same update glyph, dimmed
+    };
+
+    // Short word beside the glyph — the glyph alone was a guess ("what does this arrow do?").
+    // Kept to one or two words so the header never reflows as the state changes.
+    public string UpdateLabel => _update switch
+    {
+        UpdateStatus.Checking => "Checking…",
+        UpdateStatus.Downloading => $"{_downloadPct:P0}",
+        UpdateStatus.Ready => Platform.SupportsInstallerUpdate ? "Install" : "Update",
+        UpdateStatus.UpToDate => "Up to date",
+        UpdateStatus.Error => "Retry",
+        _ => "Check",
     };
 
     public string UpdateTooltip => _update switch
@@ -234,7 +247,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
             var progress = new Progress<double>(p => Dispatcher.UIThread.Post(() =>
             {
                 _downloadPct = p;
-                if (_update == UpdateStatus.Downloading) Raise(nameof(UpdateTooltip));
+                if (_update == UpdateStatus.Downloading) { Raise(nameof(UpdateTooltip)); Raise(nameof(UpdateLabel)); }
             }));
             _installerPath = await UpdateService.DownloadAsync(info, progress);
             // Stamp only after the download landed: a mid-stream failure must not arm the
@@ -382,7 +395,9 @@ public class MainViewModel : ObservableObject, ITunnelHost
         else
         {
             // UI review harness: fake some live stats so the collapsed status lines render,
-            // then open the first tunnel's edit layout.
+            // then open the first tunnel's edit layout. An "update ready" state too — the header
+            // update affordance is hidden while idle, so it was unreviewable in the harness.
+            SetUpdate(UpdateStatus.Ready);
             foreach (var t in Tunnels.Where(t => !t.IsCustom && !t.IsExternal))
             {
                 t.SetConnectedState(true);

@@ -150,9 +150,17 @@ public partial class MainView : UserControl
     // Only genuinely empty chrome/background drags: bail on any interactive control (Button and
     // its toggles/switches, TextBox, Slider, Thumb, ScrollBar) and on a TunnelCard, so caption
     // buttons, toggles, editing, and card drag-reorder all keep working. Desktop Window only.
+    // Avalonia 12 no longer makes the Window the visual root — a TopLevelHost wraps the content,
+    // so `VisualRoot as Window` is ALWAYS null on desktop and every guard written that way
+    // silently disables itself (which is exactly why title-bar drag died in the 12 migration).
+    // GetTopLevel still resolves to the Window; the ancestor walk is a belt-and-braces fallback.
+    Window? ResolveWindow() =>
+        TopLevel.GetTopLevel(this) as Window
+        ?? this.GetVisualAncestors().OfType<Window>().FirstOrDefault();
+
     void OnHostPointerPressedForDrag(object? sender, PointerPressedEventArgs e)
     {
-        if (VisualRoot is not Window w) return;                       // desktop only (Android no-op)
+        if (ResolveWindow() is not { } w) return;                      // desktop only (Android no-op)
         if (_openDrawer != Drawer.None) return;                       // a press with a drawer open just closes it
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
         for (var el = e.Source as Visual; el is not null; el = el.GetVisualParent())

@@ -22,10 +22,15 @@
                      VerticalAlignment="Bottom" Margin="0,0,0,3" IsHitTestVisible="False" />
           <!-- Update affordance: hidden until a check/download is happening or an update is
                ready (accent glyph). First click downloads, a second installs. -->
-          <Button Classes="hdr" Name="UpdateButton" Click="OnUpdateClick" VerticalAlignment="Center"
+          <Button Classes="hdr upd" Name="UpdateButton" Click="OnUpdateClick" VerticalAlignment="Center"
                   IsVisible="{Binding UpdateVisible}" ToolTip.Tip="{Binding UpdateTooltip}">
-            <TextBlock Classes="glyph updicon" Classes.hot="{Binding UpdateHighlight}"
-                       Text="{Binding UpdateGlyph}" FontSize="{DynamicResource Fs12}" />
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Classes="glyph updicon" Classes.hot="{Binding UpdateHighlight}"
+                         Text="{Binding UpdateGlyph}" FontSize="{DynamicResource Fs12}" />
+              <TextBlock Classes="updicon" Classes.hot="{Binding UpdateHighlight}"
+                         Text="{Binding UpdateLabel}" FontSize="{DynamicResource Fs12}"
+                         VerticalAlignment="Center" />
+            </StackPanel>
           </Button>
         </StackPanel>
       </Border>
