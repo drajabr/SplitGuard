@@ -14,11 +14,11 @@
        Consumers stay happy: build.ps1 publishes with an explicit -o, and the UI driver matches the
        dev instance on "bin\Debug" which the redirected path still contains. Set the properties
        explicitly (e.g. on CI) to override. -->
-  <PropertyGroup Condition="'$(BaseIntermediateOutputPath)' == '' AND '$(LOCALAPPDATA)' != ''">
+  <PropertyGroup Condition="'$(OS)' == 'Windows_NT' AND '$(LOCALAPPDATA)' != '' AND '$(BaseIntermediateOutputPath)' == ''">
     <BaseIntermediateOutputPath>$(LOCALAPPDATA)\SplitGuardBuild\$(MSBuildProjectName)\obj\</BaseIntermediateOutputPath>
     <MSBuildProjectExtensionsPath>$(BaseIntermediateOutputPath)</MSBuildProjectExtensionsPath>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(BaseOutputPath)' == '' AND '$(LOCALAPPDATA)' != ''">
+  <PropertyGroup Condition="'$(OS)' == 'Windows_NT' AND '$(LOCALAPPDATA)' != '' AND '$(BaseOutputPath)' == ''">
     <BaseOutputPath>$(LOCALAPPDATA)\SplitGuardBuild\$(MSBuildProjectName)\bin\</BaseOutputPath>
   </PropertyGroup>
   <!-- The SDK's default source glob only excludes the CURRENT intermediate path. With obj\
@@ -26,6 +26,6 @@
        checkout that sets BaseIntermediateOutputPath) would get its generated AssemblyInfo.cs
        compiled — "error CS0579: Duplicate ... attribute". Exclude both trees explicitly. -->
   <PropertyGroup>
-    <DefaultItemExcludes>$(DefaultItemExcludes);obj\**;bin\**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);obj/**;bin/**</DefaultItemExcludes>
   </PropertyGroup>
 </Project>

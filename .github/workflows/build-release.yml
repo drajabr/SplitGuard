@@ -48,10 +48,20 @@ jobs:
         run: dotnet workload install android
       - name: Build signed APK
         run: |
+          set -euo pipefail
           VER=$(tr -d '[:space:]' < VERSION)
-          dotnet publish src/SplitGuard.Android/SplitGuard.Android.csproj -c Release
-          APK=$(find src/SplitGuard.Android/bin/Release -name '*-Signed.apk' | head -1)
+          # Publish to an explicit output dir and glob from THERE: relying on the project's
+          # bin\ layout broke once the repo started redirecting build output, and a failed
+          # glob silently became `cp "" ...` — an exit 1 with no error to read.
+          dotnet publish src/SplitGuard.Android/SplitGuard.Android.csproj -c Release -o artifacts/apk
+          APK=$(find artifacts/apk -name '*-Signed.apk' | head -1)
+          if [ -z "$APK" ]; then
+            echo "::error::No *-Signed.apk under artifacts/apk. Contents:"
+            find artifacts -name '*.apk' -o -name '*.aab' | sed 's/^/  /'
+            exit 1
+          fi
           cp "$APK" "SplitGuard-$VER.apk"
+          ls -l "SplitGuard-$VER.apk"
       - uses: actions/upload-artifact@v4
         with:
           name: SplitGuard-APK
