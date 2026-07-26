@@ -79,6 +79,8 @@ public partial class MainView : UserControl
     };
 
     int _themeIndex;
+    // "auto" has two flavours (see ApplyTheme): false = white/black, true = light/graphite.
+    bool _autoSoft;
     int _accentIndex;
     int _fontIndex;
     int _zoomIndex;
@@ -253,6 +255,7 @@ public partial class MainView : UserControl
     {
         prefs.Zoom = MigrateZoomName(prefs.Zoom);
         _themeIndex = Math.Max(0, Array.FindIndex(Palettes, p => p.Name == prefs.Theme));
+        _autoSoft = prefs.AutoSoft;
         _accentIndex = Math.Max(0, Array.FindIndex(AccentSteps, a => a.Name == prefs.Accent));
         _fontIndex = Math.Max(0, Array.FindIndex(FontSteps, s => s.Name == prefs.Font));
         _zoomIndex = Math.Max(0, Array.FindIndex(ZoomSteps, s => s.Name == prefs.Zoom));
@@ -304,7 +307,11 @@ public partial class MainView : UserControl
         if (t.Variant == ThemeVariant.Default)
         {
             var osLight = ActualThemeVariant == ThemeVariant.Light;
-            t = Palettes.First(p => p.Name == (osLight ? "white" : "black")) with { Variant = ThemeVariant.Default };
+            // Two auto flavours: the crisp pair (white/black) or the soft pair (light/graphite).
+            var pair = _autoSoft
+                ? (osLight ? "light" : "graphite")
+                : (osLight ? "white" : "black");
+            t = Palettes.First(p => p.Name == pair) with { Variant = ThemeVariant.Default };
         }
         var resources = Avalonia.Application.Current!.Resources;
 
@@ -614,25 +621,24 @@ public partial class MainView : UserControl
                  + region.Padding.Top + region.Padding.Bottom
                  + region.BorderThickness.Top + region.BorderThickness.Bottom;
         }
-        // The vertical margins ride the height animation (closed = zero footprint, open = 8px
-        // gaps), so the open drawer always hugs the bar and a closed one leaves no dead space.
-        var m0 = region.Margin.Top;
+        // The 8px gaps (closed = zero footprint, open = hugging the bar) are set ONCE, up front,
+        // instead of riding the tween. A Margin write invalidates the PARENT's layout, so animating
+        // it made every frame re-measure the whole bottom cluster on top of this region — visible
+        // as sub-30fps drawer motion on a phone. Height alone carries the motion; over 200ms the
+        // 8px step is imperceptible.
         double m1 = open ? 8 : 0;
+        if (Math.Abs(region.Margin.Top - m1) > 0.1) region.Margin = new Thickness(14, m1, 14, m1);
         TunnelCard.Tween(from, to, Motion.SlowMs,
             v =>
             {
                 if (cur() != gen) return;
                 region.Height = v;
-                var f = Math.Abs(to - from) < 0.5 ? 1 : Math.Clamp((v - from) / (to - from), 0, 1);
-                var m = m0 + (m1 - m0) * f;
-                region.Margin = new Thickness(14, m, 14, m);
             },
             () =>
             {
                 if (cur() != gen) return;
                 if (open) region.Height = double.NaN;
                 else region.IsVisible = false; // fully out of the tab order once collapsed
-                region.Margin = new Thickness(14, m1, 14, m1);
             });
     }
 
@@ -689,9 +695,21 @@ public partial class MainView : UserControl
         // If the drawer is open mid-switch its height is auto (NaN) and simply re-fits.
     }
 
+    string? _settingsFingerprint;
+
     void BuildSettingsPanel()
     {
         if (DataContext is not MainViewModel sv) return;
+        // This builds every toggle row, 15 swatches and 5 font samples — and it ran on the very
+        // frame the drawer's height animation starts, which measured as a 100-210ms stall (the
+        // animation getting 3 steps instead of 12). Skip the rebuild when nothing it renders has
+        // changed; same fingerprint trick the card's detail tree uses. A real change (a toggle, a
+        // theme/font/zoom pick, a tray-side flip) alters the fingerprint and rebuilds on next open.
+        var fp = string.Join('|', _themeIndex, _autoSoft, _accentIndex, _fontIndex, _zoomIndex,
+            sv.HasCustomDns, sv.Prefs.StartOnBoot, sv.Prefs.SkipUacLaunch, sv.Prefs.Notifications,
+            sv.Prefs.CheckUpdates, sv.Platform.SupportsStartup, sv.Platform.SupportsBootStart);
+        if (fp == _settingsFingerprint && GeneralList.Children.Count > 0) return;
+        _settingsFingerprint = fp;
         GeneralList.Children.Clear();
         GeneralList.Children.Add(ToggleRow("Custom DNS forwarding", () => sv.HasCustomDns, on => sv.ToggleCustomDns(on)));
         // Startup rows exist only where the platform has the concept (Windows: registry Run key +
@@ -809,6 +827,20 @@ public partial class MainView : UserControl
     // Theme picker: each option is a full box filled with the palette's page shade, so the row
     // reads as a light->dark ramp; "auto" is a split light/dark box signalling "follows the OS". A
     // hairline keeps the near-white boxes visible on a white card. Selected box = accent ring.
+    // The auto swatch previews the pair it currently resolves to, split corner-to-corner.
+    IBrush AutoSwatchBrush()
+    {
+        var (lightHex, darkHex) = _autoSoft ? ("#E2E4E7", "#17191C") : ("#F7F7F5", "#26292E");
+        return new LinearGradientBrush
+        {
+            StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
+            EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
+            GradientStops = { new GradientStop(Color.Parse(lightHex), 0.5), new GradientStop(Color.Parse(darkHex), 0.5) },
+        };
+    }
+
+    string AutoTip() => _autoSoft ? "auto — light / graphite (click to switch)" : "auto — white / black (click to switch)";
+
     Control ThemeGroup()
     {
         var hair = this.FindResource("HairlineBrush") as IBrush ?? Brushes.Gray;
@@ -820,12 +852,7 @@ public partial class MainView : UserControl
             var pal = Palettes[i];
             var box = new Border { CornerRadius = new CornerRadius(4), BorderBrush = hair, BorderThickness = new Thickness(1) };
             if (pal.Page is null)
-                box.Background = new LinearGradientBrush
-                {
-                    StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
-                    EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
-                    GradientStops = { new GradientStop(Color.Parse("#F7F7F5"), 0.5), new GradientStop(Color.Parse("#26292E"), 0.5) },
-                };
+                box.Background = AutoSwatchBrush();
             else
                 box.Background = new SolidColorBrush(Color.Parse(pal.Page));
             var b = new Button { Content = box, Height = 26, Margin = new Thickness(2.5, 0) };
@@ -834,9 +861,22 @@ public partial class MainView : UserControl
             if (i == _themeIndex) b.Classes.Add("sel");
             b.Click += (_, _) =>
             {
+                // Clicking "auto" while it's ALREADY selected flips which pair it follows the OS
+                // into (white/black <-> light/graphite) — a second control would cost a row in a
+                // panel that has none to spare, and the swatch shows the current pair anyway.
+                if (pal.Page is null && _themeIndex == idx)
+                {
+                    _autoSoft = !_autoSoft;
+                    Persist(p => p.AutoSoft = _autoSoft);
+                    box.Background = AutoSwatchBrush();
+                    ToolTip.SetTip(b, AutoTip());
+                    ApplyTheme();
+                    return;
+                }
                 SelectTheme(idx);
                 for (int k = 0; k < buttons.Count; k++) buttons[k].Classes.Set("sel", k == idx);
             };
+            if (pal.Page is null) ToolTip.SetTip(b, AutoTip());
             row.Children.Add(b);
             buttons.Add(b);
         }

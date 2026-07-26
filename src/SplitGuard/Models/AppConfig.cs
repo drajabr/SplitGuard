@@ -33,6 +33,9 @@ public class CustomDnsRole
 public class UiPrefs
 {
     public string Theme { get; set; } = "auto";
+    // Which pair "auto" follows the OS into: false = white/black (crisp), true = light/graphite
+    // (soft). Clicking the already-selected auto swatch flips it.
+    public bool AutoSoft { get; set; }
     public string Accent { get; set; } = "green";
     public string Font { get; set; } = "mono";
     public string Zoom { get; set; } = "1x";
