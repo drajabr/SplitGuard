@@ -39,6 +39,10 @@ public partial class PeerViewModel : ObservableObject
     string _name = "";
     public string Name { get => _name; set => Set(ref _name, value); }
 
+    // The owning tunnel's name, so cross-tunnel messages can render "peer@tunnel" for a peer
+    // they only hold a reference to (a peer name is unique only within its own tunnel).
+    public string TunnelName => _tunnel.Name;
+
     string _publicKey = "";
     public string PublicKey { get => _publicKey; set => Set(ref _publicKey, value); }
 

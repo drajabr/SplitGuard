@@ -1015,8 +1015,11 @@ public class MainViewModel : ObservableObject, ITunnelHost
         foreach (var p in tunnel.Peers)
         {
             var clash = WgPeerVms().FirstOrDefault(o => !ReferenceEquals(o, p) && o.ParsedMetric == p.ParsedMetric && SharesCidr(o, p));
+            // Name both sides as peer@tunnel — the clash is often with a peer on ANOTHER tunnel,
+            // which the old wording left the reader to hunt for.
             if (clash is not null)
-                return $"Overlapping allowed IPs share metric {p.ParsedMetric} — give each peer in the group a distinct metric";
+                return $"{Labels.PeerAt(p.Name, tunnel.Name, p.PublicKey)} and {Labels.PeerAt(clash.Name, clash.TunnelName, clash.PublicKey)} "
+                     + $"share metric {p.ParsedMetric} on overlapping allowed IPs — give each peer in the group a distinct metric";
         }
         return null;
     }
@@ -1078,7 +1081,9 @@ public class MainViewModel : ObservableObject, ITunnelHost
         var weak = claims.Values.Where(members => members.Count > 1)
             .SelectMany(members => members)
             .Where(m => m.Peer.PersistentKeepalive == 0 && string.IsNullOrEmpty(m.Peer.PingHost))
-            .Select(m => m.Tunnel)
+            // peer@tunnel, not just the tunnel: with two peers of one tunnel in the same group,
+            // naming the tunnel alone doesn't say which peer is missing its health signal.
+            .Select(m => Labels.PeerAt(m.Peer.Name, m.Tunnel, m.Peer.PublicKey))
             .Distinct()
             .ToList();
         return weak.Count == 0 ? null

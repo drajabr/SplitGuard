@@ -38,9 +38,14 @@ public class TunnelManager : ITunnelEngine
     {
         public required string Key; // base64 public key
         public required byte[] PublicKey;
+        // Configured peer name, so user-visible messages can say "peer@tunnel" (may be blank).
+        public string? Name;
         public byte[]? Psk;
         public IPEndPoint? Endpoint;
         public ushort Keepalive;
+        // What we actually program into the driver: Keepalive, unless this peer is contested and
+        // would otherwise have no health signal, in which case ForcedKeepaliveSec (see reconcile).
+        public ushort EffectiveKeepalive;
         public required List<(IPAddress Ip, byte Cidr)> AllowedIps;
         public int Metric;
         public int PingTimeoutMs;
@@ -141,9 +146,11 @@ public class TunnelManager : ITunnelEngine
             {
                 Key = Convert.ToBase64String(pub),
                 PublicKey = pub,
+                Name = p.Name,
                 Psk = psk,
                 Endpoint = endpoint,
                 Keepalive = p.PersistentKeepalive,
+                EffectiveKeepalive = p.PersistentKeepalive,
                 AllowedIps = allowed,
                 Metric = p.Metric,
                 PingTimeoutMs = (p.PingTimeout is >= 1 and <= 60 ? p.PingTimeout : DefaultPingTimeoutSec) * 1000,
@@ -214,23 +221,11 @@ public class TunnelManager : ITunnelEngine
                     if (Netio.AddEndpointHostRoute(ep) is { } route)
                         tunnel.EndpointRoutes.Add(route);
                 }
-            // Probe routes: pin each unique in-tunnel ping host to its own adapter so the
-            // ping tests *this* path even while the peer is standby in a failover group
-            // (otherwise the probe follows the active route and says nothing about us).
-            // A ping host shared by several peers can't be pinned to one adapter — skipped.
-            List<string?> allPingHosts;
-            lock (_gate) allPingHosts = _active.Values.SelectMany(t => t.Peers).Select(p => p.PingHost).ToList();
-            foreach (var rt in runtimes)
-            {
-                if (rt.PingHost is null || !IPAddress.TryParse(rt.PingHost, out var probeIp)) continue;
-                bool unique = runtimes.Count(p => p.PingHost == rt.PingHost) == 1
-                    && !allPingHosts.Contains(rt.PingHost);
-                bool inTunnel = rt.AllowedIps.Any(a => WireGuardConf.CidrContains($"{a.Ip}/{a.Cidr}", probeIp));
-                if (!unique || !inTunnel) continue;
-                Netio.AddRoute(adapter.Luid, probeIp,
-                    (byte)(probeIp.AddressFamily == AddressFamily.InterNetwork ? 32 : 128));
-                rt.HasProbeRoute = true;
-            }
+            // Probe routes are NOT pinned here: eligibility depends on the other connected
+            // tunnels (a ping host shared with another peer can't be pinned to one adapter), and
+            // doing it once at connect meant a peer that lost that race never got a pin later,
+            // even after the conflict disconnected. ReconcileProbeRoutes owns them now and runs
+            // on every poll — the ReconcileFailover call at the end of this method covers us.
             adapter.SetState(true);
         }
         catch
@@ -469,7 +464,7 @@ public class TunnelManager : ITunnelEngine
                 if (rt.PingFailStreak >= rt.PingDownCount) rt.Healthy = false;
                 else if (rt.PingOkStreak >= rt.PingUpCount) rt.Healthy = true;
             }
-            else if (rt.Keepalive == 0 && IsStandbyEverywhere(tunnel, rt, groups))
+            else if (rt.EffectiveKeepalive == 0 && IsStandbyInAnyGroup(tunnel, rt, groups))
             {
                 // A keepalive-less STANDBY routes no traffic, so it can never handshake —
                 // judging its handshake stale marked it permanently unhealthy, which
@@ -492,23 +487,23 @@ public class TunnelManager : ITunnelEngine
         }
     }
 
-    // Member of at least one overlap group, active in none of them, with no ungrouped
-    // range of its own — i.e. a peer that cannot be carrying any traffic right now.
-    bool IsStandbyEverywhere(ActiveTunnel tunnel, PeerRuntime rt,
+    // Standby in at least one arbitrated group. Deliberately PER-GROUP: the old version also
+    // demanded that every one of the peer's ranges be contested, so the common shape — a peer
+    // claiming the shared range PLUS its own tunnel subnet — failed the test, fell through to
+    // strict handshake freshness, and (carrying no traffic) could never look healthy again. Losing
+    // one contested group is enough to deserve the benefit of the doubt; promotion then gives it a
+    // real grace window to prove itself, so a genuinely dead peer is skipped on the next hop.
+    bool IsStandbyInAnyGroup(ActiveTunnel tunnel, PeerRuntime rt,
         Dictionary<string, List<(ActiveTunnel Tunnel, PeerRuntime Peer)>> groups)
     {
-        bool inAnyGroup = false;
         var key = MemberKey(tunnel, rt);
         foreach (var (cidr, members) in groups)
         {
             if (!members.Any(m => ReferenceEquals(m.Peer, rt))) continue;
-            inAnyGroup = true;
-            // Active here (or the group hasn't been arbitrated yet): judge it normally.
-            if (!_groupActive.TryGetValue(cidr, out var active) || active == key) return false;
+            // Arbitrated and someone else holds it → this peer is carrying nothing for that range.
+            if (_groupActive.TryGetValue(cidr, out var active) && active != key) return true;
         }
-        if (!inAnyGroup) return false;
-        // Any range of its own that ISN'T contested still carries this peer's traffic.
-        return rt.AllowedIps.All(a => groups.ContainsKey(CidrKey(a.Ip, a.Cidr)));
+        return false;
     }
 
     bool PingRoutesElsewhere(ActiveTunnel tunnel, PeerRuntime rt, IPAddress pingIp,
@@ -534,6 +529,19 @@ public class TunnelManager : ITunnelEngine
 
     static string MemberKey(ActiveTunnel t, PeerRuntime p) => $"{t.Name}\n{p.Key}";
 
+    // "peer@tunnel" for a stored member key. The peer may have gone away since it was recorded
+    // (disconnect / config change), so fall back to the short key the member key itself carries.
+    static string MemberLabel(string? memberKey, List<ActiveTunnel> snapshot)
+    {
+        if (string.IsNullOrEmpty(memberKey)) return "unknown";
+        var parts = memberKey.Split('\n');
+        var tunnelName = parts[0];
+        var peerKey = parts.Length > 1 ? parts[1] : "";
+        var name = snapshot.FirstOrDefault(t => t.Name == tunnelName)?
+            .Peers.FirstOrDefault(p => p.Key == peerKey)?.Name;
+        return Labels.PeerAt(name, tunnelName, peerKey);
+    }
+
     // Applied state, so reconcile only touches the system when something changed.
     // Everything below _reconcileGate (group state, applied metrics, peer health fields)
     // is only read/written inside ReconcileFailoverCore.
@@ -543,6 +551,54 @@ public class TunnelManager : ITunnelEngine
     // Specific-range routes we created on adapters that only cover the range with a
     // broader route (subset failover) — ours to delete when the group dissolves.
     readonly HashSet<(ulong Luid, string Cidr)> _shadowRoutes = new();
+    // /32 (or /128) pins that make a peer's ping test ITS OWN path even while standby. Reconciled
+    // every pass, so a peer that loses the race for a shared ping host gets pinned as soon as the
+    // conflict clears — and unpinned again if a conflict appears.
+    readonly HashSet<(ulong Luid, string Cidr)> _probeRoutes = new();
+    // Forced on a contested peer that would otherwise have NO health signal at all (see
+    // ReconcileFailoverCore): WireGuard only handshakes when it has something to send, so a silent
+    // standby could never prove it was back and stayed failed-over forever.
+    const ushort ForcedKeepaliveSec = 25;
+
+    // Pin each eligible ping host to its OWN adapter with a host route, so the probe measures this
+    // peer's path even when the peer is standby and the shared range is routed elsewhere (longest
+    // prefix beats the group metric). Eligible = the host parses, sits inside this peer's own
+    // allowed IPs, and no other connected peer probes the same address (one address can only be
+    // pinned to one adapter). Re-evaluated every pass: eligibility changes as tunnels come and go.
+    void ReconcileProbeRoutes(List<ActiveTunnel> snapshot)
+    {
+        var all = snapshot.SelectMany(t => t.Peers.Select(p => (Tunnel: t, Peer: p))).ToList();
+        foreach (var (tunnel, rt) in all)
+        {
+            bool eligible = rt.PingHost is not null
+                && IPAddress.TryParse(rt.PingHost, out var probeIp)
+                && rt.AllowedIps.Any(a => WireGuardConf.CidrContains($"{a.Ip}/{a.Cidr}", probeIp))
+                && all.Count(m => m.Peer.PingHost == rt.PingHost) == 1;
+            if (eligible == rt.HasProbeRoute) continue;
+            if (!IPAddress.TryParse(rt.PingHost ?? "", out var ip))
+            {
+                rt.HasProbeRoute = false;
+                continue;
+            }
+            var prefix = (byte)(ip.AddressFamily == AddressFamily.InterNetwork ? 32 : 128);
+            var stateKey = (tunnel.Adapter.Luid, CidrKey(ip, prefix));
+            try
+            {
+                if (eligible)
+                {
+                    Netio.AddRoute(tunnel.Adapter.Luid, ip, prefix);
+                    _probeRoutes.Add(stateKey);
+                }
+                else
+                {
+                    Netio.DeleteRoute(tunnel.Adapter.Luid, ip, prefix);
+                    _probeRoutes.Remove(stateKey);
+                }
+                rt.HasProbeRoute = eligible;
+            }
+            catch { } // transient: retried next pass, health just falls back to handshake freshness
+        }
+    }
 
     // Serialized: called concurrently from the poll timer and from Connect/Disconnect
     // background tasks, over shared dictionaries and peer health state.
@@ -556,6 +612,9 @@ public class TunnelManager : ITunnelEngine
         List<ActiveTunnel> snapshot;
         lock (_gate) snapshot = _active.Values.ToList();
         var now = DateTime.UtcNow;
+
+        // Before judging health: make sure every probe that CAN test its own path does.
+        ReconcileProbeRoutes(snapshot);
 
         // Group every connected peer's allowed CIDRs; a group is a CIDR claimed twice.
         var groups = new Dictionary<string, List<(ActiveTunnel Tunnel, PeerRuntime Peer)>>();
@@ -589,6 +648,23 @@ public class TunnelManager : ITunnelEngine
         foreach (var (_, p) in all) p.FailoverRole = null;
 
         var wgDirty = new HashSet<ActiveTunnel>();
+
+        // Guarantee every CONTESTED peer a health signal. WireGuard only handshakes when it has
+        // something to send, so a standby with no keepalive and no usable probe can never refresh
+        // its handshake — it looked permanently dead and the group never came back to it (the
+        // rebooted-router-never-returns bug). Force a keepalive on exactly those peers; a peer with
+        // a real signal (its own keepalive, or a probe that tests its own path) is left alone.
+        var contested = new HashSet<PeerRuntime>(groups.SelectMany(g => g.Value).Select(m => m.Peer));
+        foreach (var (t, p) in all)
+        {
+            var want = p.Keepalive == 0 && contested.Contains(p) && !p.PingMeaningful
+                ? ForcedKeepaliveSec
+                : p.Keepalive;
+            if (p.EffectiveKeepalive == want) continue;
+            p.EffectiveKeepalive = want;
+            wgDirty.Add(t);
+        }
+
         foreach (var (key, members) in groups)
         {
             var ordered = members
@@ -605,7 +681,7 @@ public class TunnelManager : ITunnelEngine
 
             if (!_groupActive.TryGetValue(key, out var prevActive) || prevActive != activeKey)
             {
-                var from = prevActive?.Split('\n')[0];
+                var fromLabel = MemberLabel(prevActive, snapshot);
                 _groupActive[key] = activeKey;
                 // Fresh promotion: restart the handshake grace clock and drop any streaks
                 // banked before promotion — the first post-promotion verdict must come
@@ -614,7 +690,13 @@ public class TunnelManager : ITunnelEngine
                 active.Peer.PingFailStreak = 0;
                 active.Peer.PingOkStreak = 0;
                 if (prevActive is not null && groups.Count > 0)
-                    FailoverChanged?.Invoke($"{key}: {(from == active.Tunnel.Name ? "peer switch" : $"failover {from} → {active.Tunnel.Name}")}");
+                {
+                    // Always peer@tunnel on BOTH sides. A tunnel name alone hid which peer moved
+                    // when the switch was between two peers of the same tunnel (it just said
+                    // "peer switch"), and a peer name alone is only unique within its tunnel.
+                    var toLabel = Labels.PeerAt(active.Peer.Name, active.Tunnel.Name, active.Peer.Key);
+                    FailoverChanged?.Invoke($"{key}: failover {fromLabel} → {toLabel}");
+                }
             }
 
             // Route metrics: the active member's adapter wins; every other adapter in the
@@ -670,6 +752,8 @@ public class TunnelManager : ITunnelEngine
         foreach (var k in _appliedMetric.Keys.Where(k => !liveLuids.Contains(k.Luid)).ToList())
             _appliedMetric.Remove(k);
         _shadowRoutes.RemoveWhere(k => !liveLuids.Contains(k.Luid));
+        // A disposed adapter takes its routes with it, so only the bookkeeping needs clearing.
+        _probeRoutes.RemoveWhere(k => !liveLuids.Contains(k.Luid));
 
         foreach (var t in wgDirty)
         {
@@ -756,7 +840,7 @@ public class TunnelManager : ITunnelEngine
             (IReadOnlyList<(IPAddress, byte)>)p.AllowedIps
                 .Where(a => !tunnel.IntraOwner.TryGetValue(CidrKey(a.Ip, a.Cidr), out var owner) || owner == p.Key)
                 .ToList(),
-            p.Keepalive)).ToList();
+            p.EffectiveKeepalive)).ToList();
 
     static IPEndPoint? ResolveEndpoint(string endpoint)
     {

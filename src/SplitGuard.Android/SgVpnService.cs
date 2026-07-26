@@ -104,7 +104,8 @@ public class SgVpnService : Android.Net.VpnService
             foreach (var cidr in p.AllowedIps)
             {
                 if (!WireGuardConf.TryParseCidr(cidr, out var net, out var prefix))
-                    throw new InvalidOperationException($"Peer '{p.Name}' AllowedIP '{cidr}' isn't a valid CIDR");
+                    throw new InvalidOperationException(
+                        $"{SplitGuard.Models.Labels.PeerAt(p.Name, cfg.Name, p.PublicKey)} AllowedIP '{cidr}' isn't a valid CIDR");
                 // Mask host bits: addRoute rejects "10.7.0.1/24" as a "Bad address" (Windows
                 // masks it silently), which otherwise fails the whole connect on import.
                 net = WireGuardConf.MaskNetwork(net, prefix);
