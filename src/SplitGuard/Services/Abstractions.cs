@@ -123,8 +123,11 @@ public interface IPlatform
     // Open a web page in the system browser (the "get the update" path on platforms
     // without an installer flow).
     void OpenUrl(string url) { }
+    // Status/navigation bar icon polarity. Light bars need dark icons; Avalonia's IInsetsManager
+    // carries the bar COLOUR but not this, and the API that honours it differs by Android version.
+    void SetSystemBarsLight(bool lightBars) { }
+
 
     // Tint the OS system bars (Android status/navigation bars) to match the app theme's page
     // background, with dark glyphs on a light background. No-op where the OS chrome isn't ours.
-    void SetSystemBarColor(uint argb, bool lightBackground) { }
 }

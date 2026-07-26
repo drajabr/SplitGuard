@@ -80,31 +80,29 @@ public class MainActivity : AvaloniaMainActivity
 
     public static MainActivity? Current { get; private set; }
 
-    // Tint the status + navigation bars to the app theme's page color, with dark glyphs on a light
-    // background — so the system bars blend into the light/graphite page instead of sitting as a
-    // hard white/black band. Called from the shared ApplyTheme via IPlatform.SetSystemBarColor.
-    // Remembered so OnResume can re-apply it — Android resets the bars to the activity theme's
-    // default when the app returns to the foreground, which otherwise reverts them to black/white.
-    int? _barColor;
-    bool _barLight;
-
-    public void SetSystemBars(int color, bool lightBackground)
+    // The bar COLOUR comes from the shared view via Avalonia's InsetsManager. Icon/text polarity is
+    // ours, and the API that honours it depends on the OS: from API 30 the only supported route is
+    // WindowInsetsController.SetSystemBarsAppearance — the old View.SystemUiVisibility flags are
+    // ignored, which is exactly why a light theme kept white (invisible) icons on a white bar.
+    public void SetSystemBarsLight(bool lightBars) => RunOnUiThread(() =>
     {
-        _barColor = color; _barLight = lightBackground;
-        ApplySystemBars();
-    }
-
-    void ApplySystemBars() => RunOnUiThread(() =>
-    {
-        if (_barColor is not { } color) return;
         var window = Window;
-        if (window?.DecorView is not { } decor) return;
-        var c = new Android.Graphics.Color(color);
-        window.SetStatusBarColor(c);
-        window.SetNavigationBarColor(c);
-        int flags = (int)(Android.Views.SystemUiFlags.LightStatusBar | Android.Views.SystemUiFlags.LightNavigationBar);
-        int v = (int)decor.SystemUiVisibility;
-        decor.SystemUiVisibility = (Android.Views.StatusBarVisibility)(_barLight ? (v | flags) : (v & ~flags));
+        if (window is null) return;
+        if (Build.VERSION.SdkInt >= BuildVersionCodes.R)
+        {
+            if (window.InsetsController is not { } controller) return;
+            const int mask = (int)(Android.Views.WindowInsetsControllerAppearance.LightStatusBars
+                | Android.Views.WindowInsetsControllerAppearance.LightNavigationBars);
+            controller.SetSystemBarsAppearance(lightBars ? mask : 0, mask);
+        }
+        else if (window.DecorView is { } decor)
+        {
+#pragma warning disable CA1422, CS0618 // pre-API-30 has nothing else
+            int flags = (int)(Android.Views.SystemUiFlags.LightStatusBar | Android.Views.SystemUiFlags.LightNavigationBar);
+            int v = (int)decor.SystemUiVisibility;
+            decor.SystemUiVisibility = (Android.Views.StatusBarVisibility)(lightBars ? v | flags : v & ~flags);
+#pragma warning restore CA1422, CS0618
+        }
     });
 
     // Exposed for SplitGuardApplication.CustomizeAppBuilder (the 12 API moves app-builder
@@ -115,7 +113,10 @@ public class MainActivity : AvaloniaMainActivity
     {
         base.OnResume();
         Current = this;
-        ApplySystemBars(); // Android resets the bars on foreground return — restore the theme tint.
+        // Android resets the bars on foreground return — restore the theme tint. The view owns this
+        // now (via Avalonia's InsetsManager); the old hand-rolled path used APIs modern Android
+        // ignores, which left the light theme with white icons on a white bar.
+        _view?.ReapplySystemBars();
         // The VPN consent dialog (one-time, or again after revocation) must come from an
         // Activity. Ask up front so the connect toggle just works.
         var consent = Android.Net.VpnService.Prepare(this);

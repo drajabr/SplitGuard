@@ -126,6 +126,9 @@ public partial class MainView : UserControl
             // through here): animation steps become one-per-presented-frame, vsync-aligned.
             Motion.AttachFrameHost(TopLevel.GetTopLevel(this));
             Dispatcher.UIThread.Post(UpdateClusterFade); // first fade after the initial layout settles
+            // The theme is applied before this view has a TopLevel, so the very first bar tint had
+            // nowhere to land — re-apply now that the InsetsManager exists.
+            Dispatcher.UIThread.Post(ApplySystemBars);
         };
         DetachedFromVisualTree += (_, _) =>
         {
@@ -150,6 +153,34 @@ public partial class MainView : UserControl
     // Only genuinely empty chrome/background drags: bail on any interactive control (Button and
     // its toggles/switches, TextBox, Slider, Thumb, ScrollBar) and on a TunnelCard, so caption
     // buttons, toggles, editing, and card drag-reorder all keep working. Desktop Window only.
+    // ---- Android system bars -------------------------------------------------------------
+    // Driven through Avalonia's InsetsManager, NOT the Android APIs directly. Two reasons the
+    // hand-rolled version misbehaved:
+    //   * icon polarity went through View.SystemUiVisibility, which Android IGNORES from API 30 —
+    //     so on a light theme the bar stayed white with white icons (invisible clock/battery).
+    //     InsetsManager drives WindowInsetsController where that's the supported route.
+    //   * it raced the framework: Avalonia applies its own bar state as the view attaches, after
+    //     our call during startup, so the theme colour only appeared once re-applied by hand.
+    // Re-applied on attach and on foreground return (Android resets the bars there).
+    Color? _barColor;
+    bool _barLight;
+
+    public void ReapplySystemBars() => ApplySystemBars();
+
+    void ApplySystemBars()
+    {
+        if (_barColor is not { } c) return;
+        if (TopLevel.GetTopLevel(this)?.InsetsManager is not { } insets) return; // desktop: none
+        try
+        {
+            insets.SystemBarColor = c; // the bar background; Avalonia's backend owns the platform call
+        }
+        catch { } // a backend without insets support must never break theming
+        // Icon/text polarity is NOT part of IInsetsManager in 12.1, so the head does it with the
+        // API its OS version actually honours (no-op off Android).
+        if (DataContext is MainViewModel vm) vm.Platform.SetSystemBarsLight(_barLight);
+    }
+
     // Avalonia 12 no longer makes the Window the visual root — a TopLevelHost wraps the content,
     // so `VisualRoot as Window` is ALWAYS null on desktop and every guard written that way
     // silently disables itself (which is exactly why title-bar drag died in the 12 migration).
@@ -286,11 +317,9 @@ public partial class MainView : UserControl
         else PageRoot.Background = new SolidColorBrush(Color.Parse(t.Page));
         // Tint the OS system bars (Android) to the page background so the status/navigation bars
         // don't read as a hard white/black band against the light/graphite page. No-op on desktop.
-        if (DataContext is MainViewModel barVm)
-        {
-            var barColor = Color.Parse(t.Page ?? (EffectiveVariant() == ThemeVariant.Light ? "#FFFFFF" : "#000000"));
-            barVm.Platform.SetSystemBarColor(barColor.ToUInt32(), EffectiveVariant() == ThemeVariant.Light);
-        }
+        _barColor = Color.Parse(t.Page ?? (EffectiveVariant() == ThemeVariant.Light ? "#FFFFFF" : "#000000"));
+        _barLight = EffectiveVariant() == ThemeVariant.Light;
+        ApplySystemBars();
         // Light themes: Fluent's default foreground is a softened ~89% black that reads dull on
         // the bright pages — force a crisp near-black. Dark themes keep the theme default.
         if (EffectiveVariant() == ThemeVariant.Light) ChromeTarget.Foreground = new SolidColorBrush(Color.Parse("#17191B"));

@@ -35,8 +35,8 @@ public class AndroidPlatform : IPlatform
         Android.App.Application.Context.StartActivity(intent);
     }
 
-    public void SetSystemBarColor(uint argb, bool lightBackground) =>
-        MainActivity.Current?.SetSystemBars(unchecked((int)argb), lightBackground);
+    public void SetSystemBarsLight(bool lightBars) => MainActivity.Current?.SetSystemBarsLight(lightBars);
+
 
     sealed class NullSplitDns : ISplitDnsService
     {
