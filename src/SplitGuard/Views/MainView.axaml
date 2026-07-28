@@ -16,20 +16,37 @@
         <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
           <Image Name="LogoImage" Source="avares://SplitGuard.Core/Assets/app.ico" Width="30" Height="30"
                  VerticalAlignment="Center" IsHitTestVisible="False" />
-          <TextBlock Text="SplitGuard" FontSize="{DynamicResource Fs17}" FontWeight="SemiBold"
-                     VerticalAlignment="Center" IsHitTestVisible="False" />
-          <TextBlock Text="{Binding CurrentVersionText}" FontSize="{DynamicResource Fs11}" Opacity="0.5"
-                     VerticalAlignment="Bottom" Margin="0,0,0,3" IsHitTestVisible="False" />
+          <!-- Title and version are ONE TextBlock, not two siblings: inline Runs share a single
+               text baseline, so the version can never drift below the title at any font or zoom
+               step. Two siblings in a StackPanel can only align box edges (the version used to be
+               VerticalAlignment=Bottom with a hand-tuned 3px margin, which is why it sat low), and
+               a smaller font's box centre never lands on the larger font's baseline.
+               The two NBSPs stand in for the panel's 8px Spacing and, being text, scale with zoom. -->
+          <TextBlock FontSize="{DynamicResource Fs17}" FontWeight="SemiBold"
+                     VerticalAlignment="Center" IsHitTestVisible="False">
+            <TextBlock.Inlines>
+              <Run Text="SplitGuard&#160;&#160;" />
+              <!-- FontWeight must be reset: TextElement.FontWeight inherits from the SemiBold
+                   parent. Foreground carries the dim because a Run has no Opacity of its own. -->
+              <Run Text="{Binding CurrentVersionText}" FontSize="{DynamicResource Fs12}"
+                   FontWeight="Normal" Foreground="{DynamicResource VersionTagBrush}" />
+            </TextBlock.Inlines>
+          </TextBlock>
           <!-- Update affordance: hidden until a check/download is happening or an update is
                ready (accent glyph). First click downloads, a second installs. -->
           <Button Classes="hdr upd" Name="UpdateButton" Click="OnUpdateClick" VerticalAlignment="Center"
                   IsVisible="{Binding UpdateVisible}" ToolTip.Tip="{Binding UpdateTooltip}">
             <StackPanel Orientation="Horizontal" Spacing="6">
-              <TextBlock Classes="glyph updicon" Classes.hot="{Binding UpdateHighlight}"
-                         Text="{Binding UpdateGlyph}" FontSize="{DynamicResource Fs12}" />
-              <TextBlock Classes="updicon" Classes.hot="{Binding UpdateHighlight}"
+              <TextBlock Name="UpdateGlyphText" Classes="glyph updicon"
+                         Classes.hot="{Binding UpdateHighlight}"
+                         Classes.bad="{Binding UpdateFailed}" Classes.good="{Binding UpdateIsFresh}"
+                         Text="{Binding UpdateGlyph}" FontSize="{DynamicResource Fs12}"
+                         TextAlignment="Center" />
+              <TextBlock Name="UpdateLabelText" Classes="updicon"
+                         Classes.hot="{Binding UpdateHighlight}"
+                         Classes.bad="{Binding UpdateFailed}" Classes.good="{Binding UpdateIsFresh}"
                          Text="{Binding UpdateLabel}" FontSize="{DynamicResource Fs12}"
-                         VerticalAlignment="Center" />
+                         TextAlignment="Left" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
         </StackPanel>

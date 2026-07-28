@@ -181,7 +181,11 @@ public partial class TunnelCard : UserControl
             foreach (var p in parsed.Peers)
             {
                 i++;
-                var label = p.Name ?? $"peer {i}";
+                // Named peers keep their name; unnamed ones show the key tail. Only when the key
+                // is missing too (this validates raw pasted input) does position stand in — and
+                // "?? " alone used to let an EMPTY name through as a bare ": no AllowedIPs".
+                var label = Models.Labels.PeerName(p.Name, p.PublicKey);
+                if (label == "peer") label = $"peer {i}";
                 if (!PeerViewModel.IsValidKey(p.PublicKey))
                     problems.Add($"{At("PublicKey", p.PublicKey.Length > 0 ? p.PublicKey : null)}{label}: PublicKey is not a valid 32-byte base64 key");
                 if (p.AllowedIps.Count == 0)
@@ -761,7 +765,7 @@ public partial class TunnelCard : UserControl
         // The peer's name (bold accent) with its live status flushed right — uptime, transfer
         // totals and RTT while connected (nothing at all when idle). One line on every head:
         // the name keeps its width, the stats trim from the left-going end when cramped.
-        void NameLine(string name, string stats, IBrush accent, PeerViewModel? peer)
+        void NameLine(string name, string endpoint, string stats, IBrush accent, PeerViewModel? peer)
         {
             var grid = new Grid
             {
@@ -773,6 +777,26 @@ public partial class TunnelCard : UserControl
             nm.Classes.Add("peername"); // same accent as the tunnel title, one size step down
             Grid.SetColumn(nm, 0);
             grid.Children.Add(nm);
+            // The peer's endpoint right after its name: "main  vpn.office.example.com:51820".
+            // Same SynIp colour the tunnel's own addresses wear in the collapsed header
+            // (TunnelCard.axaml:46), applied through the CLASS rather than a snapshotted brush so
+            // it follows a theme change on its own — Mono() would set Foreground as a local value
+            // and beat the setter. Bounded so a long hostname ellipsizes instead of squeezing the
+            // stats off the card.
+            if (endpoint.Length > 0)
+            {
+                var ep = new TextBlock
+                {
+                    Text = endpoint,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    Margin = new Avalonia.Thickness(8, 0, 0, 0),
+                    MaxWidth = Compact ? 160 : 260,
+                };
+                ep.Classes.Add("mono");
+                ep.Classes.Add("synip");
+                Grid.SetColumn(ep, 1);
+                grid.Children.Add(ep);
+            }
             var st = new TextBlock
             {
                 Text = stats, Opacity = 0.65,
@@ -834,14 +858,17 @@ public partial class TunnelCard : UserControl
         //
         // Pass 1 — compute the STRUCTURE (pill texts + markers) without touching controls.
         var wg = !_vm.IsExternal && !_vm.IsCustom;
-        var spec = new List<(PeerViewModel P, string Name, List<(string Text, bool Dup)> Routes,
+        var spec = new List<(PeerViewModel P, string Name, string Endpoint, List<(string Text, bool Dup)> Routes,
                              List<(string Text, bool Dup)> Domains)>();
         for (int i = 0; i < _vm.Peers.Count; i++)
         {
             var p = _vm.Peers[i];
-            var name = string.IsNullOrWhiteSpace(p.Name)
-                ? (_vm.Peers.Count > 1 ? $"peer {i + 1}" : "peer")
-                : p.Name.Trim();
+            // An unnamed peer shows its key tail (the same 4 chars the identity row's key chip
+            // ends with) rather than a positional "peer 2" that renumbers when peers reorder.
+            var name = Models.Labels.PeerName(p.Name, p.PublicKey);
+            // Endpoint is computed over EndpointHost/EndpointPort (PeerViewModel.cs:59-67): "" with
+            // no host, and a trailing-colon "host:" while the port box is blank — trim that.
+            var endpoint = wg ? p.Endpoint.Trim().TrimEnd(':') : "";
             var routes = new List<(string, bool)>();
             if (wg)
             {
@@ -864,7 +891,7 @@ public partial class TunnelCard : UserControl
             // at the END of each row, so the stable part of the list never reshuffles.
             routes = routes.OrderBy(r => r.Item2).ToList();
             domains = domains.OrderBy(d => d.Item2).ToList();
-            spec.Add((p, name, routes, domains));
+            spec.Add((p, name, endpoint, routes, domains));
         }
 
         // Fingerprint structure + palette; unchanged → refresh stat texts in place, done.
@@ -873,7 +900,7 @@ public partial class TunnelCard : UserControl
            .Append(dupBrush is ISolidColorBrush dc ? dc.Color.ToUInt32() : 0).Append('|').Append(wg);
         foreach (var s in spec)
         {
-            fpb.Append('\n').Append(s.Name).Append('|').Append(s.P.IsPinned).Append('|')
+            fpb.Append('\n').Append(s.Name).Append('|').Append(s.Endpoint).Append('|').Append(s.P.IsPinned).Append('|')
                .Append(s.P.HasDns ? s.P.Dns.Trim() : "");
             foreach (var r in s.Routes) fpb.Append(';').Append(r.Text).Append(r.Dup ? '!' : '.');
             fpb.Append('#');
@@ -898,7 +925,7 @@ public partial class TunnelCard : UserControl
 
             if (wg)
             {
-                NameLine(s.Name, PeerStatsText(s.P), accent, s.P);
+                NameLine(s.Name, s.Endpoint, PeerStatsText(s.P), accent, s.P);
                 var routePills = new List<Control>();
                 foreach (var (text, dup) in s.Routes) routePills.Add(Pill(text, dup ? dupBrush : accent));
                 if (routePills.Count > 0) LabeledRow("routes", routePills);

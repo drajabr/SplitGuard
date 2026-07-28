@@ -128,6 +128,10 @@ public partial class MainView : UserControl
             // through here): animation steps become one-per-presented-frame, vsync-aligned.
             Motion.AttachFrameHost(TopLevel.GetTopLevel(this));
             Dispatcher.UIThread.Post(UpdateClusterFade); // first fade after the initial layout settles
+            // Pin the update pill's label/glyph widths for the first paint too. ApplyZoom posts this
+            // during prefs load, but the DynamicResource font sizes aren't guaranteed resolved that
+            // early — measuring again once the tree is up keeps the very first state from jittering.
+            Dispatcher.UIThread.Post(UpdateBadgeMetrics);
             // The theme is applied before this view has a TopLevel, so the very first bar tint had
             // nowhere to land — re-apply now that the InsetsManager exists.
             Dispatcher.UIThread.Post(ApplySystemBars);
@@ -278,6 +282,7 @@ public partial class MainView : UserControl
         ChromeTarget.FontFamily = new FontFamily(FontFamilyOf(FontSteps[_fontIndex]));
         // Label widths changed; re-judge stacked vs side-by-side once the new font lands.
         Dispatcher.UIThread.Post(UpdateSettingsLayout);
+        Dispatcher.UIThread.Post(UpdateBadgeMetrics);
     }
 
     void ApplyZoom()
@@ -287,6 +292,42 @@ public partial class MainView : UserControl
         foreach (var (key, baseValue) in ZoomResources)
             resources[key] = baseValue * scale;
         Dispatcher.UIThread.Post(UpdateSettingsLayout);
+        Dispatcher.UIThread.Post(UpdateBadgeMetrics);
+    }
+
+    // The update button has to hold ONE width while its label steps Checking… -> 12 % -> Install,
+    // or the title strip twitches every time the state changes. The widest label depends on the
+    // live font and zoom pick, so it is MEASURED rather than hardcoded (same discipline as
+    // UpdateSettingsLayout). The glyph column is measured too: the state glyphs are not all the
+    // same advance width, and the glyph font differs between the two heads.
+    static readonly string[] UpdateLabelCandidates =
+        { "Checking…", "100 %", "Install", "Update", "Installing…", "Up to date", "Retry", "Check" };
+    static readonly string[] UpdateGlyphCandidates = { "", "", "", "", "" };
+
+    void UpdateBadgeMetrics()
+    {
+        UpdateLabelText.MinWidth = WidestOf(UpdateLabelText, UpdateLabelCandidates);
+        UpdateGlyphText.MinWidth = WidestOf(UpdateGlyphText, UpdateGlyphCandidates);
+    }
+
+    // Measured on a throwaway probe, never by writing Text on the real TextBlock — that would land
+    // a local value on top of its {Binding UpdateLabel} and freeze the label permanently.
+    static double WidestOf(TextBlock like, string[] candidates)
+    {
+        var probe = new TextBlock
+        {
+            FontFamily = like.FontFamily, FontSize = like.FontSize,
+            FontWeight = like.FontWeight, FontStyle = like.FontStyle,
+        };
+        double w = 0;
+        foreach (var s in candidates)
+        {
+            probe.Text = s;
+            probe.InvalidateMeasure();
+            probe.Measure(Size.Infinity);
+            w = Math.Max(w, probe.DesiredSize.Width);
+        }
+        return Math.Ceiling(w);
     }
 
     // Surface theme: page + card/chip fills + borders + text contrast.
@@ -335,6 +376,12 @@ public partial class MainView : UserControl
         resources["SurfaceBrush"] = new SolidColorBrush(t.Surface is null ? Color.Parse("#00FFFFFF") : Color.Parse(t.Surface));
         resources["ItemBrush"] = new SolidColorBrush(t.Item is null ? Color.FromArgb(0x14, 0x80, 0x80, 0x80) : Color.Parse(t.Item));
         resources["DimOpacity"] = t.Dim;
+        // The version tag rides inside the title TextBlock as a Run so the two share one baseline,
+        // and a Run has no Opacity — so bake the dim into a brush that follows the foreground just
+        // set above, at the same per-theme Dim the rest of the strip uses. A fixed grey would drift:
+        // #8C808080 renders ~#505153 on graphite against the ~#8B8C8E it should be.
+        resources["VersionTagBrush"] = new SolidColorBrush(
+            EffectiveVariant() == ThemeVariant.Light ? Color.Parse("#17191B") : Color.Parse("#FFFFFF"), t.Dim);
         resources["HairlineBrush"] = new SolidColorBrush(Color.FromArgb(t.Hair, 0x80, 0x80, 0x80));
         resources["FieldBorderBrush"] = new SolidColorBrush(Color.FromArgb(t.Field, 0x80, 0x80, 0x80));
         // Soft neutral fill behind borderless fields; a touch stronger on hover. Keyed on the

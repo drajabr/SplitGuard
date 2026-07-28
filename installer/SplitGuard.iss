@@ -43,6 +43,11 @@ Name: "{autodesktop}\SplitGuard"; Filename: "{app}\SplitGuard.exe"; Tasks: deskt
 [Run]
 ; First elevated run registers the no-UAC launcher task and the logon task.
 Filename: "{app}\SplitGuard.exe"; Description: "{cm:LaunchProgram,SplitGuard}"; Flags: nowait postinstall skipifsilent
+; Silent self-update: the app relaunches itself by passing /SGRELAUNCH=1, which the running
+; instance sets when it hands over. Gated on that switch rather than simply dropping
+; "skipifsilent" above, so an administrator's scripted /SILENT mass-deployment still installs
+; without launching the app in someone's session.
+Filename: "{app}\SplitGuard.exe"; Flags: nowait; Check: WantsRelaunch
 
 [UninstallRun]
 ; Stop a running (elevated, tray-resident) instance, then let the app clear its own
@@ -59,4 +64,11 @@ begin
   Exec(ExpandConstant('{sys}\taskkill.exe'), '/IM SplitGuard.exe /F', '', SW_HIDE,
     ewWaitUntilTerminated, ResultCode);
   Result := '';
+end;
+
+// True only for the app's own unattended self-update, which passes /SGRELAUNCH=1. Used by the
+// [Run] entry above to reopen the app once a silent update finishes.
+function WantsRelaunch: Boolean;
+begin
+  Result := ExpandConstant('{param:SGRELAUNCH|0}') = '1';
 end;

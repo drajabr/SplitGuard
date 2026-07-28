@@ -7,7 +7,10 @@ namespace SplitGuard.Services;
 
 // A newer release than the running build: where to fetch its Windows installer (empty on
 // platforms that go through the release page instead) and the release's web page.
-public record UpdateInfo(Version Version, string Tag, string DownloadUrl, string AssetName, string PageUrl);
+// Size is the length GitHub reports for the asset; 0 when unknown (the no-installer/Android path).
+// It is checked after download because the cached .exe is later executed with the app's inherited
+// admin token and, on the unattended path, with no wizard for anyone to notice something is wrong.
+public record UpdateInfo(Version Version, string Tag, string DownloadUrl, string AssetName, string PageUrl, long Size = 0);
 
 // Self-update against the public GitHub releases of drajabr/SplitGuard: query the latest
 // release, download its installer, then hand off to it. No auth — the API is public and the
@@ -62,7 +65,8 @@ public static class UpdateService
             var name = asset.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
             if (!name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) continue;
             var url = asset.TryGetProperty("browser_download_url", out var u) ? u.GetString() ?? "" : "";
-            if (url.Length > 0) return new UpdateInfo(latest, tag, url, name, page);
+            var size = asset.TryGetProperty("size", out var sz) && sz.TryGetInt64(out var s) ? s : 0;
+            if (url.Length > 0) return new UpdateInfo(latest, tag, url, name, page, size);
         }
         return null;
     }
@@ -97,12 +101,33 @@ public static class UpdateService
                 if (total > 0) progress?.Report((double)read / total);
             }
         }
+        // Verify the finished download against the length GitHub advertised BEFORE promoting the
+        // .part file to the name we will later execute. A truncated transfer used to be launched
+        // anyway; the unattended path makes that worse, because setup runs with no wizard and with
+        // this process's admin token. Not a substitute for signing — see the note on LaunchInstaller.
+        var got = new FileInfo(tmp).Length;
+        if (info.Size > 0 && got != info.Size)
+        {
+            try { File.Delete(tmp); } catch { }
+            throw new IOException($"Download is {got} bytes but the release lists {info.Size} — discarded");
+        }
         File.Move(tmp, path, overwrite: true);
         return path;
     }
 
-    // Launch the downloaded installer; it self-elevates via its own manifest (UAC). The
-    // caller must exit the app right after so the setup can replace the running files.
-    public static void LaunchInstaller(string path) =>
-        Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+    // Launch the downloaded installer. Started from an always-elevated app it inherits that token,
+    // so no UAC prompt appears; `arguments` carries the unattended switches on the self-update path.
+    // The caller must exit the app right after so setup can replace the running files.
+    //
+    // NOTE: the installer is not Authenticode-signed and is cached under %LOCALAPPDATA%, which is
+    // user-writable. The size check in DownloadAsync catches a truncated or swapped-for-a-different
+    // -length file, but anything able to write that directory between download and launch could
+    // still substitute a same-size payload. Signing the setup and verifying the signature here is
+    // the real fix and is not yet done.
+    public static void LaunchInstaller(string path, string arguments = "")
+    {
+        var psi = new ProcessStartInfo(path) { UseShellExecute = true };
+        if (arguments.Length > 0) psi.Arguments = arguments;
+        Process.Start(psi);
+    }
 }

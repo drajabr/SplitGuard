@@ -52,12 +52,9 @@ public class AndroidTunnelEngine : ITunnelEngine
     public void Connect(TunnelConfig config)
     {
         var names = new Dictionary<string, string>();
-        for (int i = 0; i < config.Peers.Count; i++)
-        {
-            var p = config.Peers[i];
+        foreach (var p in config.Peers)
             if (!string.IsNullOrWhiteSpace(p.PublicKey))
-                names[p.PublicKey] = string.IsNullOrWhiteSpace(p.Name) ? $"peer {i + 1}" : p.Name!.Trim();
-        }
+                names[p.PublicKey] = Models.Labels.PeerName(p.Name, p.PublicKey);
         _peerNames = names;
         var ctx = Android.App.Application.Context;
         // Consent must already be granted (MainActivity runs the prepare flow before
@@ -166,7 +163,7 @@ public class AndroidTunnelEngine : ITunnelEngine
             foreach (var (key, s) in per)
             {
                 up += s.UpBps; down += s.DownBps;
-                var label = names.TryGetValue(key, out var n) ? n : key[..Math.Min(8, key.Length)];
+                var label = names.TryGetValue(key, out var n) ? n : Models.Labels.KeyTail(key);
                 var hs = s.Handshake is null ? "no handshake" : ViewModels.Format.Ago(s.Handshake);
                 lines.Add($"{label} — {hs} · ↑ {ViewModels.Format.Bytes(s.TotalTx)} ↓ {ViewModels.Format.Bytes(s.TotalRx)}");
             }

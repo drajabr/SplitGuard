@@ -36,11 +36,13 @@ public partial class MainWindow : Window, IDialogs
             }
             catch { }
         };
+        // Bubbling, so this runs AFTER a TunnelCard under the pointer has already set Copy for a
+        // dragged text payload (TunnelCard.OnCardDragOver). Accepting text here too keeps that
+        // effect — answering None would veto it and Win32 would never deliver the drop at all.
         AddHandler(DragDrop.DragOverEvent, (_, e) =>
-            e.DragEffects = e.DataTransfer.Contains(DataFormat.File) ? DragDropEffects.Copy : DragDropEffects.None);
-        // "Drop to import" overlay while files hover anywhere over the window.
-        AddHandler(DragDrop.DragEnterEvent, (_, e) =>
-            View.SetDropOverlay(e.DataTransfer.Contains(DataFormat.File)));
+            e.DragEffects = Droppable(e) ? DragDropEffects.Copy : DragDropEffects.None);
+        // "Drop to import" overlay while a payload hovers anywhere over the window.
+        AddHandler(DragDrop.DragEnterEvent, (_, e) => View.SetDropOverlay(Droppable(e)));
         AddHandler(DragDrop.DragLeaveEvent, (_, _) => View.SetDropOverlay(false));
         AddHandler(DragDrop.DropEvent, OnDrop);
     }
@@ -54,23 +56,65 @@ public partial class MainWindow : Window, IDialogs
             try { StartupService.Set(prefs.StartOnBoot); } catch { }
     }
 
+    // Anything droppable on the window: a .conf file, or a config pasted as text straight out of
+    // an editor. Checked on drag-over as well as drop so the cursor promises what will happen.
+    static bool Droppable(DragEventArgs e) =>
+        e.DataTransfer.Contains(DataFormat.File) || e.DataTransfer.Contains(DataFormat.Text);
+
     async void OnDrop(object? sender, DragEventArgs e)
     {
         View.SetDropOverlay(false);
         if (DataContext is not MainViewModel vm) return;
-        var files = e.DataTransfer.TryGetFiles() ?? Enumerable.Empty<IStorageItem>();
+        var files = (e.DataTransfer.TryGetFiles() ?? Enumerable.Empty<IStorageItem>()).ToList();
+
+        // No files: a text payload dragged from an editor.
+        if (files.Count == 0)
+        {
+            var text = e.DataTransfer.TryGetText();
+            if (MainViewModel.LooksLikeConfig(text)) vm.AddTunnelFromText(text!, null);
+            else
+            {
+                vm.StatusText = "That text isn't a WireGuard configuration";
+                vm.StatusOk = false;
+            }
+            return;
+        }
+
+        // `attempted` marks that something was handed to the importer, so its own verdict (which
+        // may be a failure, e.g. "no valid PrivateKey") is never overwritten by the catch-all below.
+        var attempted = false;
         foreach (var item in files.OfType<IStorageFile>())
         {
             if (!item.Name.EndsWith(".conf", StringComparison.OrdinalIgnoreCase)) continue;
-            await using var stream = await item.OpenReadAsync();
-            using var reader = new StreamReader(stream);
-            var conf = await reader.ReadToEndAsync();
+            string conf;
+            try
+            {
+                await using var stream = await item.OpenReadAsync();
+                using var reader = new StreamReader(stream);
+                conf = await reader.ReadToEndAsync();
+            }
+            catch (Exception ex)
+            {
+                attempted = true;
+                vm.StatusText = $"Couldn't read {item.Name}: {ex.Message}";
+                vm.StatusOk = false;
+                continue;
+            }
             // Only import whole tunnels here. A peer-descriptor .conf dropped onto a tunnel card is
             // added there as a peer (TunnelCard.OnCardDrop); the card handler can't mark the bubbling
             // drop handled before its async file read, so gate on content to avoid double-processing.
-            if (!conf.Contains("[Interface]", StringComparison.OrdinalIgnoreCase)) continue;
+            if (!MainViewModel.LooksLikeConfig(conf)) continue;
+            attempted = true;
             vm.AddTunnelFromText(conf, Path.GetFileNameWithoutExtension(item.Name));
         }
+
+        // Nothing reached the importer. Previously every one of these paths returned in silence,
+        // which read as "drag and drop doesn't work" rather than "that file wasn't a tunnel".
+        if (attempted) return;
+        vm.StatusText = files.Any(f => f.Name.EndsWith(".conf", StringComparison.OrdinalIgnoreCase))
+            ? "That .conf has no [Interface] section — it isn't a tunnel configuration"
+            : "Drop a WireGuard .conf file to import a tunnel";
+        vm.StatusOk = false;
     }
 
     protected override async void OnKeyDown(KeyEventArgs e)

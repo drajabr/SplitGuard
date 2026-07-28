@@ -135,7 +135,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
 
     // One button in the header steps through this: click while Idle checks GitHub and, if a
     // newer release exists, downloads its installer; a click while Ready launches it.
-    public enum UpdateStatus { Idle, Checking, Downloading, Ready, UpToDate, Error }
+    public enum UpdateStatus { Idle, Checking, Downloading, Ready, Installing, UpToDate, Error }
 
     UpdateStatus _update = UpdateStatus.Idle;
     UpdateInfo? _pendingUpdate;
@@ -150,6 +150,8 @@ public class MainViewModel : ObservableObject, ITunnelHost
         Raise(nameof(UpdateLabel));
         Raise(nameof(UpdateTooltip));
         Raise(nameof(UpdateHighlight));
+        Raise(nameof(UpdateFailed));
+        Raise(nameof(UpdateIsFresh));
         Raise(nameof(UpdateVisible));
     }
 
@@ -161,6 +163,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
         UpdateStatus.Checking => "",     // Sync
         UpdateStatus.Downloading => "",  // Download
         UpdateStatus.Ready => "",        // UpdateRestore (the "update available" badge)
+        UpdateStatus.Installing => "",   // Sync — setup is running unattended behind us
         UpdateStatus.UpToDate => "",     // CheckMark
         UpdateStatus.Error => "",        // Error
         _ => "",                          // Idle: same update glyph, dimmed
@@ -173,6 +176,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
         UpdateStatus.Checking => "Checking…",
         UpdateStatus.Downloading => $"{_downloadPct:P0}",
         UpdateStatus.Ready => Platform.SupportsInstallerUpdate ? "Install" : "Update",
+        UpdateStatus.Installing => "Installing…",
         UpdateStatus.UpToDate => "Up to date",
         UpdateStatus.Error => "Retry",
         _ => "Check",
@@ -185,6 +189,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
         UpdateStatus.Ready => Platform.SupportsInstallerUpdate
             ? $"Update {_pendingUpdate?.Tag} ready — click to install"
             : $"Update {_pendingUpdate?.Tag} available — click to open the release page",
+        UpdateStatus.Installing => "Installing the update… the app will reopen on its own",
         UpdateStatus.UpToDate => $"Up to date (v{UpdateService.CurrentVersion})",
         UpdateStatus.Error => "Update check failed — click to retry",
         _ => $"Check for updates (v{UpdateService.CurrentVersion})",
@@ -192,6 +197,11 @@ public class MainViewModel : ObservableObject, ITunnelHost
 
     // The button lights up (accent) only when an update is downloaded and ready to install.
     public bool UpdateHighlight => _update == UpdateStatus.Ready;
+
+    // The other two outcomes worth colouring: a failed check reads red, a confirmed up-to-date
+    // green. Without these both rendered in the same dim grey as "nothing is happening".
+    public bool UpdateFailed => _update == UpdateStatus.Error;
+    public bool UpdateIsFresh => _update == UpdateStatus.UpToDate;
 
     // The update affordance next to the version is hidden until something's happening: a check
     // is running, an update is downloading/ready, or a transient up-to-date/error result. Idle
@@ -202,10 +212,30 @@ public class MainViewModel : ObservableObject, ITunnelHost
     // Header button click: install when ready, ignore while busy, otherwise (re)check.
     public void OnUpdateButtonClicked()
     {
+        // In the UI-review harness a real check is refused (CheckForUpdatesAsync returns on its
+        // first line), which used to leave this button stuck on one state and impossible to review.
+        // Here a click walks the states instead, so every glyph, colour and label width can be
+        // inspected — including that the pill holds ONE width the whole way round.
+        if (RuleStore.DemoMode)
+        {
+            _downloadPct = _update == UpdateStatus.Downloading ? 1.0 : 0.12;
+            SetUpdate(_update switch
+            {
+                UpdateStatus.Idle => UpdateStatus.Checking,
+                UpdateStatus.Checking => UpdateStatus.Downloading,
+                UpdateStatus.Downloading => UpdateStatus.Ready,
+                UpdateStatus.Ready => UpdateStatus.UpToDate,
+                UpdateStatus.UpToDate => UpdateStatus.Error,
+                _ => UpdateStatus.Checking,
+            });
+            return;
+        }
         switch (_update)
         {
             case UpdateStatus.Ready: InstallUpdate(); break;
-            case UpdateStatus.Checking or UpdateStatus.Downloading: break;
+            // Installing is terminal from the UI's side: setup is already running and this process
+            // is on its way out, so a second click must not start anything.
+            case UpdateStatus.Checking or UpdateStatus.Downloading or UpdateStatus.Installing: break;
             default: _ = CheckForUpdatesAsync(manual: true); break;
         }
     }
@@ -283,15 +313,42 @@ public class MainViewModel : ObservableObject, ITunnelHost
             _ = CheckForUpdatesAsync(manual: true); // installer went missing — re-fetch
             return;
         }
+        _ = InstallUpdateAsync();
+    }
+
+    // Unattended install: one click and setup runs to completion with no wizard, no prompts, and
+    // relaunches the app. No UAC appears because this process is already elevated (app.manifest)
+    // and a child process inherits that token — which is also why the installer is never asked to
+    // self-elevate. Switches, and why each one:
+    //   /VERYSILENT        no wizard and no progress window
+    //   /SUPPRESSMSGBOXES  answer any message box with its default instead of blocking, unattended
+    //   /NORESTART         never reboot the machine behind the user's back
+    //   /SGRELAUNCH=1      our own flag; the [Run] entry's Check gate reopens the app afterwards
+    //   /LOG=...           the only forensic trail left, since nothing is on screen to read
+    // Deliberately NOT /RESTARTAPPLICATIONS or /CLOSEAPPLICATIONS: the script sets
+    // CloseApplications=no and kills the process itself in PrepareToInstall, so enabling the
+    // Restart Manager scan would only duplicate that work.
+    async Task InstallUpdateAsync()
+    {
+        SetUpdate(UpdateStatus.Installing);
+        var log = Path.Combine(Path.GetDirectoryName(_installerPath) ?? Path.GetTempPath(),
+                               $"install-{_pendingUpdate?.Tag ?? "update"}.log");
+        var args = $"/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SGRELAUNCH=1 /LOG=\"{log}\"";
+        // Drop tunnels and NRPT rules on OUR terms first. Setup's PrepareToInstall runs
+        // `taskkill /F`, which would otherwise land mid-teardown and leave adapters up and DNS
+        // rules pointing at a tunnel that no longer exists. Bounded, because a wedged CIM call
+        // must not strand the user staring at "Installing…" forever.
+        try { await Task.WhenAny(Task.Run(OnExit), Task.Delay(15000)); } catch { }
         try
         {
-            UpdateService.LaunchInstaller(_installerPath);
+            UpdateService.LaunchInstaller(_installerPath, args);
             SplitGuard.App.ExitApplication?.Invoke(); // free the running files for the setup
         }
         catch (Exception ex)
         {
             StatusText = $"Couldn't start the installer: {ex.Message}";
             StatusOk = false;
+            SetUpdate(UpdateStatus.Ready); // still downloaded — let them click again
         }
     }
 
@@ -1239,14 +1296,16 @@ public class MainViewModel : ObservableObject, ITunnelHost
     public static bool LooksLikeConfig(string? text) =>
         text is not null && text.Contains("[Interface]", StringComparison.OrdinalIgnoreCase);
 
-    public void AddTunnelFromText(string text, string? suggestedName)
+    // Returns whether a tunnel was actually added, so a caller handling several dropped files can
+    // tell "nothing here was importable" from "imported fine" and say so.
+    public bool AddTunnelFromText(string text, string? suggestedName)
     {
         var parsed = WireGuardConf.Parse(text);
         if (!PeerViewModel.IsValidKey(parsed.PrivateKey))
         {
             StatusText = "Import failed: config has no valid PrivateKey";
             StatusOk = false;
-            return;
+            return false;
         }
         // An embedded Name (our own exports write one) outranks the filename guess; a QR
         // scan or paste has no filename at all, so the clone keeps its name either way.
@@ -1284,6 +1343,7 @@ public class MainViewModel : ObservableObject, ITunnelHost
         Tunnels.Add(new TunnelViewModel(this, cfg));
         StatusText = $"Tunnel '{name}' added";
         StatusOk = true;
+        return true;
     }
 
     // ---- externals -------------------------------------------------------------

@@ -39,6 +39,10 @@
     <SolidColorBrush x:Key="WarningBrush">#C77E16</SolidColorBrush>
     <SolidColorBrush x:Key="SuccessBrush">#4F9A34</SolidColorBrush>
     <SolidColorBrush x:Key="DotBrush">#8A8A8A</SolidColorBrush>
+    <!-- Version tag beside the wordmark. It rides inside the title TextBlock as a Run so the two
+         share one baseline, and Runs have no Opacity — so the dim lives in the brush. Replaced per
+         theme by MainView.ApplyTheme; this is the dark-variant default for the first frame. -->
+    <SolidColorBrush x:Key="VersionTagBrush" Color="#FFFFFF" Opacity="0.68" />
     <SolidColorBrush x:Key="WarningBgBrush">#22C77E16</SolidColorBrush>
     <SolidColorBrush x:Key="DangerBgBrush">#22D14B41</SolidColorBrush>
     <!-- Faded hairline for separators: transparent at both ends, faint neutral middle —

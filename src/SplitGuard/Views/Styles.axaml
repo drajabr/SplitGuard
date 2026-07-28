@@ -232,6 +232,19 @@
     <Setter Property="Background" Value="{DynamicResource FieldFillBrush}" />
   </Style>
 
+  <!-- Update button: ONE geometry for every state. Its label steps through Checking… / 12 % /
+       Install / Up to date / Retry, whose widths all differ, so the glyph and the label carry
+       MEASURED MinWidths (MainView.UpdateBadgeMetrics — measured, never hardcoded, so they hold
+       across every font and zoom pick). Content is left-aligned because Button's inherited
+       centring re-centres whatever is inside the pinned width, which slid the glyph sideways on
+       every state change — the jitter that made the button read as unfinished. Height stays
+       padding-driven: it is already identical in every state, and pinning it to CtrlH would
+       overtake the hardcoded 30px logo at 1.3x zoom and grow the whole title strip. -->
+  <Style Selector="Button.upd">
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+
   <!-- Full-width action row in the Add drawer: left-aligned label with its shortcut flushed
        right; a soft rounded hover fill (fades via the universal button transition). -->
   <Style Selector="Button.actionrow">
@@ -290,8 +303,18 @@
     <Setter Property="Cursor" Value="Hand" />
     <Setter Property="Template">
       <ControlTemplate>
-        <Border Name="track" Background="{TemplateBinding Background}" CornerRadius="11">
-          <Ellipse Name="knob" Width="16" Height="16" Fill="White"
+        <!-- Track and knob are SIBLINGS, not parent and child. The off state dims the track to
+             0.45, and opacity applies to a control's whole subtree — as the knob's parent, the
+             track was washing the white circle out with it, which reads as a soft, ill-placed
+             dot. As siblings the track dims alone and the knob stays crisp in both states. -->
+        <Panel>
+          <Border Name="track" Background="{TemplateBinding Background}" CornerRadius="11" />
+          <!-- UseLayoutRounding=False is load-bearing at fractional scaling. The knob's centred
+               offset is (track-knob)/2, which is a whole 3px at 100% but 3.75 at 125% and 4.5 at
+               150% — layout rounding then snaps it DOWN to 4 and 5, parking the circle up to half
+               a pixel below centre. Opting out lets it sit at the true centre; the shape is
+               antialiased anyway, so nothing turns blurry. -->
+          <Ellipse Name="knob" Width="16" Height="16" Fill="White" UseLayoutRounding="False"
                    HorizontalAlignment="Left" VerticalAlignment="Center" Margin="3,0">
             <Ellipse.Transitions>
               <Transitions>
@@ -299,7 +322,7 @@
               </Transitions>
             </Ellipse.Transitions>
           </Ellipse>
-        </Border>
+        </Panel>
       </ControlTemplate>
     </Setter>
   </Style>
@@ -643,6 +666,18 @@
   <Style Selector="TextBlock.updicon.hot">
     <Setter Property="Opacity" Value="1" />
     <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
+  </Style>
+  <!-- Same shape as .hot, only the brush differs: a failed check and a confirmed up-to-date both
+       said their piece in dim grey before, so the two outcomes that matter looked like the idle
+       state. Once an update installs silently (no wizard to watch), this red "Retry" is the only
+       on-screen evidence a self-update failed. -->
+  <Style Selector="TextBlock.updicon.bad">
+    <Setter Property="Opacity" Value="1" />
+    <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
+  </Style>
+  <Style Selector="TextBlock.updicon.good">
+    <Setter Property="Opacity" Value="1" />
+    <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" />
   </Style>
   <!-- Fluent's own Button theme repaints the presenter's Foreground on pointerover, which fought
        the fade above and made LEAVE stutter (the same two-driver bug as the caption buttons).
