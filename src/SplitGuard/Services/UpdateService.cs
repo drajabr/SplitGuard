@@ -1,16 +1,23 @@
 using System.Diagnostics;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text.Json;
 
 namespace SplitGuard.Services;
 
 // A newer release than the running build: where to fetch its Windows installer (empty on
 // platforms that go through the release page instead) and the release's web page.
-// Size is the length GitHub reports for the asset; 0 when unknown (the no-installer/Android path).
-// It is checked after download because the cached .exe is later executed with the app's inherited
-// admin token and, on the unattended path, with no wizard for anyone to notice something is wrong.
-public record UpdateInfo(Version Version, string Tag, string DownloadUrl, string AssetName, string PageUrl, long Size = 0);
+//
+// Size and Sha256 are what the releases API reports for the asset, and they are the whole basis for
+// trusting the file we execute. The installer runs with this process's inherited admin token and,
+// on the unattended path, with no wizard for a human to notice anything wrong — so the bytes are
+// checked against these on download AND again immediately before launch. Both arrive over TLS from
+// api.github.com, which is already the trust anchor for the download itself.
+// Sha256 is lowercase hex without the "sha256:" prefix; "" when the API didn't report one.
+public record UpdateInfo(Version Version, string Tag, string DownloadUrl, string AssetName, string PageUrl,
+                         long Size = 0, string Sha256 = "");
 
 // Self-update against the public GitHub releases of drajabr/SplitGuard: query the latest
 // release, download its installer, then hand off to it. No auth — the API is public and the
@@ -66,7 +73,12 @@ public static class UpdateService
             if (!name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) continue;
             var url = asset.TryGetProperty("browser_download_url", out var u) ? u.GetString() ?? "" : "";
             var size = asset.TryGetProperty("size", out var sz) && sz.TryGetInt64(out var s) ? s : 0;
-            if (url.Length > 0) return new UpdateInfo(latest, tag, url, name, page, size);
+            // GitHub reports this as "sha256:<hex>"; keep just the hex, and only for that algorithm
+            // (anything else we can't check, so treat it as absent rather than pretend).
+            var digest = asset.TryGetProperty("digest", out var dg) ? dg.GetString() ?? "" : "";
+            var sha = digest.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase)
+                ? digest["sha256:".Length..].Trim().ToLowerInvariant() : "";
+            if (url.Length > 0) return new UpdateInfo(latest, tag, url, name, page, size, sha);
         }
         return null;
     }
@@ -74,13 +86,68 @@ public static class UpdateService
     static bool TryParseTag(string tag, out Version version) =>
         Version.TryParse(tag.TrimStart('v', 'V').Trim(), out version!);
 
-    static string UpdatesDir => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SplitGuard", "updates");
+    // ProgramData, not LOCALAPPDATA. The cached installer is executed with this process's admin
+    // token, so where it sits IS a security boundary: %LOCALAPPDATA% is writable by the ordinary
+    // user session, which means any unprivileged process could swap the .exe between our download
+    // and the user's click and get it run elevated. Moving the cache under an
+    // Administrators/SYSTEM-only DACL removes that window rather than trying to detect it.
+    public static string UpdatesDir => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "SplitGuard", "updates");
+
+    // Create the cache with inheritance disabled and only Administrators + SYSTEM able to write.
+    // ProgramData's default DACL lets any authenticated user create files in new subdirectories,
+    // so relying on the default here would leave the same hole one level up.
+    // Returns the reason the DACL could not be applied, or null on success. Tightening the DACL is
+    // best-effort ON PURPOSE: if it fails (an unexpected owner, group policy, a non-NTFS volume),
+    // refusing to download would break updating altogether, and the launch-time SHA-256 re-check in
+    // VerifyInstaller still catches tampering. So this hardens the happy path without becoming a
+    // single point of failure — but a caller that cares should surface a non-null result.
+    public static string? EnsureUpdatesDir()
+    {
+        Directory.CreateDirectory(UpdatesDir);
+        if (!OperatingSystem.IsWindows()) return "not Windows";
+        try
+        {
+            var sec = new DirectorySecurity();
+            sec.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+            var inherit = InheritanceFlags.ObjectInherit | InheritanceFlags.ContainerInherit;
+            foreach (var who in new[] { WellKnownSidType.BuiltinAdministratorsSid, WellKnownSidType.LocalSystemSid })
+                sec.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(who, null),
+                    FileSystemRights.FullControl, inherit, PropagationFlags.None, AccessControlType.Allow));
+            new DirectoryInfo(UpdatesDir).SetAccessControl(sec);
+            return null;
+        }
+        catch (Exception ex) { return $"{ex.GetType().Name}: {ex.Message}"; }
+    }
+
+    // SHA-256 of a file as lowercase hex, for comparison against the release API's digest.
+    public static string Sha256Of(string path)
+    {
+        using var stream = File.OpenRead(path);
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream)).ToLowerInvariant();
+    }
+
+    // Re-check the cached installer against what the release API said, immediately before running
+    // it. Verifying only at download time would leave a gap between "verified" and "executed" —
+    // exactly the window an attacker wants — so this is called again at the point of launch.
+    // Returns null when the file is good, or the reason it was rejected.
+    public static string? VerifyInstaller(string path, UpdateInfo info)
+    {
+        if (!File.Exists(path)) return "the downloaded installer is gone";
+        var len = new FileInfo(path).Length;
+        if (info.Size > 0 && len != info.Size)
+            return $"size is {len} bytes but the release lists {info.Size}";
+        if (info.Sha256.Length == 0) return null; // nothing published to compare against
+        var actual = Sha256Of(path);
+        return actual == info.Sha256
+            ? null
+            : $"SHA-256 is {actual[..16]}… but the release lists {info.Sha256[..16]}…";
+    }
 
     // Download the installer to a local cache, reporting 0..1 progress; returns its path.
     public static async Task<string> DownloadAsync(UpdateInfo info, IProgress<double>? progress = null, CancellationToken ct = default)
     {
-        Directory.CreateDirectory(UpdatesDir);
+        EnsureUpdatesDir();
         var path = Path.Combine(UpdatesDir, info.AssetName);
         using var http = NewClient();
         using var resp = await http.GetAsync(info.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, ct);
@@ -101,15 +168,13 @@ public static class UpdateService
                 if (total > 0) progress?.Report((double)read / total);
             }
         }
-        // Verify the finished download against the length GitHub advertised BEFORE promoting the
-        // .part file to the name we will later execute. A truncated transfer used to be launched
-        // anyway; the unattended path makes that worse, because setup runs with no wizard and with
-        // this process's admin token. Not a substitute for signing — see the note on LaunchInstaller.
-        var got = new FileInfo(tmp).Length;
-        if (info.Size > 0 && got != info.Size)
+        // Verify size AND SHA-256 against the release API BEFORE promoting the .part file to the
+        // name we will later execute, so a bad download never becomes a runnable installer.
+        var bad = VerifyInstaller(tmp, info);
+        if (bad is not null)
         {
             try { File.Delete(tmp); } catch { }
-            throw new IOException($"Download is {got} bytes but the release lists {info.Size} — discarded");
+            throw new IOException($"Discarded the downloaded update: {bad}");
         }
         File.Move(tmp, path, overwrite: true);
         return path;
@@ -119,11 +184,15 @@ public static class UpdateService
     // so no UAC prompt appears; `arguments` carries the unattended switches on the self-update path.
     // The caller must exit the app right after so setup can replace the running files.
     //
-    // NOTE: the installer is not Authenticode-signed and is cached under %LOCALAPPDATA%, which is
-    // user-writable. The size check in DownloadAsync catches a truncated or swapped-for-a-different
-    // -length file, but anything able to write that directory between download and launch could
-    // still substitute a same-size payload. Signing the setup and verifying the signature here is
-    // the real fix and is not yet done.
+    // Callers MUST call VerifyInstaller immediately beforehand. Two defences carry this path: the
+    // cache lives under an Administrators-only DACL (EnsureUpdatesDir), so an unprivileged process
+    // cannot reach the file at all, and the bytes are re-hashed against the release API's digest at
+    // the moment of launch, so tampering by anything that *could* reach it is still caught.
+    //
+    // RESIDUAL RISK: both the digest and the download come from GitHub, so this defends against
+    // tampering below GitHub — not against a compromised GitHub account or release. Only an
+    // Authenticode signature made with a key held outside GitHub, verified here against a pinned
+    // publisher, would cover that; it needs a code-signing certificate the project does not have.
     public static void LaunchInstaller(string path, string arguments = "")
     {
         var psi = new ProcessStartInfo(path) { UseShellExecute = true };

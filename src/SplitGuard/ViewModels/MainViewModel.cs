@@ -330,6 +330,22 @@ public class MainViewModel : ObservableObject, ITunnelHost
     // Restart Manager scan would only duplicate that work.
     async Task InstallUpdateAsync()
     {
+        // Re-verify at the point of launch, not just after download: the file has been sitting on
+        // disk since, and this is the last moment before it runs with our admin token. Refusing here
+        // is the whole point — a rejected installer is deleted so the next click re-downloads it.
+        if (_pendingUpdate is { } info)
+        {
+            var bad = UpdateService.VerifyInstaller(_installerPath, info);
+            if (bad is not null)
+            {
+                try { File.Delete(_installerPath); } catch { }
+                _installerPath = "";
+                StatusText = $"Refused to run the update installer: {bad}";
+                StatusOk = false;
+                SetUpdate(UpdateStatus.Error);
+                return;
+            }
+        }
         SetUpdate(UpdateStatus.Installing);
         var log = Path.Combine(Path.GetDirectoryName(_installerPath) ?? Path.GetTempPath(),
                                $"install-{_pendingUpdate?.Tag ?? "update"}.log");
