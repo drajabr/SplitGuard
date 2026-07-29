@@ -762,9 +762,13 @@ public partial class TunnelCard : UserControl
             DetailPanel.Children.Add(grid);
         }
 
-        // The peer's name (bold accent) with its live status flushed right — uptime, transfer
-        // totals and RTT while connected (nothing at all when idle). One line on every head:
-        // the name keeps its width, the stats trim from the left-going end when cramped.
+        // The peer's name (bold accent), then its endpoint, then live status flushed right —
+        // uptime, transfer totals and RTT while connected (nothing at all when idle).
+        // PRIORITY when the line won't fit: name, then endpoint, then the stats. The endpoint
+        // identifies WHERE the peer is and is the reason to read this line at all, so it keeps its
+        // width and the uptime/transfer figures are what give way — they're live numbers the user
+        // can also get by expanding the card. Hence Auto for the endpoint (takes what it needs) and
+        // star for the stats (absorbs the shortfall and ellipsizes into it).
         void NameLine(string name, string endpoint, string stats, IBrush accent, PeerViewModel? peer)
         {
             var grid = new Grid
@@ -781,8 +785,9 @@ public partial class TunnelCard : UserControl
             // Same SynIp colour the tunnel's own addresses wear in the collapsed header
             // (TunnelCard.axaml:46), applied through the CLASS rather than a snapshotted brush so
             // it follows a theme change on its own — Mono() would set Foreground as a local value
-            // and beat the setter. Bounded so a long hostname ellipsizes instead of squeezing the
-            // stats off the card.
+            // and beat the setter. Deliberately NOT width-capped: a cap would make the endpoint
+            // ellipsize while the stats kept their full width, which is the wrong thing to sacrifice.
+            // It still trims if the endpoint alone can't fit the card.
             if (endpoint.Length > 0)
             {
                 var ep = new TextBlock
@@ -790,12 +795,23 @@ public partial class TunnelCard : UserControl
                     Text = endpoint,
                     TextTrimming = TextTrimming.CharacterEllipsis,
                     Margin = new Avalonia.Thickness(8, 0, 0, 0),
-                    MaxWidth = Compact ? 160 : 260,
                 };
                 ep.Classes.Add("mono");
                 ep.Classes.Add("synip");
                 Grid.SetColumn(ep, 1);
                 grid.Children.Add(ep);
+                // Cap the endpoint at the width actually available to it, measured — never a fixed
+                // number. An Auto column is measured with INFINITE width, so the TextBlock believes
+                // it got everything it asked for and TextTrimming never engages: a hostname longer
+                // than the card was hard-clipped mid-character at the card edge instead of
+                // ellipsizing. The cap only ever binds when the endpoint alone cannot fit, so the
+                // normal case still takes its natural width and the stats still yield first.
+                grid.SizeChanged += (_, _) =>
+                {
+                    var room = grid.Bounds.Width - nm.DesiredSize.Width - 16;
+                    // Guarded: writing MaxWidth re-measures, which would re-enter this handler.
+                    if (room > 24 && Math.Abs(ep.MaxWidth - room) > 0.5) ep.MaxWidth = room;
+                };
             }
             var st = new TextBlock
             {
