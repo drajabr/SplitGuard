@@ -222,6 +222,7 @@ public partial class MainView : UserControl
         // An expanded drawer is something the user explicitly opened — it never auto-hides.
         // Only the bare bar yields to content scrolling behind it.
         double op = 1;
+        var passThrough = false;
         if (_openDrawer == Drawer.None)
         {
             // Where the cards actually end, in ListHost coordinates: the reserved bottom margin
@@ -231,8 +232,18 @@ public partial class MainView : UserControl
             // move while a drawer above it animates, so this is stable (no flash on drawer close).
             var barTop = BottomBar.TranslatePoint(default, ListHost)?.Y ?? (ListHost.Bounds.Height - BottomBar.Bounds.Height);
             var overlap = cardsBottom > barTop + 1;
-            op = !overlap || _clusterHover ? 1 : 0;
+            // While a card is expanded for editing, its Save/Cancel/Delete row can sit exactly
+            // where the bar does — hovering there to click them must NOT resurrect the bar over
+            // the buttons, and the invisible bar must not eat their clicks either. The bar comes
+            // back when the edit ends or the overlap clears (both change the scroll extent, which
+            // re-runs this via ScrollChanged).
+            var editing = DataContext is MainViewModel mv && mv.Tunnels.Any(t => t.IsEditing);
+            if (overlap && editing)
+                passThrough = true;
+            op = !overlap || (_clusterHover && !passThrough) ? 1 : 0;
         }
+        BottomCluster.IsHitTestVisible = !passThrough;
+        if (passThrough) _clusterHover = false; // PointerExited can't fire once hit-testing is off
         // Fade the shadow-casting Borders themselves, never their parent StackPanel — an opacity
         // layer on the parent clips the children's BoxShadows to the panel's bounds.
         BottomBar.Opacity = op;
