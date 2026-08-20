@@ -377,18 +377,38 @@ public class MainViewModel : ObservableObject, ITunnelHost
         if (_update == from && token == _updateRevertToken) SetUpdate(UpdateStatus.Idle);
     }
 
-    // Startup: Windows checks at most once a day (a found update downloads an installer —
-    // that shouldn't churn on every launch); Android checks on EVERY run — it's one cheap
-    // API call and the result is just an arrow to the release page.
-    void MaybeCheckUpdatesOnStartup()
+    // One gate for startup AND the hourly re-check: Windows checks at most once a day (a
+    // found update downloads an installer — that shouldn't churn on every launch); Android
+    // still checks on EVERY launch — one cheap API call whose result is just an arrow to
+    // the release page — but its periodic re-checks are day-gated the same way. The stamp
+    // only advances on a completed check (see StampUpdateCheck), so a failed check simply
+    // retries on the next tick.
+    void MaybeCheckUpdates(bool startup)
     {
         if (!_config.Ui.CheckUpdates) return;
-        if (Platform.SupportsInstallerUpdate
+        if ((Platform.SupportsInstallerUpdate || !startup)
             && DateTime.TryParse(_config.Ui.LastUpdateCheck, null,
                 System.Globalization.DateTimeStyles.RoundtripKind, out var last)
             && DateTime.UtcNow - last.ToUniversalTime() < TimeSpan.FromDays(1))
             return;
         _ = CheckForUpdatesAsync(manual: false);
+    }
+
+    // The startup-only check meant an instance that runs for weeks (tray app, starts on
+    // boot) never checked again — updates only surfaced after a relaunch. Re-evaluate the
+    // day gate hourly so a long-running instance notices a release within a day of it
+    // shipping. Hourly, not daily: the gate owns the cadence, the timer only samples it,
+    // so a missed tick (sleep/hibernate) costs an hour, not a day.
+    System.Threading.Timer? _updateRecheckTimer;
+    void StartUpdateRecheck()
+    {
+        if (RuleStore.DemoMode || _updateRecheckTimer is not null) return;
+        _updateRecheckTimer = new System.Threading.Timer(
+            _ => Dispatcher.UIThread.Post(() =>
+            {
+                if (!_shuttingDown) MaybeCheckUpdates(startup: false);
+            }),
+            null, TimeSpan.FromHours(1), TimeSpan.FromHours(1));
     }
 
     // Fire an OS/in-app notification when the user has them enabled.
@@ -462,7 +482,8 @@ public class MainViewModel : ObservableObject, ITunnelHost
             RefreshPins();
             await Task.Run(RefreshCatchAll);
             RestoreConnections();
-            MaybeCheckUpdatesOnStartup();
+            MaybeCheckUpdates(startup: true);
+            StartUpdateRecheck(); // a long-running instance re-evaluates the day gate hourly
             StartNrptVerify(); // periodic drift repair against the ACTUAL OS rule state
         }
         else
@@ -480,6 +501,10 @@ public class MainViewModel : ObservableObject, ITunnelHost
                     p.HasStats = true;
                     p.TxTotalText = "1.24 GB";
                     p.RxTotalText = "8.7 GB";
+                    // Raw totals too — the collapsed stats line re-formats from these
+                    // (width-adaptive ↑/↓ pair or ⇅ total), not from the texts above.
+                    p.TxTotal = (ulong)(1.24 * (1UL << 30));
+                    p.RxTotal = (ulong)(8.7 * (1UL << 30));
                     p.HandshakeText = "handshake 14s ago";
                     p.UptimeText = "2h 14m";
                     if (p.HasPingHost) p.PingText = "23 ms";

@@ -42,7 +42,8 @@ public class UiPrefs
     public bool StartOnBoot { get; set; } = true;
     public bool Notifications { get; set; } = true;
     public bool CustomDnsEnabled { get; set; } = true;
-    // Check GitHub for a newer release on startup (at most once a day). On by default.
+    // Check GitHub for a newer release — on startup and hourly while running, at most one
+    // completed check a day. On by default.
     public bool CheckUpdates { get; set; } = true;
     // ISO-8601 UTC timestamp of the last automatic update check (empty = never).
     public string LastUpdateCheck { get; set; } = "";
