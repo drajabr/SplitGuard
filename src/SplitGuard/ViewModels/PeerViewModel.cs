@@ -224,6 +224,11 @@ public partial class PeerViewModel : ObservableObject
     string _rxTotalText = "";
     public string RxTotalText { get => _rxTotalText; set => Set(ref _rxTotalText, value); }
 
+    // Raw totals behind the texts, so the collapsed stats line can re-format them
+    // width-adaptively (shared-unit ↑/↓ pair, or a combined ⇅ total when space is tight).
+    // Plain fields: only the card's fit pass reads them, on the same tick that writes them.
+    public ulong TxTotal, RxTotal;
+
     bool _hasStats;
     public bool HasStats { get => _hasStats; set => Set(ref _hasStats, value); }
 

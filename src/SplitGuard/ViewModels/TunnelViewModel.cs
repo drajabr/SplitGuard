@@ -370,6 +370,8 @@ public class TunnelViewModel : ObservableObject
             p.PingText = "";
             p.TxTotalText = "";
             p.RxTotalText = "";
+            p.TxTotal = 0;
+            p.RxTotal = 0;
             p.FailoverRole = "";
             p.IsHealthy = true;
             p.FirstHandshake = null;
@@ -629,9 +631,13 @@ public class TunnelViewModel : ObservableObject
         // Defer the snapshot restore until the card's collapse curtain has fully closed:
         // Peers.Clear()+rebuild guts the still-visible edit pane mid-animation (a tall empty
         // shell shrinking). If the user re-enters edit before this fires, restoring then is
-        // still correct — cancel promised the saved values either way.
+        // still correct — cancel promised the saved values either way. COALESCED: rapid
+        // cancel/re-open cycles used to arm one timer per cancel, each restore rebuilding
+        // the peer list mid-whatever-animation was running; only the newest fires.
+        var gen = ++_restoreGen;
         Avalonia.Threading.DispatcherTimer.RunOnce(() =>
         {
+            if (gen != _restoreGen) return; // superseded by a newer cancel
             if (IsExternal)
             {
                 Peers[0].Dns = External!.Dns ?? "";
@@ -647,6 +653,9 @@ public class TunnelViewModel : ObservableObject
             }
         }, TimeSpan.FromMilliseconds(Views.Motion.SlowMs + Views.Motion.CushionMs));
     }
+
+    // Bumped per CancelEdit so only the newest deferred snapshot restore runs.
+    int _restoreGen;
 
     void LoadFromCustom()
     {
@@ -826,6 +835,8 @@ public class TunnelViewModel : ObservableObject
             peer.HasStats = true;
             peer.TxTotalText = Format.Bytes(s.TotalTx);
             peer.RxTotalText = Format.Bytes(s.TotalRx);
+            peer.TxTotal = s.TotalTx;
+            peer.RxTotal = s.TotalRx;
             if (s.Handshake is not null)
             {
                 peer.FirstHandshake ??= s.Handshake;

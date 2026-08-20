@@ -271,7 +271,8 @@ public partial class TunnelCard : UserControl
     // with one identical motion.
     void AnimateSwap(Control show, Control hide)
     {
-        var gen = ++_animGen;
+        var swapGen = ++_swapGen;
+        var heightGen = ++_heightGen;
         var from = Body.Bounds.Height;
         var w = Body.Bounds.Width;
         if (w < 1) w = 400;
@@ -282,8 +283,12 @@ public partial class TunnelCard : UserControl
 
         if (to < 1 || from < 1 || Math.Abs(to - from) < 0.5)
         {
-            // No height change to ride — just swap the panes, no reveal.
+            // No height change to ride — just swap the panes, no reveal. Normalize BOTH:
+            // the hidden pane may carry a mid-fade opacity from a superseded reveal, which
+            // would survive until its next show.
             hide.IsVisible = false;
+            hide.Opacity = 1;
+            if (hide.RenderTransform is TranslateTransform t1) t1.Y = 0;
             show.IsVisible = true;
             show.Opacity = 1;
             if (show.RenderTransform is TranslateTransform t0) t0.Y = 0;
@@ -300,10 +305,10 @@ public partial class TunnelCard : UserControl
             show.Opacity = 0;
             show.IsVisible = true;
             Tween(0, 1, AnimMs,
-                v => { if (_animGen == gen) { show.Opacity = v; shift.Y = RevealShift * (1 - v); } },
+                v => { if (_swapGen == swapGen) { show.Opacity = v; shift.Y = RevealShift * (1 - v); } },
                 () =>
                 {
-                    if (_animGen != gen) return;
+                    if (_swapGen != swapGen) return;
                     show.Opacity = 1;
                     if (ReferenceEquals(show.RenderTransform, shift)) show.RenderTransform = null;
                 });
@@ -314,10 +319,10 @@ public partial class TunnelCard : UserControl
         RevealShow();
         Body.Height = from;
         Tween(from, to, AnimMs,
-            v => { if (_animGen == gen) Body.Height = v; },
+            v => { if (_heightGen == heightGen) Body.Height = v; },
             () =>
             {
-                if (_animGen != gen) return;
+                if (_heightGen != heightGen) return;
                 Body.Height = double.NaN;
                 _postTween.Restart();
             });
@@ -354,7 +359,15 @@ public partial class TunnelCard : UserControl
 
     const int AnimMs = Motion.SlowMs;              // structural motion (expand/collapse/reveal)
     const double RevealShift = Motion.RevealShift; // px the incoming pane slides up from as it fades in
-    int _animGen; // cancels a stale animation finalize on rapid re-toggle
+    // Two independent cancellation generations, because they guard DISJOINT properties that
+    // must be allowed to animate concurrently: a height retarget (content grew mid-edit) must
+    // not strand a pane reveal at mid-fade opacity — that was the "card contents stuck dim"
+    // bug: CancelEdit's deferred peer restore landed inside the next expand's reveal, bumped
+    // the shared generation, and the reveal's set-Opacity-to-1 finalize silently no-opped.
+    // INVARIANT: whoever bumps a generation must leave the properties it guards in a valid
+    // final state (the superseded tween writes nothing further).
+    int _swapGen;   // pane reveal: show/hide, Opacity, Y-shift (AnimateSwap, ResetOverlays)
+    int _heightGen; // Body.Height tweens (AnimateSwap, TweenBodyToContent)
 
     static double NaturalHeight(Control content, double width)
     {
@@ -529,13 +542,18 @@ public partial class TunnelCard : UserControl
     {
         if (ScanOverlay.IsVisible) DisposeScanner();   // release the camera before tearing the pane down
         if (!ExportOverlay.IsVisible && !PairOverlay.IsVisible && !ScanOverlay.IsVisible) return;
-        ++_animGen;                                   // cancel any in-flight overlay swap
+        ++_swapGen;                                   // cancel any in-flight overlay swap
         ExportOverlay.IsVisible = false; ExportQr.Source = null;
         PairOverlay.IsVisible = false;   PairQr.Source = null;
         ScanOverlay.IsVisible = false;
+        // Normalize BOTH body panes, not just the one the overlay covered: the cancelled
+        // reveal may have been fading the OTHER pane, and a bump-without-restore leaves it
+        // stuck at mid-fade opacity (the invariant on the generation fields).
         ExpandContent.IsVisible = true;               // the pane the overlay was covering
         ExpandContent.Opacity = 1;
         if (ExpandContent.RenderTransform is TranslateTransform t) t.Y = 0;
+        DetailPanel.Opacity = 1;
+        if (DetailPanel.RenderTransform is TranslateTransform td) td.Y = 0;
         if (_vm is not null)
         {
             _suppressExportAnim = true;
@@ -604,7 +622,9 @@ public partial class TunnelCard : UserControl
     void TweenBodyToContent(double? fromOverride = null)
     {
         if (_vm is null) return;
-        var gen = ++_animGen;
+        // Height generation ONLY: retargeting the height must not cancel a pane reveal —
+        // they animate disjoint properties and compose (see the generation fields).
+        var gen = ++_heightGen;
         var from = fromOverride ?? Body.Bounds.Height;
         var w = Body.Bounds.Width;
         if (w < 1) w = 400;
@@ -618,10 +638,10 @@ public partial class TunnelCard : UserControl
 
         Body.Height = from;
         Tween(from, to, AnimMs,
-            v => { if (_animGen == gen) Body.Height = v; },
+            v => { if (_heightGen == gen) Body.Height = v; },
             () =>
             {
-                if (_animGen != gen) return;
+                if (_heightGen != gen) return;
                 Body.Height = double.NaN; // back to auto
                 _postTween.Restart();
             });
@@ -684,27 +704,43 @@ public partial class TunnelCard : UserControl
         }
     }
 
-    // Set by the Android head: reflow the collapsed detail for a narrow, thumb-driven
-    // screen — the cramped right-aligned peer-stats line becomes a 2-column label/value
-    // grid. Desktop leaves this false and keeps the single-line strip.
+    // Set by the Android head. The peer-stats line itself is identical on both heads (the
+    // width-adaptive fit below just has less room to work with on a phone); Compact only
+    // drives the tween shortcut and MainView-level toggles.
     public static bool Compact;
 
     // Steady-state stats ticks must NOT rebuild the collapsed detail's control tree —
     // rebuilding every card every poll was the mobile jank. The STRUCTURE (names, pill
     // texts, duplicate/owner markers, palette) is fingerprinted; while it's unchanged,
-    // only the live stat texts are written in place (no allocation, minimal layout).
+    // only the live stat texts are refit in place (each slot's action re-runs its line's
+    // variant fit — totals grow, so a tick can demote the shown variant).
     string? _detailFingerprint;
-    readonly List<(PeerViewModel Peer, TextBlock Stats)> _detailStatSlots = new();
+    readonly List<(PeerViewModel Peer, Action Refresh)> _detailStatSlots = new();
 
-    // The live half of a peer's name line (uptime · totals · rtt); empty when idle.
-    static string PeerStatsText(PeerViewModel p)
+    static readonly List<string> NoStats = new();
+
+    // Ordered candidates for the live half of a peer's name line, widest first. The fit
+    // pass shows the widest one that fits, so the RTT — present in every variant — is
+    // never the first casualty of a congested line (single-TextBlock trimming ate from the
+    // string's end, where the RTT lived).
+    static List<string> PeerStatsVariants(PeerViewModel p)
     {
-        if (!p.HasStats) return "";
-        var parts = new List<string>();
-        if (!string.IsNullOrEmpty(p.UptimeText)) parts.Add(p.UptimeText);
-        parts.Add($"↑ {p.TxTotalText}  ↓ {p.RxTotalText}");
-        if (p.HasPingHost && !string.IsNullOrEmpty(p.PingText)) parts.Add(p.PingText);
-        return string.Join(Compact ? "  ·  " : "   ·   ", parts);
+        if (!p.HasStats) return NoStats;
+        var up = string.IsNullOrEmpty(p.UptimeText) ? null : p.UptimeText;
+        var ping = p.HasPingHost && !string.IsNullOrEmpty(p.PingText) ? p.PingText : null;
+        var pair = Format.BytesPair(p.TxTotal, p.RxTotal);   // "↑1.24 ↓8.7 GB"
+        var total = Format.BytesTotal(p.TxTotal, p.RxTotal); // "⇅ 9.94 GB"
+        var variants = new List<string>(4);
+        void Add(params string?[] parts)
+        {
+            var s = string.Join(" · ", parts.Where(x => !string.IsNullOrEmpty(x)));
+            if (s.Length > 0 && !variants.Contains(s)) variants.Add(s);
+        }
+        Add(up, pair, ping);
+        Add(up, total, ping);
+        Add(total, ping);
+        Add(ping ?? total); // no RTT configured → the narrowest traffic form stands last
+        return variants;
     }
 
     void BuildDetail()
@@ -764,12 +800,13 @@ public partial class TunnelCard : UserControl
 
         // The peer's name (bold accent), then its endpoint, then live status flushed right —
         // uptime, transfer totals and RTT while connected (nothing at all when idle).
-        // PRIORITY when the line won't fit: name, then endpoint, then the stats. The endpoint
-        // identifies WHERE the peer is and is the reason to read this line at all, so it keeps its
-        // width and the uptime/transfer figures are what give way — they're live numbers the user
-        // can also get by expanding the card. Hence Auto for the endpoint (takes what it needs) and
-        // star for the stats (absorbs the shortfall and ellipsizes into it).
-        void NameLine(string name, string endpoint, string stats, IBrush accent, PeerViewModel? peer)
+        // PRIORITY when the line won't fit: name, then endpoint, then the stats DETAIL — the
+        // stats don't ellipsize away, they step down through measured variants (full pair →
+        // combined total → drop uptime → RTT alone), so the RTT survives every width. The
+        // endpoint identifies WHERE the peer is, so it still outranks the optional stats
+        // detail, but its cap reserves the narrowest variant's width — it can no longer
+        // starve the stats column to zero.
+        void NameLine(string name, string endpoint, IBrush accent, PeerViewModel? peer)
         {
             var grid = new Grid
             {
@@ -788,9 +825,10 @@ public partial class TunnelCard : UserControl
             // and beat the setter. Deliberately NOT width-capped: a cap would make the endpoint
             // ellipsize while the stats kept their full width, which is the wrong thing to sacrifice.
             // It still trims if the endpoint alone can't fit the card.
+            TextBlock? ep = null;
             if (endpoint.Length > 0)
             {
-                var ep = new TextBlock
+                ep = new TextBlock
                 {
                     Text = endpoint,
                     TextTrimming = TextTrimming.CharacterEllipsis,
@@ -800,22 +838,10 @@ public partial class TunnelCard : UserControl
                 ep.Classes.Add("synip");
                 Grid.SetColumn(ep, 1);
                 grid.Children.Add(ep);
-                // Cap the endpoint at the width actually available to it, measured — never a fixed
-                // number. An Auto column is measured with INFINITE width, so the TextBlock believes
-                // it got everything it asked for and TextTrimming never engages: a hostname longer
-                // than the card was hard-clipped mid-character at the card edge instead of
-                // ellipsizing. The cap only ever binds when the endpoint alone cannot fit, so the
-                // normal case still takes its natural width and the stats still yield first.
-                grid.SizeChanged += (_, _) =>
-                {
-                    var room = grid.Bounds.Width - nm.DesiredSize.Width - 16;
-                    // Guarded: writing MaxWidth re-measures, which would re-enter this handler.
-                    if (room > 24 && Math.Abs(ep.MaxWidth - room) > 0.5) ep.MaxWidth = room;
-                };
             }
             var st = new TextBlock
             {
-                Text = stats, Opacity = 0.65,
+                Text = "", Opacity = 0.65,
                 HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
                 TextAlignment = Avalonia.Media.TextAlignment.Right,
                 TextTrimming = TextTrimming.CharacterEllipsis,
@@ -824,9 +850,68 @@ public partial class TunnelCard : UserControl
             st.Classes.Add("mono");
             Grid.SetColumn(st, 2);
             grid.Children.Add(st);
+
+            // Width-adaptive stats: show the WIDEST variant that fits the room left after the
+            // name and endpoint — everything measured, never a fixed number (docs/design/06:
+            // pixel thresholds are defects). One probe per line, cloned from the live control
+            // so it follows font/zoom; measuring on the probe keeps layout churn (and local-
+            // value writes) off the real tree. The endpoint keeps its measured cap: an Auto
+            // column is measured with INFINITE width, so TextTrimming never engages without
+            // one — but the cap now also reserves the narrowest variant, so a long hostname
+            // ellipsizes instead of pushing the whole stats column to zero.
+            var probe = new TextBlock();
+            int shown = -1; // variant index currently displayed, for promote-hysteresis
+            void FitStats()
+            {
+                var variants = peer is null ? NoStats : PeerStatsVariants(peer);
+                if (variants.Count == 0)
+                {
+                    shown = -1;
+                    if (st.Text is { Length: > 0 }) st.Text = "";
+                    return;
+                }
+                probe.FontFamily = st.FontFamily; probe.FontSize = st.FontSize;
+                probe.FontWeight = st.FontWeight; probe.FontStyle = st.FontStyle;
+                double W(string s)
+                {
+                    probe.Text = s;
+                    probe.InvalidateMeasure();
+                    probe.Measure(Size.Infinity);
+                    return Math.Ceiling(probe.DesiredSize.Width);
+                }
+
+                var gridW = grid.Bounds.Width;
+                if (gridW < 1) { shown = variants.Count - 1; st.Text = variants[shown]; return; }
+
+                var minStats = W(variants[^1]);
+                if (ep is not null)
+                {
+                    var room = gridW - nm.DesiredSize.Width - 16 - minStats;
+                    // Guarded: writing MaxWidth re-measures, which would re-enter via SizeChanged.
+                    if (room > 24 && Math.Abs(ep.MaxWidth - room) > 0.5) ep.MaxWidth = room;
+                }
+                // DesiredSize includes the control's margin; MaxWidth does not, hence the +8.
+                var epW = ep is null ? 0 : Math.Min(ep.DesiredSize.Width, ep.MaxWidth + 8);
+                var avail = gridW - nm.DesiredSize.Width - epW - 8;
+
+                // Promoting to a WIDER variant needs slack to spare, so a borderline width
+                // doesn't oscillate between neighbours; stepping down happens exactly when
+                // the shown one stops fitting (same shape as UpdateSettingsLayout).
+                const double Slack = 12;
+                int pick = variants.Count - 1;
+                for (int i = 0; i < variants.Count; i++)
+                {
+                    var need = W(variants[i]) + (shown >= 0 && i < shown ? Slack : 0);
+                    if (need <= avail) { pick = i; break; }
+                }
+                shown = pick;
+                if (st.Text != variants[pick]) st.Text = variants[pick];
+            }
+            grid.SizeChanged += (_, _) => FitStats();
+            FitStats();
             DetailPanel.Children.Add(grid);
-            // Registered so a stats tick can refresh this text without rebuilding the tree.
-            if (peer is not null) _detailStatSlots.Add((peer, st));
+            // Registered so a stats tick can refit this line without rebuilding the tree.
+            if (peer is not null) _detailStatSlots.Add((peer, FitStats));
         }
 
         // The DNS server as a bubble like the domains. When it's pinned as the device-wide
@@ -925,7 +1010,7 @@ public partial class TunnelCard : UserControl
         var fp = fpb.ToString();
         if (fp == _detailFingerprint && DetailPanel.Children.Count > 0)
         {
-            foreach (var (peer, tb) in _detailStatSlots) tb.Text = PeerStatsText(peer);
+            foreach (var (_, refresh) in _detailStatSlots) refresh();
             return;
         }
         _detailFingerprint = fp;
@@ -941,7 +1026,7 @@ public partial class TunnelCard : UserControl
 
             if (wg)
             {
-                NameLine(s.Name, s.Endpoint, PeerStatsText(s.P), accent, s.P);
+                NameLine(s.Name, s.Endpoint, accent, s.P);
                 var routePills = new List<Control>();
                 foreach (var (text, dup) in s.Routes) routePills.Add(Pill(text, dup ? dupBrush : accent));
                 if (routePills.Count > 0) LabeledRow("routes", routePills);

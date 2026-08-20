@@ -66,6 +66,24 @@ public static class Format
         _ => $"{b} B",
     };
 
+    // Both transfer directions as ONE metric with a shared unit — "↑1.24 ↓8.7 GB". The unit
+    // (and precision) follow the LARGER value so the pair reads on one scale; a direction
+    // that rounds away against that scale just shows 0.
+    public static string BytesPair(ulong tx, ulong rx)
+    {
+        (double Div, string Unit, string Fmt) s = Math.Max(tx, rx) switch
+        {
+            >= 1UL << 30 => (1UL << 30, "GB", "0.##"),
+            >= 1UL << 20 => (1UL << 20, "MB", "0.#"),
+            >= 1UL << 10 => (1UL << 10, "KB", "0"),
+            _ => (1, "B", "0"),
+        };
+        return $"↑{(tx / s.Div).ToString(s.Fmt)} ↓{(rx / s.Div).ToString(s.Fmt)} {s.Unit}";
+    }
+
+    // Both directions summed into a single figure — "⇅ 9.94 GB" — the narrowest traffic form.
+    public static string BytesTotal(ulong tx, ulong rx) => $"⇅ {Bytes(tx + rx)}";
+
     // Compact connection-uptime: "45s", "14m", "2h 05m", "3d 4h".
     public static string Duration(TimeSpan span)
     {
