@@ -166,6 +166,50 @@ public sealed class WireGuardAdapter : IDisposable
         }
     }
 
+    // Patch a batch of peers in place (matched by public key): no interface fields, no peer
+    // replacement — roamed endpoints and handshake state of every peer survive. Each patch
+    // carries only the facets to change: a null Keepalive/AllowedIps leaves that facet alone.
+    // Keepalive is flagged even at value 0 — that is how a forced keepalive is CLEARED; the
+    // full-replace path may skip the flag at 0 only because replaced peers start from zero.
+    public void UpdatePeers(IReadOnlyList<(byte[] PublicKey, ushort? Keepalive,
+        IReadOnlyList<(IPAddress Ip, byte Cidr)>? AllowedIps)> patches)
+    {
+        if (patches.Count == 0) return;
+        int size = IfaceSize + patches.Sum(p => PeerSize + (p.AllowedIps?.Count ?? 0) * AllowedIpSize);
+        var buf = new byte[size];
+        var span = buf.AsSpan();
+        BinaryPrimitives.WriteUInt32LittleEndian(span, 0);        // no interface flags
+        BinaryPrimitives.WriteUInt32LittleEndian(span[72..], (uint)patches.Count);
+        int off = IfaceSize;
+        foreach (var p in patches)
+        {
+            uint flags = PeerHasPublicKey | PeerUpdateOnly;
+            if (p.Keepalive.HasValue) flags |= PeerHasKeepalive;
+            if (p.AllowedIps is not null) flags |= PeerReplaceAllowedIps;
+            BinaryPrimitives.WriteUInt32LittleEndian(span[off..], flags);
+            p.PublicKey.CopyTo(span[(off + 8)..]);
+            BinaryPrimitives.WriteUInt16LittleEndian(span[(off + 72)..], p.Keepalive ?? 0);
+            BinaryPrimitives.WriteUInt32LittleEndian(span[(off + 128)..], (uint)(p.AllowedIps?.Count ?? 0));
+            off += PeerSize;
+            if (p.AllowedIps is null) continue;
+            foreach (var (ip, cidr) in p.AllowedIps)
+            {
+                var bytes = ip.GetAddressBytes();
+                bytes.CopyTo(span[off..]);
+                BinaryPrimitives.WriteUInt16LittleEndian(span[(off + 16)..],
+                    (ushort)(ip.AddressFamily == AddressFamily.InterNetwork ? 2 : 23));
+                span[off + 18] = cidr;
+                off += AllowedIpSize;
+            }
+        }
+        lock (_hLock)
+        {
+            if (_handle == IntPtr.Zero) return;
+            if (!WireGuardSetConfiguration(_handle, buf, (uint)size))
+                throw new InvalidOperationException($"UpdatePeers failed (win32 {Marshal.GetLastWin32Error()}).");
+        }
+    }
+
     public void SetState(bool up)
     {
         lock (_hLock)

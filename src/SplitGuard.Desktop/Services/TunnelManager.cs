@@ -43,10 +43,29 @@ public class TunnelManager : ITunnelEngine
         public byte[]? Psk;
         public IPEndPoint? Endpoint;
         public ushort Keepalive;
-        // What we actually program into the driver: Keepalive, unless this peer is contested and
-        // would otherwise have no health signal, in which case ForcedKeepaliveSec (see reconcile).
+        // What we actually program into the driver: Keepalive, unless this peer would otherwise
+        // have no health signal, in which case ForcedKeepaliveSec (see reconcile).
         public ushort EffectiveKeepalive;
+        // Once a peer qualifies for the forced keepalive it keeps it for the life of the
+        // connection: the qualifying condition is computed from CONNECTED tunnels only, so a
+        // group dissolving (the other claimant disconnected) used to strip the survivor's
+        // keepalive — silencing the one peer that still needed a signal.
+        public bool KeepaliveLatched;
+        // Peer serves split DNS (has a DNS server and domains). Such a peer's only steady
+        // traffic is in-tunnel DNS queries; when arbitration moves its NRPT rule to a rival,
+        // that traffic stops and it could never handshake back — so it also earns the forced
+        // keepalive even without a contested CIDR.
+        public bool HasSplitDns;
         public required List<(IPAddress Ip, byte Cidr)> AllowedIps;
+        // What the driver currently holds for this peer (keepalive + owned CIDR keys), so the
+        // reconcile can patch exactly the changed facets via UpdatePeers instead of replacing
+        // every peer — a full replace zeroes handshake state and roamed endpoints adapter-wide.
+        public ushort AppliedKeepalive;
+        public HashSet<string>? AppliedAllowedCidrs;
+        // When this peer's driver state was last rebuilt by a FULL peer replace (connect, or
+        // the incremental-update fallback): the wipe zeroes last-handshake, so health grants
+        // grace from this moment instead of judging the void as staleness.
+        public DateTime LastFullReplaceAt;
         public int Metric;
         public int PingTimeoutMs;
         public int PingPeriodSec;
@@ -132,7 +151,17 @@ public class TunnelManager : ITunnelEngine
             var pub = Convert.FromBase64String(p.PublicKey);
             byte[]? psk = p.PresharedKeyProtected is null ? null
                 : Convert.FromBase64String(RuleStore.Unprotect(p.PresharedKeyProtected));
-            var endpoint = ResolveEndpoint(p.Endpoint);
+            // A NAME that won't resolve right now must not fail the connect: during an outage
+            // the catch-all DNS chain still leads with the dead in-tunnel resolver, so the
+            // user's recovery toggle kept failing until it happened to win the race. Connect
+            // without an endpoint; the background re-resolve pushes it the moment resolution
+            // works. Literal IPs still throw — that's a config error worth surfacing.
+            IPEndPoint? endpoint;
+            if (EndpointHostIsName(p.Endpoint))
+                try { endpoint = ResolveEndpoint(p.Endpoint); }
+                catch { endpoint = null; }
+            else
+                endpoint = ResolveEndpoint(p.Endpoint);
             if (endpoint is not null) endpointIps.Add(endpoint.Address);
             var allowed = new List<(IPAddress, byte)>();
             foreach (var cidr in p.AllowedIps)
@@ -161,8 +190,10 @@ public class TunnelManager : ITunnelEngine
                 ConnectedAt = now,
                 PromotedAt = now,
                 EndpointSpec = EndpointHostIsName(p.Endpoint) ? p.Endpoint.Trim() : null,
-                NextResolveDue = now.AddSeconds(90),
+                // No endpoint yet (name didn't resolve): retry immediately, not in 90s.
+                NextResolveDue = endpoint is null ? now : now.AddSeconds(90),
                 NextPingDue = now,
+                HasSplitDns = !string.IsNullOrWhiteSpace(p.Dns) && p.Domains.Count > 0,
             });
         }
 
@@ -184,6 +215,7 @@ public class TunnelManager : ITunnelEngine
             // each duplicated CIDR to the best-ranked peer; failover reassigns it live.
             RecomputeIntraOwners(tunnel);
             adapter.SetConfiguration(privateKey, config.ListenPort, BuildWgPeers(tunnel));
+            StampApplied(tunnel, now);
             foreach (var addr in config.Addresses)
             {
                 if (WireGuardConf.TryParseCidr(addr, out var ip, out var prefix))
@@ -381,18 +413,28 @@ public class TunnelManager : ITunnelEngine
         }
     }
 
-    // A peer whose handshake has gone stale and whose endpoint came from a hostname gets
-    // the name re-resolved (once a minute, one in flight): if the IP moved (DDNS), the
-    // driver's endpoint is updated IN PLACE via a single-peer update — never a full peer
-    // replace, which would reset every peer's roamed endpoint and handshake state.
+    // A peer whose handshake has gone stale gets its configured endpoint re-pushed (once a
+    // minute, one in flight): hostnames are re-resolved first (DDNS servers move — the
+    // one-shot resolve at Connect froze the old IP forever). The push happens EVEN IF the
+    // address is unchanged — the driver's endpoint roams to the last authenticated source,
+    // so after a server reboot it can be pinned to a dead NAT mapping that only a re-push
+    // clears; staleness is the gate, so a live session's legitimate roaming is never fought.
+    // Always a single-peer update IN PLACE — never a full peer replace, which would reset
+    // every peer's roamed endpoint and handshake state.
     void ScheduleEndpointReresolve(ActiveTunnel tunnel, DateTime now)
     {
         foreach (var rt in tunnel.Peers)
         {
-            if (rt.EndpointSpec is null || rt.ResolveInFlight || now < rt.NextResolveDue) continue;
-            var stale = rt.LastHandshake is { } h
-                ? now - h >= HandshakeStale
-                : now - rt.ConnectedAt >= HandshakeGrace;
+            // Literal-IP peers re-push too (EndpointSpec is null); endpoint-less peers
+            // (listen-only) have nothing to push.
+            if (rt.EndpointSpec is null && rt.Endpoint is null) continue;
+            if (rt.ResolveInFlight || now < rt.NextResolveDue) continue;
+            // No endpoint at all (connect-time resolve failed) counts as stale: the first
+            // successful resolve must land immediately, not after a grace window.
+            var stale = rt.Endpoint is null
+                || (rt.LastHandshake is { } h
+                    ? now - h >= HandshakeStale
+                    : now - rt.ConnectedAt >= HandshakeGrace);
             if (!stale) continue;
             rt.NextResolveDue = now.AddSeconds(60);
             rt.ResolveInFlight = true;
@@ -401,8 +443,8 @@ public class TunnelManager : ITunnelEngine
             {
                 try
                 {
-                    var ep = ResolveEndpoint(rt.EndpointSpec);
-                    if (ep is not null && !ep.Equals(rt.Endpoint))
+                    var ep = rt.EndpointSpec is not null ? ResolveEndpoint(rt.EndpointSpec) : rt.Endpoint;
+                    if (ep is not null)
                     {
                         rt.Endpoint = ep;
                         t.Adapter.UpdatePeerEndpoint(rt.PublicKey, ep);
@@ -454,6 +496,10 @@ public class TunnelManager : ITunnelEngine
                 // and captures our probes — outcomes would describe that adapter's path.
                 && !members.Any(m => !ReferenceEquals(m.Peer, rt)
                     && m.Peer.HasProbeRoute && m.Peer.PingHost == rt.PingHost);
+            // Streaks freeze while probes test a foreign path — stale evidence. Thaw them on
+            // re-entry so the first fresh verdict comes from probes that traversed THIS path
+            // (a frozen fail streak used to re-condemn the peer before a single new probe).
+            if (pingBased && !rt.PingMeaningful) { rt.PingFailStreak = 0; rt.PingOkStreak = 0; }
             rt.PingMeaningful = pingBased;
 
             if (pingBased)
@@ -477,10 +523,13 @@ public class TunnelManager : ITunnelEngine
             }
             else
             {
-                // Handshake freshness, with grace measured from the LATER of connect and
-                // promotion — a just-promoted peer's pre-promotion handshake age means
-                // nothing (it couldn't handshake while standby).
+                // Handshake freshness, with grace measured from the LATEST of connect,
+                // promotion, and a full driver replace — a just-promoted peer's
+                // pre-promotion handshake age means nothing (it couldn't handshake while
+                // standby), and a full replace zeroes the driver's handshake clock, so
+                // judging the void as staleness would instantly fail a healthy peer.
                 var basis = rt.PromotedAt > rt.ConnectedAt ? rt.PromotedAt : rt.ConnectedAt;
+                if (rt.LastFullReplaceAt > basis) basis = rt.LastFullReplaceAt;
                 rt.Healthy = (rt.LastHandshake is { } h && now - h < HandshakeStale)
                     || now - basis < HandshakeGrace;
             }
@@ -649,17 +698,26 @@ public class TunnelManager : ITunnelEngine
 
         var wgDirty = new HashSet<ActiveTunnel>();
 
-        // Guarantee every CONTESTED peer a health signal. WireGuard only handshakes when it has
-        // something to send, so a standby with no keepalive and no usable probe can never refresh
-        // its handshake — it looked permanently dead and the group never came back to it (the
-        // rebooted-router-never-returns bug). Force a keepalive on exactly those peers; a peer with
-        // a real signal (its own keepalive, or a probe that tests its own path) is left alone.
+        // Guarantee every peer that needs one a health signal. WireGuard only handshakes when
+        // it has something to send, so a peer with no keepalive and no usable probe can never
+        // refresh its handshake once its traffic stops — it looked permanently dead and the
+        // group never came back to it (the rebooted-router-never-returns bug). Qualifying:
+        //  - CONTESTED (in an arbitrated route group): a standby routes no traffic at all;
+        //  - SPLIT-DNS (serves domains): its only steady traffic is in-tunnel DNS queries,
+        //    which arbitration moves to a rival the moment it looks unhealthy — a latch.
+        // The latch is STICKY for the life of the connection: the qualifying sets are built
+        // from connected tunnels only, so a dissolving group used to strip the survivor's
+        // keepalive — silencing the one peer that still needed a signal. (A latched peer that
+        // later gains a probe pin keeps the keepalive alongside the ping — a few bytes/25s.)
+        // A peer with a real signal (its own keepalive, or a probe that tests its own path)
+        // is left alone: silently adding keepalives to every tunnel would change behavior
+        // users opted into.
         var contested = new HashSet<PeerRuntime>(groups.SelectMany(g => g.Value).Select(m => m.Peer));
         foreach (var (t, p) in all)
         {
-            var want = p.Keepalive == 0 && contested.Contains(p) && !p.PingMeaningful
-                ? ForcedKeepaliveSec
-                : p.Keepalive;
+            if (p.Keepalive == 0 && !p.PingMeaningful && (contested.Contains(p) || p.HasSplitDns))
+                p.KeepaliveLatched = true;
+            var want = p.KeepaliveLatched ? ForcedKeepaliveSec : p.Keepalive;
             if (p.EffectiveKeepalive == want) continue;
             p.EffectiveKeepalive = want;
             wgDirty.Add(t);
@@ -757,8 +815,50 @@ public class TunnelManager : ITunnelEngine
 
         foreach (var t in wgDirty)
         {
-            try { t.Adapter.SetConfiguration(t.PrivateKey, t.ListenPort, BuildWgPeers(t)); }
-            catch { }
+            // Patch only the peers (and facets) that changed, with UpdateOnly semantics.
+            // The old full SetConfiguration replaced every peer, which zeroed last-handshake
+            // and roamed endpoints adapter-wide — so each keepalive/ownership nudge instantly
+            // re-marked freshly recovered peers unhealthy and the group oscillated through
+            // re-arbitration instead of settling (the toggle-many-times bug).
+            var patches = new List<(PeerRuntime P, ushort? Ka,
+                IReadOnlyList<(IPAddress, byte)>? Ips, HashSet<string> Owned, bool Shrinks)>();
+            foreach (var p in t.Peers)
+            {
+                var owned = OwnedCidrs(t, p);
+                ushort? ka = p.EffectiveKeepalive != p.AppliedKeepalive ? p.EffectiveKeepalive : null;
+                var ipsChanged = p.AppliedAllowedCidrs is null || !owned.SetEquals(p.AppliedAllowedCidrs);
+                IReadOnlyList<(IPAddress, byte)>? ips = ipsChanged
+                    ? p.AllowedIps.Where(a => owned.Contains(CidrKey(a.Ip, a.Cidr))).ToList()
+                    : null;
+                if (ka is null && ips is null) continue;
+                var shrinks = ipsChanged && (p.AppliedAllowedCidrs?.Except(owned).Any() ?? false);
+                patches.Add((p, ka, ips, owned, shrinks));
+            }
+            if (patches.Count == 0) continue;
+            // Losers first: an allowed IP may live on only one peer, so the peer giving a
+            // range up must be written before the peer taking it within the one ioctl.
+            patches.Sort((a, b) => b.Shrinks.CompareTo(a.Shrinks));
+            try
+            {
+                t.Adapter.UpdatePeers(patches.Select(x => (x.P.PublicKey, x.Ka, x.Ips)).ToList());
+                foreach (var x in patches)
+                {
+                    if (x.Ka is { } k) x.P.AppliedKeepalive = k;
+                    if (x.Ips is not null) x.P.AppliedAllowedCidrs = x.Owned;
+                }
+            }
+            catch
+            {
+                // Patch refused (driver quirk / teardown race): fall back to the full
+                // replace, stamping the wipe so health grants grace instead of judging
+                // the zeroed handshakes as staleness.
+                try
+                {
+                    t.Adapter.SetConfiguration(t.PrivateKey, t.ListenPort, BuildWgPeers(t));
+                    StampApplied(t, now);
+                }
+                catch { }
+            }
         }
     }
 
@@ -841,6 +941,26 @@ public class TunnelManager : ITunnelEngine
                 .Where(a => !tunnel.IntraOwner.TryGetValue(CidrKey(a.Ip, a.Cidr), out var owner) || owner == p.Key)
                 .ToList(),
             p.EffectiveKeepalive)).ToList();
+
+    // The CIDR keys this peer actually owns in the driver config (after intra-tunnel
+    // ownership filtering) — the same projection BuildWgPeers applies, as a diffable set.
+    static HashSet<string> OwnedCidrs(ActiveTunnel tunnel, PeerRuntime p) =>
+        p.AllowedIps
+            .Select(a => CidrKey(a.Ip, a.Cidr))
+            .Where(key => !tunnel.IntraOwner.TryGetValue(key, out var owner) || owner == p.Key)
+            .ToHashSet();
+
+    // Record what a FULL peer replace just programmed, and when it wiped the driver's
+    // handshake state (EvaluateHealth grants grace from that moment).
+    static void StampApplied(ActiveTunnel tunnel, DateTime now)
+    {
+        foreach (var p in tunnel.Peers)
+        {
+            p.AppliedKeepalive = p.EffectiveKeepalive;
+            p.AppliedAllowedCidrs = OwnedCidrs(tunnel, p);
+            p.LastFullReplaceAt = now;
+        }
+    }
 
     static IPEndPoint? ResolveEndpoint(string endpoint)
     {
